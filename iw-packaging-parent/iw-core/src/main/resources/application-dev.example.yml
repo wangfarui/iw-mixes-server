@@ -1,0 +1,35 @@
+iw:
+  db:
+    driver-class: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/iw_mixes?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: change-me
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+    username:
+    password:
+  feign:
+    secret: dev-secret
+  auth:
+    application-account:
+      aes-key: 0123456789abcdef0123456789abcdef
+  remote:
+    external:
+      base-url: http://127.0.0.1:18006
+
+aliyun:
+  sms:
+    sign-name:
+    template-code:
+  email:
+    account-name:
+    from-alias: Wray
+  oss:
+    access-key-id:
+    access-key-secret:
+    base-url:
+    endpoint:
+    bucket-name:
+    upload-parent-dir:

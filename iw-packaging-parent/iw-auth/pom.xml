@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>iw-packaging-parent</artifactId>
+        <groupId>com.itwray.mixes</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>iw-auth</artifactId>
+    <description>IW Project Auth Module</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-auth-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-external-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-rocketmq-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>application*.yml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+    </build>
+
+</project>

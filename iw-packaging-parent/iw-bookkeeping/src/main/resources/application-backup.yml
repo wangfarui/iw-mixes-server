@@ -1,0 +1,30 @@
+# iw配置
+iw:
+  db:
+    driver-class: ${IW_DB_DRIVER_CLASS:}
+    url: ${IW_DB_URL:}
+    username: ${IW_DB_USERNAME:}
+    password: ${IW_DB_PASSWORD:}
+  dao:
+    dataPermission:
+      enabled: true
+      enable-table-names:
+        - bookkeeping_records
+
+# 服务器配置
+server:
+  servlet:
+    context-path: /bookkeeping-service
+  port: 18004
+
+# spring 配置
+spring:
+  application:
+    name: iw-bookkeeping-service
+
+# springdoc 配置
+springdoc:
+  swagger-ui:
+    path: /doc.html
+  packages-to-scan:
+    - com.itwray.iw.bookkeeping.controller

@@ -1,0 +1,129 @@
+name: Deploy iw-mixes-server
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Service to deploy
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - core
+          - external
+  push:
+    tags:
+      - "server-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build release jars
+        run: mvn -pl iw-packaging-parent/iw-core,iw-packaging-parent/iw-external -am -DskipTests package
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p artifacts
+          cp iw-packaging-parent/iw-core/target/iw-core-*.jar artifacts/iw-core.jar
+          cp iw-packaging-parent/iw-external/target/iw-external-*.jar artifacts/iw-external.jar
+          ls -lh artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iw-mixes-server-jars
+          path: artifacts/*.jar
+          if-no-files-found: error
+
+  deploy-external:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'external' }}
+    steps:
+      - name: Checkout deploy scripts
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: iw-mixes-server-jars
+          path: artifacts
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.IW_DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/iw_deploy_key
+          chmod 600 ~/.ssh/iw_deploy_key
+
+      - name: Deploy iw-external to public server
+        env:
+          PUBLIC_HOST: ${{ secrets.IW_PUBLIC_HOST }}
+          PUBLIC_USER: ${{ secrets.IW_PUBLIC_USER }}
+          PUBLIC_PORT: ${{ secrets.IW_PUBLIC_PORT }}
+        run: |
+          set -euo pipefail
+          PUBLIC_PORT="${PUBLIC_PORT:-22}"
+          PUBLIC_TARGET="${PUBLIC_USER}@${PUBLIC_HOST}"
+          SSH_OPTS=(-i ~/.ssh/iw_deploy_key -p "$PUBLIC_PORT" -o StrictHostKeyChecking=accept-new)
+          SCP_OPTS=(-i ~/.ssh/iw_deploy_key -P "$PUBLIC_PORT" -o StrictHostKeyChecking=accept-new)
+          ssh "${SSH_OPTS[@]}" "$PUBLIC_TARGET" "mkdir -p /tmp/iw-mixes-server"
+          scp "${SCP_OPTS[@]}" artifacts/iw-external.jar deploy/scripts/deploy-jar.sh "$PUBLIC_TARGET:/tmp/iw-mixes-server/"
+          ssh "${SSH_OPTS[@]}" "$PUBLIC_TARGET" "sudo env GITHUB_SHA='${GITHUB_SHA}' bash /tmp/iw-mixes-server/deploy-jar.sh iw-external /tmp/iw-mixes-server/iw-external.jar"
+
+  deploy-core:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'core' }}
+    steps:
+      - name: Checkout deploy scripts
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: iw-mixes-server-jars
+          path: artifacts
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.IW_DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/iw_deploy_key
+          chmod 600 ~/.ssh/iw_deploy_key
+
+      - name: Deploy iw-core through public server
+        env:
+          PUBLIC_HOST: ${{ secrets.IW_PUBLIC_HOST }}
+          PUBLIC_USER: ${{ secrets.IW_PUBLIC_USER }}
+          PUBLIC_PORT: ${{ secrets.IW_PUBLIC_PORT }}
+          CORE_HOST: ${{ secrets.IW_CORE_HOST }}
+          CORE_USER: ${{ secrets.IW_CORE_USER }}
+          CORE_PORT: ${{ secrets.IW_CORE_PORT }}
+        run: |
+          set -euo pipefail
+          PUBLIC_PORT="${PUBLIC_PORT:-22}"
+          CORE_PORT="${CORE_PORT:-22}"
+          BASTION="${PUBLIC_USER}@${PUBLIC_HOST}:${PUBLIC_PORT}"
+          CORE_TARGET="${CORE_USER}@${CORE_HOST}"
+          SSH_OPTS=(-i ~/.ssh/iw_deploy_key -o StrictHostKeyChecking=accept-new)
+          ssh "${SSH_OPTS[@]}" -J "$BASTION" -p "$CORE_PORT" "$CORE_TARGET" "mkdir -p /tmp/iw-mixes-server"
+          scp "${SSH_OPTS[@]}" -o ProxyJump="$BASTION" -P "$CORE_PORT" artifacts/iw-core.jar deploy/scripts/deploy-jar.sh "$CORE_TARGET:/tmp/iw-mixes-server/"
+          ssh "${SSH_OPTS[@]}" -J "$BASTION" -p "$CORE_PORT" "$CORE_TARGET" "sudo env GITHUB_SHA='${GITHUB_SHA}' bash /tmp/iw-mixes-server/deploy-jar.sh iw-core /tmp/iw-mixes-server/iw-core.jar"

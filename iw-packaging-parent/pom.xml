@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>iw-parent</artifactId>
+        <groupId>com.itwray.mixes</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>iw-packaging-parent</artifactId>
+    <description>IW Mixes Project Packaging Parent</description>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>iw-core</module>
+        <module>iw-auth</module>
+        <module>iw-eat</module>
+        <module>iw-bookkeeping</module>
+        <module>iw-points</module>
+        <module>iw-external</module>
+    </modules>
+
+    <properties>
+        <iw.mainClass>com.itwray.iw.xx.Application</iw.mainClass>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.itwray.mixes</groupId>
+                <artifactId>iw-points-client</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itwray.mixes</groupId>
+                <artifactId>iw-eat-client</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itwray.mixes</groupId>
+                <artifactId>iw-bookkeeping-client</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itwray.mixes</groupId>
+                <artifactId>iw-auth-client</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itwray.mixes</groupId>
+                <artifactId>iw-external-client</artifactId>
+                <version>${revision}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

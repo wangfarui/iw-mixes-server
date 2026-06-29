@@ -1,0 +1,149 @@
+create table base_dict
+(
+    id          int unsigned auto_increment                 not null comment 'id',
+    parent_id   int unsigned      default 0                 not null comment '父字典id',
+    dict_type   smallint unsigned                           not null comment '字典类型(枚举)',
+    dict_code   smallint unsigned default 0                 not null comment '字典code',
+    dict_name   varchar(32)                                 not null comment '字典名称',
+    dict_status tinyint           default 1                 not null comment '字典状态(0禁用 1启用)',
+    sort        smallint unsigned default 1                 not null comment '排序',
+    deleted     tinyint(1)        default 0                 not null comment '是否删除(true表示已删除, 默认false表示未删除)',
+    create_time datetime          default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time datetime          default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id     int unsigned      default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_dict_type (dict_type)
+) comment '字典表';
+
+# 字典表的用户id应该是非空且有实际用户id的，当 user_id == 0 时，表示该字典值为模板字典
+alter table base_dict
+    modify column user_id int unsigned not null comment '用户id';
+
+create table base_dict_business_relation
+(
+    id            int unsigned auto_increment not null comment '主键id',
+    business_type smallint unsigned           not null comment '业务类型(枚举code)',
+    business_id   int unsigned                not null comment '业务id',
+    dict_id       int unsigned                not null comment '字典id',
+    primary key (id),
+    key idx_business_column (business_type, business_id)
+) comment '字典业务关联表';
+
+## 初始字典模板数据
+insert into base_dict (dict_type, dict_code, dict_name, sort, user_id)
+values (3002, 0, '任意时间', 1, 0),
+       (3002, 1, '早餐', 2, 0),
+       (3002, 2, '午餐', 3, 0),
+       (3002, 3, '晚餐', 4, 0),
+       (3003, 1, '荤菜', 1, 0),
+       (3003, 2, '素菜', 2, 0),
+       (3003, 3, '荤素搭配', 3, 0),
+       (3004, 1, '正常', 1, 0),
+       (3004, 2, '禁用', 2, 0),
+       (3004, 3, '售空', 3, 0),
+       (4002, 1, '餐饮美食', 1, 0),
+       (4002, 2, '日用百货', 2, 0),
+       (4002, 3, '交通出行', 3, 0),
+       (4002, 4, '充值缴费', 4, 0),
+       (4002, 5, '生活服务', 5, 0),
+       (4002, 6, '其他', 6, 0),
+       (4003, 1, '支出', 1, 0),
+       (4003, 2, '收入', 2, 0)
+;
+insert into base_dict (dict_type, dict_name, sort, user_id)
+values (4001, '买菜', 1, 0),
+       (4001, '外卖', 2, 0),
+       (4001, '朴朴', 3, 0),
+       (4001, '聚餐', 4, 0),
+       (4001, '固定支出', 5, 0),
+       (4001, '旅游', 6, 0)
+;
+insert into base_dict (dict_type, dict_name, sort, user_id)
+values (4011, '工资', 1, 0),
+       (4011, '返现', 2, 0),
+       (4011, '退款', 3, 0),
+       (4011, '奖金', 4, 0)
+;
+
+## 字典 - 应用账号 - 应用分类数据初始化
+insert into base_dict (dict_type, dict_code, dict_name, sort, user_id)
+values (2010, 0, '未分类', 1, 0);
+
+## 字典 - 记账会员类型数据初始化
+insert into base_dict (dict_type, dict_code, dict_name, sort, user_id)
+values (4004, 1, '音乐', 1, 0),
+       (4004, 2, '视频', 2, 0),
+       (4004, 3, '购物', 3, 0),
+       (4004, 4, '工具', 4, 0),
+       (4004, 5, '生活', 5, 0),
+       (4004, 6, '教育', 6, 0),
+       (4004, 7, '云服务', 7, 0),
+       (4004, 8, 'AI', 8, 0),
+       (4004, 9, '其他', 9, 0)
+;
+insert into base_dict (dict_type, dict_code, dict_name, sort, user_id)
+values (4005, 1, '按月', 1, 0),
+       (4005, 2, '按年', 2, 0),
+       (4005, 3, '按周', 3, 0),
+       (4005, 4, '按天', 4, 0),
+       (4005, 5, '一次性', 5, 0),
+       (4005, 6, '自定义', 6, 0),
+       (4006, 1, '天', 1, 0),
+       (4006, 2, '周', 2, 0),
+       (4006, 3, '月', 3, 0),
+       (4006, 4, '年', 4, 0)
+;
+
+## 初始所有用户的字典数据
+## 注意!!! 该脚本需要在 iw-auth-init.sql 之后执行
+insert into base_dict(parent_id, dict_type, dict_code, dict_name, dict_status, sort, user_id)
+select bd.parent_id, bd.dict_type, bd.dict_code, bd.dict_name, bd.dict_status, bd.sort, au.id
+from auth_user au
+join base_dict bd on bd.user_id = 0
+;
+
+##  MQ消息消费记录表
+create table base_mq_consume_records
+(
+    id           bigint unsigned auto_increment comment '消息消费记录id',
+    service_name varchar(32)                           not null comment '服务名称',
+    message_id   varchar(64)                           not null comment '消息id',
+    version      varchar(16)                           not null comment '消息版本',
+    topic        varchar(64)                           not null comment '消息topic',
+    tag          varchar(64) default ''                not null comment '消息tag',
+    body         text                                  not null comment '消息体',
+    status       tinyint                               not null comment '消费状态(0待消费, 1消费成功, 2消费失败)',
+    create_time  datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    user_id      int unsigned                          null comment '用户id',
+    primary key (id),
+    key idx_message_id (message_id)
+) comment 'MQ消息消费记录表';
+
+##  MQ消息生产记录表
+create table base_mq_produce_records
+(
+    id           bigint unsigned auto_increment comment '消息生产记录id',
+    service_name varchar(32)                           not null comment '服务名称',
+    message_id   varchar(64)                           not null comment '消息id',
+    version      varchar(16)                           not null comment '消息版本',
+    topic        varchar(64)                           not null comment '消息topic',
+    tag          varchar(64) default ''                not null comment '消息tag',
+    body         text                                  not null comment '消息体',
+    create_time  datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    user_id      int unsigned                          null comment '用户id',
+    primary key (id)
+) comment 'MQ消息生产记录表';
+
+create table base_business_file (
+    id int unsigned auto_increment not null comment 'id',
+    business_type smallint not null comment '业务类型',
+    business_id int unsigned not null comment '业务id',
+    file_name varchar(128) not null comment '文件名称(带后缀)',
+    file_url varchar(255) not null comment '文件路径',
+    deleted tinyint(1) default 0 not null comment '是否删除(true表示已删除, 默认false表示未删除)',
+    create_time datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time datetime default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id int unsigned default 0 not null comment '用户id',
+    primary key (id),
+    key idx_user_id (user_id)
+) comment '业务文件关联表';

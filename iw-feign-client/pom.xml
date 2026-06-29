@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>iw-parent</artifactId>
+        <groupId>com.itwray.mixes</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>iw-feign-client</artifactId>
+    <description>IW项目FeignClient模块</description>
+
+    <modules>
+        <module>iw-points-client</module>
+        <module>iw-bookkeeping-client</module>
+        <module>iw-eat-client</module>
+        <module>iw-auth-client</module>
+        <module>iw-external-client</module>
+    </modules>
+
+    <packaging>pom</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>

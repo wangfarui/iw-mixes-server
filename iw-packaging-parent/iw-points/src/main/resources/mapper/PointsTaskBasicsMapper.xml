@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.itwray.iw.points.mapper.PointsTaskBasicsMapper">
+
+    <select id="queryTaskNum" resultType="com.itwray.iw.points.model.bo.QueryTaskNumBo">
+        select task_group_id, count(*) as taskNum
+        from points_task_basics
+        where deleted = 0 and task_group_id in
+        <foreach collection="groupIds" item="item" open="(" close=")" separator=",">#{item}</foreach>
+        <if test="taskStatus != null">
+            and task_status = #{taskStatus}
+        </if>
+        group by task_group_id
+    </select>
+
+    <select id="queryExpiredTask" resultType="com.itwray.iw.points.model.bo.ExpiredTaskBo">
+        select ptb.id taskId, ptb.task_name, ptb.user_id, ptr.id relationId, ptr.punish_points
+        from points_task_basics ptb
+        inner join points_task_relation ptr on ptr.task_id = ptb.id and ptr.punish_status = #{punishStatus}
+        where ptb.deleted = 0 and task_status = #{taskStatus} and deadline_date <![CDATA[<]]> #{deadlineDate}
+        limit #{pageStart}, #{pageSize}
+    </select>
+    <select id="queryList" resultType="com.itwray.iw.points.model.entity.PointsTaskBasicsEntity">
+        select *
+        from points_task_basics
+        where deleted = 0 and task_status = 0
+        <if test="taskGroupId != null">
+            and task_group_id = #{taskGroupId}
+        </if>
+        <if test="parentId != null">
+            and parent_id = #{parentId}
+        </if>
+        <if test="startDeadlineDate != null">
+            and deadline_date <![CDATA[>=]]> #{startDeadlineDate}
+        </if>
+        <if test="endDeadlineDate != null">
+            and deadline_date <![CDATA[<=]]> #{endDeadlineDate}
+        </if>
+        <if test="statisticsDeadline != null and statisticsDeadline == true">
+            and deadline_date is not null
+        </if>
+        order by is_top desc,
+        <if test="sortDeadline != null and sortDeadline == true">
+            deadline_date is null, deadline_date asc,
+        </if>
+        sort desc, id desc
+    </select>
+</mapper>

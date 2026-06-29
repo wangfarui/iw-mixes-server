@@ -1,0 +1,40 @@
+# iw配置
+iw:
+  redis:
+    host: ${IW_REDIS_HOST:127.0.0.1}
+    port: ${IW_REDIS_PORT:6379}
+    database: ${IW_REDIS_DATABASE:0}
+    username: ${IW_REDIS_USERNAME:}
+    password: ${IW_REDIS_PASSWORD:}
+  db:
+    driver-class: ${IW_DB_DRIVER_CLASS:}
+    url: ${IW_DB_URL:}
+    username: ${IW_DB_USERNAME:}
+    password: ${IW_DB_PASSWORD:}
+  feign:
+    secret: ${IW_INTERNAL_SECRET:dev-secret}
+  dao:
+    dataPermission:
+      enabled: true
+      enable-table-names:
+        - base_application_account
+        - base_website_navigation
+        - base_ai_task
+
+# 服务器配置
+server:
+  port: 18001
+
+# spring 配置
+spring:
+  application:
+    name: iw-auth-service
+  profiles:
+    default: dev
+
+# springdoc 配置
+springdoc:
+  swagger-ui:
+    path: /doc.html
+  packages-to-scan:
+    - com.itwray.iw.auth.controller

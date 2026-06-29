@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.itwray.iw.bookkeeping.mapper.BookkeepingRecordsMapper">
+
+    <select id="page" resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingRecordPageVo">
+        SELECT br.*
+        <include refid="fromForPageList" />
+        <include refid="whereForPageList" />
+        GROUP BY br.id
+        <choose>
+            <when test="dto.sortType == null">
+                ORDER BY br.id <choose><when test="dto.sortWay != null and dto.sortWay == 1">ASC</when><otherwise>DESC</otherwise></choose>
+            </when>
+            <otherwise>
+                ORDER BY br.${dto.sortType.name} <choose><when test="dto.sortWay != null and dto.sortWay == 1">ASC</when><otherwise>DESC</otherwise></choose>
+            </otherwise>
+        </choose>
+    </select>
+    <select id="statistics" resultType="com.itwray.iw.bookkeeping.model.bo.RecordsStatisticsBo">
+        SELECT t.record_category AS recordCategory, SUM(t.amount) AS totalAmount
+        FROM (
+            SELECT br.*
+            <include refid="fromForPageList" />
+            <include refid="whereForPageList" />
+            GROUP BY br.id
+        ) t
+        GROUP BY t.record_category
+    </select>
+    <sql id="fromForPageList">
+        FROM bookkeeping_records br
+        <if test="dto.tagBusinessType != null and dto.tagIdList != null and dto.tagIdList.size > 0">
+            INNER JOIN base_dict_business_relation bdbr on bdbr.business_type = #{dto.tagBusinessType} and br.id = bdbr.business_id
+        </if>
+    </sql>
+    <sql id="whereForPageList">
+        WHERE br.deleted = 0
+        <if test="dto.recordStartDate != null and dto.recordEndDate != null">
+            AND br.record_date BETWEEN #{dto.recordStartDate} AND #{dto.recordEndDate}
+        </if>
+        <if test="dto.recordSource != null and dto.recordSource != ''">
+            AND br.record_source like concat('%', #{dto.recordSource}, '%')
+        </if>
+        <if test="dto.recordType != null">
+            AND br.record_type = #{dto.recordType}
+        </if>
+        <if test="dto.recordCategory != null">
+            AND br.record_category = #{dto.recordCategory}
+        </if>
+        <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
+            AND br.is_statistics = 1
+        </if>
+        <if test="dto.mixAmount != null">
+            AND br.amount <![CDATA[>=]]>  #{dto.mixAmount}
+        </if>
+        <if test="dto.maxAmount != null">
+            AND br.amount <![CDATA[<=]]>  #{dto.maxAmount}
+        </if>
+        <if test="dto.tagBusinessType != null and dto.tagIdList != null and dto.tagIdList.size > 0">
+            AND bdbr.dict_id in <foreach collection="dto.tagIdList" item="tagId" open="(" close=")" separator=",">#{tagId}</foreach>
+        </if>
+    </sql>
+    <select id="totalStatistics"
+            resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingStatisticsTotalVo">
+        SELECT IFNULL(SUM(amount), 0) AS totalAmount, count(*) AS totalRecordNum
+        FROM bookkeeping_records
+        WHERE deleted = 0
+        AND record_date BETWEEN #{dto.currentStartMonth} AND #{dto.currentEndMonth}
+        <if test="dto.recordCategory != null">
+            AND record_category = #{dto.recordCategory}
+        </if>
+        <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
+            AND is_statistics = 1
+        </if>
+    </select>
+    <select id="rankStatistics" resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingStatisticsRankVo">
+        select id, user_id, record_type, record_source, record_date, record_time, amount
+        from bookkeeping_records
+        WHERE deleted = 0 and record_category = #{dto.recordCategory}
+        AND record_date BETWEEN #{dto.currentStartMonth} AND #{dto.currentEndMonth}
+        <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
+            AND is_statistics = 1
+        </if>
+        order by amount desc
+        limit ${dto.limit}
+    </select>
+    <select id="barChartStatistics"
+            resultType="com.itwray.iw.bookkeeping.model.bo.BookkeepingBarChartStatisticsBo">
+        select
+        <choose>
+            <when test="dto.statisticsType.code == 1">record_date as recordDate</when>
+            <when test="dto.statisticsType.code == 2">DATE_FORMAT(record_date, '%Y-%m') as recordDate</when>
+        </choose>
+        ,IFNULL(sum(amount), 0) as amount
+        from bookkeeping_records
+        where deleted = 0 and record_category = #{dto.recordCategory}
+        AND record_date BETWEEN #{dto.currentStartMonth} AND #{dto.currentEndMonth}
+        <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
+            AND is_statistics = 1
+        </if>
+        <choose>
+            <when test="dto.statisticsType.code == 1">group by record_date</when>
+            <when test="dto.statisticsType.code == 2">group by DATE_FORMAT(record_date, '%Y-%m')</when>
+        </choose>
+    </select>
+    <select id="categoryStatistics"
+            resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingConsumeStatisticsCategoryVo">
+        SELECT record_type, IFNULL(sum(amount), 0) AS amount, count(*) AS recordNum
+        FROM bookkeeping_records
+        WHERE deleted = 0
+        AND record_category = #{dto.recordCategory}
+        AND record_date BETWEEN #{dto.currentStartMonth} AND #{dto.currentEndMonth}
+        <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
+            AND is_statistics = 1
+        </if>
+        <if test="dto.recordTypeList != null and dto.recordTypeList.size > 0">
+            AND record_type in <foreach collection="dto.recordTypeList" separator="," open="(" close=")" item="item">#{item}</foreach>
+        </if>
+        GROUP BY record_type
+        ORDER BY amount desc
+    </select>
+</mapper>

@@ -1,0 +1,97 @@
+package com.itwray.iw.bookkeeping.model.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.itwray.iw.auth.model.enums.ShareStateEnum;
+import com.itwray.iw.bookkeeping.model.enums.RecordCategoryEnum;
+import com.itwray.iw.web.model.entity.UserEntity;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+/**
+ * 记账-记录表
+ *
+ * @author wray
+ * @since 2024/8/28
+ */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@TableName("bookkeeping_records")
+public class BookkeepingRecordsEntity extends UserEntity<Integer> {
+
+    /**
+     * id
+     */
+    @TableId(value = "id", type = IdType.AUTO)
+    private Integer id;
+
+    /**
+     * 订单号
+     */
+    private String orderNo;
+
+    /**
+     * 记录日期
+     */
+    private LocalDate recordDate;
+
+    /**
+     * 记录时间
+     */
+    private LocalDateTime recordTime;
+
+    /**
+     * 记录类型
+     */
+    private RecordCategoryEnum recordCategory;
+
+    /**
+     * 记录来源
+     */
+    private String recordSource;
+
+    /**
+     * 记录图标
+     */
+    private String recordIcon;
+
+    /**
+     * 金额
+     */
+    private BigDecimal amount;
+
+    /**
+     * 记录分类
+     */
+    private Integer recordType;
+
+    /**
+     * 备注
+     */
+    private String remark;
+
+    /**
+     * 是否为激励记录
+     */
+    private Integer isExcitationRecord;
+
+    /**
+     * 是否计入统计
+     */
+    private Integer isStatistics;
+
+    /**
+     * 家庭组ID (0-个人模式)
+     */
+    private Integer groupId;
+
+    /**
+     * 共享状态 (0-不共享, 1-共享中, 2-已离组)
+     */
+    private ShareStateEnum shareState;
+}

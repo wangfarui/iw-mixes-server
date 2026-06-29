@@ -1,0 +1,52 @@
+iw:
+  db:
+    driver-class: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/iw_mixes?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: change-me
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+    username:
+    password:
+  feign:
+    secret: dev-secret
+  remote:
+    auth:
+      base-url: http://127.0.0.1:18000
+    external:
+      base-url: http://127.0.0.1:18006
+  ai:
+    api-key:
+  external:
+    amap:
+      key:
+    exchangeRate:
+      key:
+    uptimerobot:
+      key:
+
+blog:
+  access:
+    token-secret: dev-blog-token-secret
+    scope:
+      life:
+        password-hash:
+        key:
+
+aliyun:
+  sms:
+    access-key-id:
+    access-key-secret:
+    endpoint: dysmsapi.aliyuncs.com
+  email:
+    access-key-id:
+    access-key-secret:
+    account-name:
+    from-alias: Wray
+  asr:
+    access-key-id:
+    access-key-secret:
+    app-key:
+    ffmpeg-command: ffmpeg

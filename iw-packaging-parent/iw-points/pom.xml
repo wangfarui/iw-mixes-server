@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>iw-packaging-parent</artifactId>
+        <groupId>com.itwray.mixes</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>iw-points</artifactId>
+    <description>积分项目-设置积分奖惩制度</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-rocketmq-starter</artifactId>
+        </dependency>
+
+        <!-- iw-feign-client -->
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-points-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-auth-client</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>application*.yml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+    </build>
+
+</project>

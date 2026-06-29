@@ -1,0 +1,84 @@
+package com.itwray.iw.web.core.feign;
+
+import com.itwray.iw.common.constants.RequestHeaderConstants;
+import com.itwray.iw.common.utils.SignatureUtil;
+import com.itwray.iw.web.core.webmvc.GeneralResponseWrapperAdvice;
+import com.itwray.iw.web.utils.UserUtils;
+import feign.RequestInterceptor;
+import feign.codec.Decoder;
+import feign.optionals.OptionalDecoder;
+import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.cloud.openfeign.FeignClientsConfiguration;
+import org.springframework.cloud.openfeign.support.HttpMessageConverterCustomizer;
+import org.springframework.cloud.openfeign.support.SpringDecoder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Feign配置类
+ * <p>
+ * 要求所有Feign接口返回对象都要经过 {@link GeneralResponseWrapperAdvice}
+ * </p>
+ *
+ * @author wray
+ * @see FeignClientsConfiguration
+ * @since 2024/9/29
+ */
+@Configuration
+@EnableFeignClients(basePackages = "com.itwray.iw.*.client")
+public class FeignConfiguration {
+
+    @Value("${iw.feign.secret:}")
+    private String feignSecret;
+
+    private final ObjectFactory<HttpMessageConverters> messageConverters;
+
+    public FeignConfiguration(ObjectFactory<HttpMessageConverters> messageConverters) {
+        this.messageConverters = messageConverters;
+    }
+
+    /**
+     * Feign响应对象解码器
+     *
+     * @param customizers HTTP消息转换器自定义器
+     * @return 默认解码器
+     * @see FeignClientsConfiguration#feignDecoder(ObjectProvider)
+     */
+    @Bean
+    public Decoder feignDecoder(ObjectProvider<HttpMessageConverterCustomizer> customizers) {
+        return new GeneralResponseDecoder(new OptionalDecoder(new SpringDecoder(messageConverters, customizers)));
+    }
+
+    /**
+     * Feign请求拦截器
+     * <p>在请求头中插入Token</p>
+     *
+     * @return RequestInterceptor
+     */
+    @Bean
+    public RequestInterceptor requestInterceptor() {
+        return requestTemplate -> {
+            String timestamp = String.valueOf(System.currentTimeMillis());
+
+            String path = requestTemplate.path();
+            String appKey = path.split("/")[0];
+
+            String signature = SignatureUtil.generateSignature(appKey, timestamp, path, this.feignSecret);
+
+            requestTemplate.header("X-App-Key", appKey);
+            requestTemplate.header("X-Timestamp", timestamp);
+            requestTemplate.header("X-Signature", signature);
+
+            // 从当前请求上下文获取token
+            String token = UserUtils.getToken(false);
+            if (token != null) {
+                // 将 token 添加到请求头中
+                requestTemplate.header(RequestHeaderConstants.TOKEN_HEADER, token);
+            }
+        };
+    }
+}

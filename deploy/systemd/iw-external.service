@@ -1,0 +1,18 @@
+[Unit]
+Description=IW External Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/iw-mixes-server/iw-external
+EnvironmentFile=-/etc/iw-mixes/iw-external.env
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/iw-mixes-server/iw-external/iw-external.jar --spring.profiles.active=prod
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

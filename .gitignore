@@ -1,0 +1,71 @@
+# maven ignore
+target/
+*.jar
+!.mvn/wrapper/*
+*.war
+*.zip
+*.tar
+*.tar.gz
+pom.xml.versionsBackup
+
+# eclipse ignore
+.settings/
+.project
+.classpath
+
+# idea ignore
+.idea/
+.idea
+*.ipr
+*.iml
+*.iws
+
+# temp ignore
+*.log
+*.cache
+*.diff
+*.patch
+*.tmp
+
+# local secret/config files
+.env
+*.env
+!*.env.example
+application-local.yml
+application-dev.yml
+application-prod.yml
+application-*.local.yml
+
+# system ignore
+.DS_Store
+Thumbs.db
+*.orig
+
+# flatten ignore
+.flattened-pom.xml
+
+# license check result
+license-list
+
+# grpc compiler
+compiler/gradle.properties
+compiler/build/*
+compiler/.gradle/*
+
+# Data
+db/
+activemq-data/
+.data/
+# Tomcat
+.extract
+.java-version
+
+# javac编译生成目录
+out/
+*.class
+
+# Log日志目录
+logs/
+
+# Arthas
+arthas-output/

@@ -1,0 +1,118 @@
+# iw配置
+iw:
+  redis:
+    host: ${IW_REDIS_HOST:127.0.0.1}
+    port: ${IW_REDIS_PORT:6379}
+    database: ${IW_REDIS_DATABASE:0}
+    username: ${IW_REDIS_USERNAME:}
+    password: ${IW_REDIS_PASSWORD:}
+  db:
+    driver-class: ${IW_DB_DRIVER_CLASS:}
+    url: ${IW_DB_URL:}
+    username: ${IW_DB_USERNAME:}
+    password: ${IW_DB_PASSWORD:}
+  feign:
+    secret: ${IW_INTERNAL_SECRET:dev-secret}
+  web:
+    env: ${IW_WEB_ENV:dev}
+    api:
+      prefix: ${IW_WEB_API_PREFIX:/}
+  ai:
+    api-url: ${IW_AI_API_URL:https://api.deepseek.com/chat/completions}
+    api-key: ${IW_AI_API_KEY:}
+  remote:
+    auth:
+      base-url: ${IW_CORE_BASE_URL:http://127.0.0.1:18080}
+    external:
+      base-url: http://127.0.0.1:${server.port}
+  dao:
+    dataPermission:
+      enabled: false
+  external:
+    dailyhot:
+      timeout-ms: ${IW_EXTERNAL_DAILYHOT_TIMEOUT_MS:3000}
+      cache-seconds: ${IW_EXTERNAL_DAILYHOT_CACHE_SECONDS:1800}
+  ding-talk:
+    enabled: ${IW_DING_TALK_ENABLED:false}
+    access-token: ${IW_DING_TALK_ACCESS_TOKEN:}
+    secret: ${IW_DING_TALK_SECRET:}
+
+# 服务器配置
+server:
+  port: ${IW_EXTERNAL_PORT:18006}
+
+# spring 配置
+spring:
+  application:
+    name: iw-external-service
+  profiles:
+    default: dev
+
+# 静态博客受保护文章访问配置
+blog:
+  access:
+    allowed-origins: ${BLOG_ACCESS_ALLOWED_ORIGINS:https://blog.itwray.com,http://localhost:4000}
+    token-secret: ${BLOG_ACCESS_TOKEN_SECRET:}
+    default-expires-in: ${BLOG_ACCESS_DEFAULT_EXPIRES_IN:86400}
+    scope:
+      life:
+        password-hash: ${BLOG_ACCESS_SCOPE_LIFE_PASSWORD_HASH:}
+        key: ${BLOG_ACCESS_SCOPE_LIFE_KEY:}
+      work:
+        password-hash: ${BLOG_ACCESS_SCOPE_WORK_PASSWORD_HASH:}
+        key: ${BLOG_ACCESS_SCOPE_WORK_KEY:}
+      private:
+        password-hash: ${BLOG_ACCESS_SCOPE_PRIVATE_PASSWORD_HASH:}
+        key: ${BLOG_ACCESS_SCOPE_PRIVATE_KEY:}
+
+aliyun:
+  sms:
+    access-key-id: ${ALIYUN_SMS_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_SMS_ACCESS_KEY_SECRET:}
+    endpoint: ${ALIYUN_SMS_ENDPOINT:dysmsapi.aliyuncs.com}
+  email:
+    access-key-id: ${ALIYUN_EMAIL_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_EMAIL_ACCESS_KEY_SECRET:}
+    account-name: ${ALIYUN_EMAIL_ACCOUNT_NAME:}
+    from-alias: ${ALIYUN_EMAIL_FROM_ALIAS:Wray}
+  asr:
+    access-key-id: ${ALIYUN_ASR_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_ASR_ACCESS_KEY_SECRET:}
+    app-key: ${ALIYUN_ASR_APP_KEY:}
+    gateway-url: ${ALIYUN_ASR_GATEWAY_URL:https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/asr}
+    region-id: ${ALIYUN_ASR_REGION_ID:cn-shanghai}
+    token-domain: ${ALIYUN_ASR_TOKEN_DOMAIN:nls-meta.cn-shanghai.aliyuncs.com}
+    token-version: ${ALIYUN_ASR_TOKEN_VERSION:2019-02-28}
+    token-action: ${ALIYUN_ASR_TOKEN_ACTION:CreateToken}
+    default-format: ${ALIYUN_ASR_DEFAULT_FORMAT:mp3}
+    default-sample-rate: ${ALIYUN_ASR_DEFAULT_SAMPLE_RATE:16000}
+    enable-punctuation-prediction: ${ALIYUN_ASR_ENABLE_PUNCTUATION_PREDICTION:true}
+    enable-inverse-text-normalization: ${ALIYUN_ASR_ENABLE_INVERSE_TEXT_NORMALIZATION:true}
+    enable-voice-detection: ${ALIYUN_ASR_ENABLE_VOICE_DETECTION:false}
+    disfluency: ${ALIYUN_ASR_DISFLUENCY:false}
+    connect-timeout-millis: ${ALIYUN_ASR_CONNECT_TIMEOUT_MILLIS:5000}
+    read-timeout-millis: ${ALIYUN_ASR_READ_TIMEOUT_MILLIS:20000}
+    token-refresh-before-seconds: ${ALIYUN_ASR_TOKEN_REFRESH_BEFORE_SECONDS:300}
+    ffmpeg-command: ${ALIYUN_ASR_FFMPEG_COMMAND:ffmpeg}
+    ffmpeg-timeout-seconds: ${ALIYUN_ASR_FFMPEG_TIMEOUT_SECONDS:20}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+iw:
+  remote:
+    auth:
+      base-url: ${IW_CORE_BASE_URL:http://127.0.0.1:18000}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+iw:
+  web:
+    env: ${IW_WEB_ENV:prod}

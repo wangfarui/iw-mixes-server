@@ -1,0 +1,18 @@
+[Unit]
+Description=IW Core Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/iw-mixes-server/iw-core
+EnvironmentFile=-/etc/iw-mixes/iw-core.env
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/iw-mixes-server/iw-core/iw-core.jar --spring.profiles.active=prod
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

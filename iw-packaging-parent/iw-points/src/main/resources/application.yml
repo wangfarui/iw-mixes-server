@@ -1,0 +1,45 @@
+# iw配置
+iw:
+  redis:
+    host: ${IW_REDIS_HOST:127.0.0.1}
+    port: ${IW_REDIS_PORT:6379}
+    database: ${IW_REDIS_DATABASE:0}
+    username: ${IW_REDIS_USERNAME:}
+    password: ${IW_REDIS_PASSWORD:}
+  db:
+    driver-class: ${IW_DB_DRIVER_CLASS:}
+    url: ${IW_DB_URL:}
+    username: ${IW_DB_USERNAME:}
+    password: ${IW_DB_PASSWORD:}
+  feign:
+    secret: ${IW_INTERNAL_SECRET:dev-secret}
+  dao:
+    dataPermission:
+      enabled: true
+      enable-table-names:
+        - points_total
+        - points_records
+        - points_task_group
+        - points_task_basics
+        - points_task_plan
+        - points_task_fixed
+
+# 服务器配置
+server:
+  servlet:
+    context-path: /points-service
+  port: 18005
+
+# spring 配置
+spring:
+  application:
+    name: iw-points-service
+  profiles:
+    default: dev
+
+# springdoc 配置
+springdoc:
+  swagger-ui:
+    path: /doc.html
+  packages-to-scan:
+    - com.itwray.iw.points.controller

@@ -1,0 +1,26 @@
+package com.itwray.iw.external.model;
+
+/**
+ * 外部服务的客户端常量
+ *
+ * @author wray
+ * @since 2024/12/19
+ */
+public abstract class ExternalClientConstants {
+
+    /**
+     * 外部服务名
+     */
+    public static final String SERVICE_NAME = "iw-external-service";
+
+    /**
+     * 所有服务实例名称
+     */
+    public static final String[] ALL_SERVICE_NAME = {SERVICE_NAME, "iw-core-service", "iw-auth-service", "iw-bookkeeping-service"};
+
+    /**
+     * 内部地址前缀
+     */
+    public static final String INTERNAL_PATH_PREFIX = "/internal";
+
+}
