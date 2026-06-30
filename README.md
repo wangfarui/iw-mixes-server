@@ -42,6 +42,24 @@ IDEA 调试建议启动两个 Application。项目默认 profile 已是 `dev`，
 - [iw-core application-dev.example.yml](iw-packaging-parent/iw-core/src/main/resources/application-dev.example.yml)
 - [iw-external application-dev.example.yml](iw-packaging-parent/iw-external/src/main/resources/application-dev.example.yml)
 
+本地快捷启动脚本：
+
+```bash
+# 同时启动 iw-external 和 iw-core，用于前端访问 http://localhost:18000
+scripts/local-backend.sh all
+
+# 也可以分别启动
+scripts/local-backend.sh start external
+scripts/local-backend.sh start core
+
+# 查看状态、跟日志、停止服务
+scripts/local-backend.sh status
+scripts/local-backend.sh logs core
+scripts/local-backend.sh stop all
+```
+
+脚本会使用 JDK 17 执行 Maven package，然后以 `dev` profile 后台运行 Jar。默认日志和 PID 位于 `logs/local/`；如需跳过构建，可设置 `IW_LOCAL_SKIP_BUILD=1`。本地数据库、Redis、AI Key、阿里云 Key 等仍通过环境变量或不提交的 `application-dev.yml` 提供。
+
 本地兼容入口不代理 WebSocket。需要验证 `/external-service/wb/**` 时，使用 [deploy/nginx/iw-mixes-server.local.conf](deploy/nginx/iw-mixes-server.local.conf)，并让 `iw-core` 改回 `18080` 运行，由 Nginx 监听 `18000`。
 
 ## 模块说明
