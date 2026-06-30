@@ -81,8 +81,9 @@ jobs:
           set -euo pipefail
           PUBLIC_PORT="${PUBLIC_PORT:-22}"
           PUBLIC_TARGET="${PUBLIC_USER}@${PUBLIC_HOST}"
-          SSH_OPTS=(-i ~/.ssh/iw_deploy_key -p "$PUBLIC_PORT" -o StrictHostKeyChecking=accept-new)
-          SCP_OPTS=(-i ~/.ssh/iw_deploy_key -P "$PUBLIC_PORT" -o StrictHostKeyChecking=accept-new)
+          ssh-keyscan -p "$PUBLIC_PORT" "$PUBLIC_HOST" >> ~/.ssh/known_hosts
+          SSH_OPTS=(-i ~/.ssh/iw_deploy_key -p "$PUBLIC_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts)
+          SCP_OPTS=(-i ~/.ssh/iw_deploy_key -P "$PUBLIC_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts)
           ssh "${SSH_OPTS[@]}" "$PUBLIC_TARGET" "mkdir -p /tmp/iw-mixes-server"
           scp "${SCP_OPTS[@]}" artifacts/iw-external.jar deploy/scripts/deploy-jar.sh "$PUBLIC_TARGET:/tmp/iw-mixes-server/"
           ssh "${SSH_OPTS[@]}" "$PUBLIC_TARGET" "sudo env GITHUB_SHA='${GITHUB_SHA}' bash /tmp/iw-mixes-server/deploy-jar.sh iw-external /tmp/iw-mixes-server/iw-external.jar"
@@ -122,8 +123,12 @@ jobs:
           PUBLIC_PORT="${PUBLIC_PORT:-22}"
           CORE_PORT="${CORE_PORT:-22}"
           BASTION="${PUBLIC_USER}@${PUBLIC_HOST}:${PUBLIC_PORT}"
+          PUBLIC_TARGET="${PUBLIC_USER}@${PUBLIC_HOST}"
           CORE_TARGET="${CORE_USER}@${CORE_HOST}"
-          SSH_OPTS=(-i ~/.ssh/iw_deploy_key -o StrictHostKeyChecking=accept-new)
+          ssh-keyscan -p "$PUBLIC_PORT" "$PUBLIC_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/iw_deploy_key -p "$PUBLIC_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "$PUBLIC_TARGET" "ssh-keyscan -p '$CORE_PORT' '$CORE_HOST'" >> ~/.ssh/known_hosts
+          SSH_OPTS=(-i ~/.ssh/iw_deploy_key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts)
           ssh "${SSH_OPTS[@]}" -J "$BASTION" -p "$CORE_PORT" "$CORE_TARGET" "mkdir -p /tmp/iw-mixes-server"
           scp "${SSH_OPTS[@]}" -o ProxyJump="$BASTION" -P "$CORE_PORT" artifacts/iw-core.jar deploy/scripts/deploy-jar.sh "$CORE_TARGET:/tmp/iw-mixes-server/"
           ssh "${SSH_OPTS[@]}" -J "$BASTION" -p "$CORE_PORT" "$CORE_TARGET" "sudo env GITHUB_SHA='${GITHUB_SHA}' bash /tmp/iw-mixes-server/deploy-jar.sh iw-core /tmp/iw-mixes-server/iw-core.jar"
