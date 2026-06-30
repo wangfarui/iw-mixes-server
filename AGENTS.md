@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-`iw-mixes-server` 是从原 `../iw-mixes` 复制出的后端重构工作区。旧项目只作为历史参照，除非用户明确要求，不要在旧项目中落地改动。
+`iw-mixes-server` 是 IW 系统当前后端主项目。旧后端项目已废弃，不再作为开发入口。
 
 当前目标是面向小规模生产环境的模块化单体：
 
@@ -12,7 +12,7 @@
 - 配置使用 Spring Boot 外部化配置，不提交真实密钥。
 - 发布链路使用 GitHub Actions + SSH + systemd。
 
-完整改造方案见根目录 `../iw-mixes-server-refactor-plan.md`，发布文件见 `deploy/`。
+发布文件见 `deploy/`，生产发布和运维说明优先读取 `README.md`、`deploy/README.md`、`deploy/OPERATIONS.md`。
 
 ## 技术栈
 
@@ -102,7 +102,7 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 ## 开发约定
 
 - 先读本文件，再读根目录 `../AGENTS.md` 了解跨项目关系。
-- 不要修改旧 `../iw-mixes`，除非用户明确要求。
+- 不要把旧后端项目当作开发入口；如果工作区中重新出现旧目录，默认视为废弃内容。
 - 不要修改 `target/`、`*.iml`、IDE 缓存、构建产物和本地敏感配置。
 - 修改公共模块 `iw-common`、`iw-web`、`iw-feign-client`、`iw-starter` 时，要评估 `iw-core` 和 `iw-external` 影响。
 - 业务模块作为库模块时，不要让模块内 `application*.yml` 污染 `iw-core` 运行时配置。

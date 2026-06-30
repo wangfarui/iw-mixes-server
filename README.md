@@ -1,6 +1,6 @@
 # iw-mixes-server
 
-`iw-mixes-server` 是基于原 `iw-mixes` 拆出的后端重构项目。旧 `../iw-mixes` 保持不动，本项目用于落地更适合小规模生产环境的后端结构。
+`iw-mixes-server` 是 IW 系统当前后端主项目，用于落地更适合小规模生产环境的后端结构。旧后端项目已废弃，不再作为开发入口。
 
 ## 运行结构
 
@@ -161,5 +161,3 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 ```
 
 确认本地变更已提交并推送到 GitHub 后，再手动运行 workflow 或推送 `server-v*` tag。
-
-架构改造方案见根目录 [iw-mixes-server-refactor-plan.md](../iw-mixes-server-refactor-plan.md)。

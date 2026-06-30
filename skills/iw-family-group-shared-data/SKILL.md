@@ -1,13 +1,13 @@
 ---
 name: iw-family-group-shared-data
-description: Add family-group shared data support to iw-mixes business modules across backend and app. Use when a new or existing user-scoped feature needs 家庭共享/仅自己 query scope, default shared write behavior, owner fields (`userId`/`userName`/`canEdit`), or owner-only edit/delete protection.
+description: Add family-group shared data support to iw-mixes-server business modules across backend and app. Use when a new or existing user-scoped feature needs 家庭共享/仅自己 query scope, default shared write behavior, owner fields (`userId`/`userName`/`canEdit`), or owner-only edit/delete protection.
 ---
 
 # IW Family Group Shared Data
 
 ## Overview
 
-Use this skill when an `iw-mixes` business module must support family-group shared visibility on top of user-owned data.
+Use this skill when an `iw-mixes-server` business module must support family-group shared visibility on top of user-owned data.
 Reuse the existing shared-query, owner-fill, and app query-scope infrastructure. Do not invent a new sharing model per module.
 
 ## When To Use
