@@ -78,4 +78,88 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 
 发布配置见 [deploy/README.md](deploy/README.md)。默认方案是 GitHub Actions 构建 Jar，通过 SSH 发布到外网机器和内网机器，并由 systemd 托管服务。
 
+### 发布链路
+
+GitHub Actions 工作流在 [.github/workflows/deploy-prod.yml](.github/workflows/deploy-prod.yml)。
+
+发布链路：
+
+1. `build`：在 GitHub runner 上使用 JDK 17 执行 Maven package，构建 `iw-core.jar` 和 `iw-external.jar`。
+2. `deploy-external`：通过 SSH 直连外网机器，上传 `iw-external.jar`，执行 `deploy/scripts/deploy-jar.sh iw-external ...`。
+3. `deploy-core`：通过外网机器作为 SSH 跳板连接内网机器，上传 `iw-core.jar`，执行 `deploy/scripts/deploy-jar.sh iw-core ...`。
+
+`deploy/scripts/deploy-jar.sh` 会把 Jar 安装到 `/opt/iw-mixes-server/releases/<service>/`，更新 `/opt/iw-mixes-server/<service>/<service>.jar` 软链接，然后执行：
+
+```bash
+systemctl restart <service>
+```
+
+因此发布某个服务时会短暂重启该服务。未选择发布的服务不会被停止或重启。
+
+### GitHub Secrets
+
+仓库需要配置这些 Actions Secrets：
+
+```text
+IW_DEPLOY_SSH_KEY
+IW_PUBLIC_HOST
+IW_PUBLIC_USER
+IW_PUBLIC_PORT
+IW_CORE_HOST
+IW_CORE_USER
+IW_CORE_PORT
+```
+
+当前生产拓扑建议：
+
+```text
+IW_PUBLIC_HOST = 外网机器公网 IP 或域名
+IW_PUBLIC_USER = root 或部署用户
+IW_PUBLIC_PORT = 22
+
+IW_CORE_HOST = 172.22.61.87
+IW_CORE_USER = root 或部署用户
+IW_CORE_PORT = 22
+```
+
+`IW_DEPLOY_SSH_KEY` 对应的公钥必须同时存在于外网机器和内网机器发布用户的 `~/.ssh/authorized_keys` 中。内网机器不需要公网 IP，Actions 通过外网机器 `ProxyJump` 进入。
+
+### 手动触发发布
+
+在 GitHub 页面进入：
+
+```text
+Actions -> Deploy iw-mixes-server -> Run workflow
+```
+
+`Service to deploy` 可选：
+
+- `all`：构建后发布 `iw-core` 和 `iw-external`。
+- `core`：只发布并重启 `iw-core`，不会停止或重启 `iw-external`。
+- `external`：只发布并重启 `iw-external`，不会停止或重启 `iw-core`。
+
+无论选择哪个目标，`build` 都会构建两个 Jar；区别只在后续部署 job 是否执行。
+
+### Tag 自动发布
+
+推送符合 `server-v*` 的 tag 会自动触发 Actions，并等价于发布 `all`，即同时发布 `iw-core` 和 `iw-external`：
+
+```bash
+git tag server-v0.2.1
+git push origin server-v0.2.1
+```
+
+如果只想发布单个服务，不要用 tag 触发；请在 GitHub Actions 页面手动选择 `core` 或 `external`。
+
+### 发布前检查
+
+发布前建议至少执行：
+
+```bash
+JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17)/bin:$PATH" \
+  mvn -pl iw-packaging-parent/iw-core,iw-packaging-parent/iw-external -am -DskipTests compile
+```
+
+确认本地变更已提交并推送到 GitHub 后，再手动运行 workflow 或推送 `server-v*` tag。
+
 架构改造方案见根目录 [iw-mixes-server-refactor-plan.md](../iw-mixes-server-refactor-plan.md)。

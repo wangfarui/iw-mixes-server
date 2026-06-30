@@ -60,6 +60,26 @@ Controller 上的路径仍不包含内部业务服务前缀。例如后端 `@Req
 - 本地可使用环境变量或不提交的 `application-dev.yml`。
 - 不要提交真实数据库密码、Redis 密码、JWT/内部调用密钥、AI Key、阿里云 Key、Nacos 密码等。
 
+## 发布入口
+
+- 生产发布规则见 [README.md](README.md) 的“发布”章节和 [.github/workflows/deploy-prod.yml](.github/workflows/deploy-prod.yml)。
+- GitHub Actions 支持手动发布 `all`、`core`、`external`；手动选择 `core` 时只重启 `iw-core`，手动选择 `external` 时只重启 `iw-external`。
+- 推送符合 `server-v*` 的 tag 会自动触发 Actions，并等价于发布 `all`，同时发布 `iw-core` 和 `iw-external`。
+- 当用户要求“打 tag 发布”“发版”“发布生产”且明确希望通过 tag 触发时，先确认当前变更已提交并推送，再按 `server-v<version>` 命名创建并推送 tag，例如：
+
+```bash
+git tag server-v0.2.1
+git push origin server-v0.2.1
+```
+
+- 如果用户只想发布单个服务，不要打 tag；应提示用户在 GitHub Actions 页面手动选择 `core` 或 `external`，或按需协助修改 workflow。
+- 发布前至少运行核心链路编译：
+
+```bash
+JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17)/bin:$PATH" \
+  mvn -pl iw-packaging-parent/iw-core,iw-packaging-parent/iw-external -am -DskipTests compile
+```
+
 ## 常用命令
 
 在本项目根目录执行。若本机 Maven 默认 Java 不是 17，显式设置 `JAVA_HOME`：
