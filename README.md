@@ -76,7 +76,7 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 
 ## 发布
 
-发布配置见 [deploy/README.md](deploy/README.md)。默认方案是 GitHub Actions 构建 Jar，通过 SSH 发布到外网机器和内网机器，并由 systemd 托管服务。
+发布配置见 [deploy/README.md](deploy/README.md)。生产日志和故障排查命令见 [deploy/OPERATIONS.md](deploy/OPERATIONS.md)。默认方案是 GitHub Actions 构建 Jar，通过 SSH 发布到外网机器和内网机器，并由 systemd 托管服务。
 
 ### 发布链路
 

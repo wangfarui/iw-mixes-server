@@ -7,6 +7,7 @@ import com.itwray.iw.common.constants.GeneralApiCode;
 import com.itwray.iw.common.utils.ExceptionUtils;
 import com.itwray.iw.web.core.dingtalk.DingTalkHelper;
 import com.itwray.iw.web.exception.*;
+import feign.FeignException;
 import feign.codec.DecodeException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -83,13 +84,16 @@ public class ExceptionHandlerInterceptor {
         return GeneralResponse.fail();
     }
 
-    @ExceptionHandler({FeignClientException.class, DecodeException.class})
+    @ExceptionHandler({FeignClientException.class, DecodeException.class, FeignException.class})
     public GeneralResponse<?> feignExceptionHandler(RuntimeException e) {
         IwException iwException = ExceptionUtils.extractIwException(e);
         if (iwException != null) {
             return this.wrapResponseByIwException(iwException);
         }
         log.error("[Feign异常]" + e.getMessage(), e);
+        if (e instanceof FeignException feignException && feignException.status() == -1) {
+            return new GeneralResponse<>(GeneralApiCode.SERVICE_UNAVAILABLE);
+        }
         return GeneralResponse.fail();
     }
 

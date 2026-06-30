@@ -52,6 +52,8 @@ Set these repository secrets:
 
 The workflow copies `iw-external` directly to the public server and copies `iw-core` through the public server as an SSH jump host.
 
+Production log and incident commands are documented in [OPERATIONS.md](OPERATIONS.md).
+
 ## Manual release command
 
 If GitHub Actions is unavailable, build locally with JDK 17:
