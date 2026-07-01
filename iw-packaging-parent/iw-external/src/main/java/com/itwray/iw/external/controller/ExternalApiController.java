@@ -3,7 +3,9 @@ package com.itwray.iw.external.controller;
 import com.itwray.iw.auth.model.vo.WebsiteNavigationListVo;
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.model.dto.GetExchangeRateDto;
+import com.itwray.iw.external.model.dto.IpLookupQueryDto;
 import com.itwray.iw.external.model.vo.GetExchangeRateVo;
+import com.itwray.iw.external.model.vo.IpLookupResultVo;
 import com.itwray.iw.external.service.ExternalApiService;
 import com.itwray.iw.external.service.InternalApiService;
 import com.itwray.iw.web.annotation.SkipWrapper;
@@ -51,6 +53,18 @@ public class ExternalApiController {
     @Operation(summary = "查询天气")
     public Map<Object, Object> getWeather() {
         return externalApiService.getWeather();
+    }
+
+    @GetMapping("/ip-lookup/current")
+    @Operation(summary = "查询当前请求IP解析定位")
+    public GeneralResponse<IpLookupResultVo> getCurrentIpLookup() {
+        return GeneralResponse.success(externalApiService.getCurrentIpLookup());
+    }
+
+    @PostMapping("/ip-lookup/query")
+    @Operation(summary = "查询公网IP或域名解析定位")
+    public GeneralResponse<IpLookupResultVo> queryIpLookup(@RequestBody @Valid IpLookupQueryDto dto) {
+        return GeneralResponse.success(externalApiService.queryIpLookup(dto));
     }
 
     @GetMapping("/system/getWeather")

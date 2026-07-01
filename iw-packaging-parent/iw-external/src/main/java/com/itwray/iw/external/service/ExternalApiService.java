@@ -1,6 +1,8 @@
 package com.itwray.iw.external.service;
 
 import com.itwray.iw.auth.model.vo.WebsiteNavigationListVo;
+import com.itwray.iw.external.model.dto.IpLookupQueryDto;
+import com.itwray.iw.external.model.vo.IpLookupResultVo;
 
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,21 @@ public interface ExternalApiService {
      * @return IP地址信息
      */
     Map<Object, Object> getIpAddress();
+
+    /**
+     * 解析当前请求IP地址信息
+     *
+     * @return IP解析结果
+     */
+    IpLookupResultVo getCurrentIpLookup();
+
+    /**
+     * 查询公网IP或域名解析定位信息
+     *
+     * @param dto 查询参数
+     * @return IP解析结果
+     */
+    IpLookupResultVo queryIpLookup(IpLookupQueryDto dto);
 
     /**
      * 获取城市天气
