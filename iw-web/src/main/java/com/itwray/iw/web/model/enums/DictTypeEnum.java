@@ -97,6 +97,24 @@ public enum DictTypeEnum implements ConstantEnum {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 获取普通用户可使用的字典
+     */
+    public static List<DictTypeEnum> getUserVisibleDict() {
+        return Arrays.stream(DictTypeEnum.values())
+                .filter(t -> !RoleTypeEnum.SUPER_ADMIN.equals(t.getRoleTypeEnum()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取管理员统一维护并同步给所有用户使用的字典
+     */
+    public static List<DictTypeEnum> getAdminManagedDict() {
+        return Arrays.stream(DictTypeEnum.values())
+                .filter(t -> RoleTypeEnum.ADMIN.equals(t.getRoleTypeEnum()))
+                .collect(Collectors.toList());
+    }
+
     public static DictTypeEnum getDictByCode(Integer code) {
         if (code == null) {
             return null;

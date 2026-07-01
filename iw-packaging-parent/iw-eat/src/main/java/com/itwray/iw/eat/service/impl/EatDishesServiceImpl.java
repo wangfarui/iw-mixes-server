@@ -19,7 +19,7 @@ import com.itwray.iw.eat.model.vo.DishesPageVo;
 import com.itwray.iw.eat.service.EatDishesService;
 import com.itwray.iw.starter.redis.RedisUtil;
 import com.itwray.iw.web.constants.WebCommonConstants;
-import com.itwray.iw.web.exception.IwWebException;
+import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
 import com.itwray.iw.web.utils.UserUtils;
 import jakarta.annotation.Resource;
@@ -156,7 +156,7 @@ public class EatDishesServiceImpl implements EatDishesService {
                 .last(WebCommonConstants.LIMIT_ONE)
                 .one();
         if (entity != null) {
-            throw new IwWebException("保存失败，菜品名称已存在");
+            throw new BusinessException("保存失败，菜品名称已存在");
         }
     }
 
@@ -168,7 +168,7 @@ public class EatDishesServiceImpl implements EatDishesService {
     private void validOperatorPermission(Integer hasPermissionUserId) {
         Integer userId = UserUtils.getUserId();
         if (!userId.equals(hasPermissionUserId)) {
-            throw new IwWebException("没有权限操作");
+            throw new BusinessException("没有权限操作");
         }
     }
 }

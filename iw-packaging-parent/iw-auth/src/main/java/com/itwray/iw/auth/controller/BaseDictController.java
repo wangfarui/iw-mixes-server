@@ -64,4 +64,10 @@ public class BaseDictController extends WebController<BaseDictService, DictAddDt
     public GeneralResponse<Long> getDictVersion() {
         return getWebService().getDictVersion();
     }
+
+    @PostMapping("/repairUserVisibleDictData")
+    @Operation(summary = "修复所有用户缺失的可见字典数据")
+    public Integer repairUserVisibleDictData() {
+        return getWebService().repairUserVisibleDictData();
+    }
 }

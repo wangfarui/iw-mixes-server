@@ -55,4 +55,11 @@ public interface BaseDictService extends WebService<DictAddDto, DictUpdateDto, D
      * @return 版本号
      */
     GeneralResponse<Long> getDictVersion();
+
+    /**
+     * 修复所有用户缺失的可见字典数据
+     *
+     * @return 新增的字典数据数量
+     */
+    Integer repairUserVisibleDictData();
 }

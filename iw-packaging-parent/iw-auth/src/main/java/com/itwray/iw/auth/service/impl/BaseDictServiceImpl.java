@@ -146,6 +146,9 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
         Integer userId = UserUtils.getUserId();
         Integer id = super.add(dto);
+        if (isAdminDict) {
+            this.saveAdminDictTemplateIfAbsent(dto);
+        }
         // 更新Redis缓存
         List<DictAllListVo> dictAllListVos = queryAllDictByType(dto.getDictType());
         RedisUtil.putHashKey(this.obtainDictRedisKeyByUser(), dto.getDictType(), dictAllListVos);
@@ -290,6 +293,30 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         return GeneralResponse.success(version);
     }
 
+    @Override
+    @Transactional
+    public Integer repairUserVisibleDictData() {
+        if (!this.isAdminUser(UserUtils.getUserId())) {
+            throw new BusinessException("权限不足");
+        }
+
+        RedisLockUtil.lock(OPERATE_ADMIN_DICT_LOCK_KEY);
+        try {
+            int insertCount = this.repairAdminDictTemplateData();
+            List<AuthUserEntity> userEntityList = authUserDao.getBaseMapper().queryAllUser();
+            for (AuthUserEntity userEntity : userEntityList) {
+                int userInsertCount = this.copyMissingVisibleDictData(userEntity.getId());
+                insertCount += userInsertCount;
+                if (userInsertCount > 0) {
+                    this.refreshUserDictCacheVersion(userEntity.getId());
+                }
+            }
+            return insertCount;
+        } finally {
+            RedisLockUtil.unlock(OPERATE_ADMIN_DICT_LOCK_KEY);
+        }
+    }
+
     private List<DictAllListVo> queryAllDictByType(Integer dictType) {
         return getBaseDao().lambdaQuery()
                 .eq(BaseDictEntity::getDictType, dictType)
@@ -299,6 +326,142 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
                 .stream()
                 .map(t -> new DictAllListVo(t.getId(), t.getDictCode(), t.getDictName()))
                 .collect(Collectors.toList());
+    }
+
+    private void saveAdminDictTemplateIfAbsent(DictAddDto dto) {
+        DictUniqueKey dictUniqueKey = this.buildDictUniqueKey(dto.getDictType(), dto.getDictCode(), dto.getDictName());
+        if (dictUniqueKey == null) {
+            return;
+        }
+
+        boolean exists = this.queryTemplateDictList(DictTypeEnum.getAdminManagedDict()).stream()
+                .map(this::buildDictUniqueKey)
+                .anyMatch(dictUniqueKey::equals);
+        if (exists) {
+            return;
+        }
+
+        BaseDictEntity templateEntity = new BaseDictEntity();
+        templateEntity.setParentId(WebCommonConstants.DATABASE_DEFAULT_INT_VALUE);
+        templateEntity.setDictType(dto.getDictType());
+        templateEntity.setDictCode(dto.getDictCode());
+        templateEntity.setDictName(dto.getDictName());
+        templateEntity.setDictStatus(dto.getDictStatus());
+        templateEntity.setSort(dto.getSort());
+        templateEntity.setUserId(WebCommonConstants.DATABASE_DEFAULT_INT_VALUE);
+        getBaseDao().save(templateEntity);
+    }
+
+    private int repairAdminDictTemplateData() {
+        Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(this.queryTemplateDictList(DictTypeEnum.getAdminManagedDict()));
+        Map<DictUniqueKey, BaseDictEntity> adminDictMap = this.toDictUniqueMap(this.queryAdminManagedDictList());
+        List<BaseDictEntity> insertList = adminDictMap.entrySet().stream()
+                .filter(entry -> !templateDictMap.containsKey(entry.getKey()))
+                .map(entry -> this.copyDictEntity(entry.getValue(), WebCommonConstants.DATABASE_DEFAULT_INT_VALUE))
+                .collect(Collectors.toList());
+        if (CollectionUtil.isEmpty(insertList)) {
+            return 0;
+        }
+        getBaseDao().saveBatch(insertList);
+        return insertList.size();
+    }
+
+    private int copyMissingVisibleDictData(Integer userId) {
+        Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict()));
+        Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(this.queryDictListByUser(userId, DictTypeEnum.getUserVisibleDict()));
+        List<BaseDictEntity> insertList = templateDictMap.entrySet().stream()
+                .filter(entry -> !userDictMap.containsKey(entry.getKey()))
+                .map(entry -> this.copyDictEntity(entry.getValue(), userId))
+                .collect(Collectors.toList());
+        if (CollectionUtil.isEmpty(insertList)) {
+            return 0;
+        }
+        getBaseDao().saveBatch(insertList);
+        RedisUtil.delete(this.obtainDictRedisKeyByUser(userId));
+        return insertList.size();
+    }
+
+    private List<BaseDictEntity> queryTemplateDictList(List<DictTypeEnum> dictTypeList) {
+        return getBaseDao().lambdaQuery()
+                .eq(BaseDictEntity::getUserId, WebCommonConstants.DATABASE_DEFAULT_INT_VALUE)
+                .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(dictTypeList))
+                .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
+                .orderByAsc(BaseDictEntity::getDictType)
+                .orderByAsc(BaseDictEntity::getSort)
+                .orderByAsc(BaseDictEntity::getId)
+                .list();
+    }
+
+    private List<BaseDictEntity> queryDictListByUser(Integer userId, List<DictTypeEnum> dictTypeList) {
+        return getBaseDao().lambdaQuery()
+                .eq(BaseDictEntity::getUserId, userId)
+                .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(dictTypeList))
+                .list();
+    }
+
+    private List<BaseDictEntity> queryAdminManagedDictList() {
+        try {
+            UserUtils.setUserDataPermission(false);
+            return getBaseDao().lambdaQuery()
+                    .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(DictTypeEnum.getAdminManagedDict()))
+                    .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
+                    .orderByAsc(BaseDictEntity::getDictType)
+                    .orderByAsc(BaseDictEntity::getSort)
+                    .orderByAsc(BaseDictEntity::getUserId)
+                    .orderByAsc(BaseDictEntity::getId)
+                    .list();
+        } finally {
+            UserUtils.removeUserDataPermission();
+        }
+    }
+
+    private Map<DictUniqueKey, BaseDictEntity> toDictUniqueMap(List<BaseDictEntity> dictEntityList) {
+        Map<DictUniqueKey, BaseDictEntity> dictMap = new LinkedHashMap<>();
+        for (BaseDictEntity dictEntity : dictEntityList) {
+            DictUniqueKey dictUniqueKey = this.buildDictUniqueKey(dictEntity);
+            if (dictUniqueKey != null) {
+                dictMap.putIfAbsent(dictUniqueKey, dictEntity);
+            }
+        }
+        return dictMap;
+    }
+
+    private DictUniqueKey buildDictUniqueKey(BaseDictEntity dictEntity) {
+        return this.buildDictUniqueKey(dictEntity.getDictType(), dictEntity.getDictCode(), dictEntity.getDictName());
+    }
+
+    private DictUniqueKey buildDictUniqueKey(Integer dictType, Integer dictCode, String dictName) {
+        DictTypeEnum dictTypeEnum = DictTypeEnum.getDictByCode(dictType);
+        if (dictTypeEnum == null) {
+            return null;
+        }
+        if (DictTypeEnum.DataType.CODE.equals(dictTypeEnum.getDataType())) {
+            return new DictUniqueKey(dictType, dictCode, null);
+        }
+        return new DictUniqueKey(dictType, null, dictName);
+    }
+
+    private BaseDictEntity copyDictEntity(BaseDictEntity source, Integer userId) {
+        BaseDictEntity dictEntity = BeanUtil.copyProperties(source, BaseDictEntity.class);
+        dictEntity.setId(null);
+        dictEntity.setParentId(WebCommonConstants.DATABASE_DEFAULT_INT_VALUE);
+        dictEntity.setUserId(userId);
+        dictEntity.setDeleted(Boolean.FALSE);
+        dictEntity.setCreateTime(null);
+        dictEntity.setUpdateTime(null);
+        return dictEntity;
+    }
+
+    private List<Integer> toDictTypeCodeList(List<DictTypeEnum> dictTypeList) {
+        return dictTypeList.stream().map(DictTypeEnum::getCode).collect(Collectors.toList());
+    }
+
+    private void refreshUserDictCacheVersion(Integer userId) {
+        RedisUtil.delete(this.obtainDictRedisKeyByUser(userId));
+        AuthRedisKeyEnum.USER_DICT_VERSION.setStringValue(System.currentTimeMillis(), userId);
+    }
+
+    private record DictUniqueKey(Integer dictType, Integer dictCode, String dictName) {
     }
 
     /**
@@ -465,57 +628,14 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
      * 新用户注册初始化基础字典数据
      */
     private void initDictData(UserAddBo bo) {
-        // 判断该用户是否已生成过字典数据
-        BaseDictEntity dictEntity = getBaseDao().lambdaQuery()
-                .eq(BaseDictEntity::getUserId, bo.getUserId())
-                .select(BaseDictEntity::getId)
-                .last(WebCommonConstants.LIMIT_ONE)
-                .one();
-        if (dictEntity != null) {
-            log.info("用户[{}]已存在基础字典数据, 默认跳过初始化基础字典数据操作", bo.getUserId());
-            return;
-        }
-
         RedisLockUtil.lock(OPERATE_ADMIN_DICT_LOCK_KEY);
         try {
-            // 查询父字典数据(仅角色类型为用户类型的字典)
-            List<BaseDictEntity> parentTemplateDictList = getBaseDao().lambdaQuery()
-                    .eq(BaseDictEntity::getUserId, WebCommonConstants.DATABASE_DEFAULT_INT_VALUE)
-                    .eq(BaseDictEntity::getParentId, WebCommonConstants.DATABASE_DEFAULT_INT_VALUE)
-                    .in(BaseDictEntity::getDictType, DictTypeEnum.getUserDict().stream().map(DictTypeEnum::getCode).toList())
-                    .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
-                    .list();
-            if (CollectionUtil.isEmpty(parentTemplateDictList)) {
-                log.info("数据库内无模板字典数据, 用户[{}]默认跳过初始化基础字典数据操作", bo.getUserId());
-                return;
+            int insertCount = this.copyMissingVisibleDictData(bo.getUserId());
+            if (insertCount == 0) {
+                log.info("用户[{}]无需补齐基础字典数据", bo.getUserId());
+            } else {
+                this.refreshUserDictCacheVersion(bo.getUserId());
             }
-            for (BaseDictEntity parentDict : parentTemplateDictList) {
-                // 保存父字典到数据库
-                BaseDictEntity newParentDict = BeanUtil.copyProperties(parentDict, BaseDictEntity.class);
-                newParentDict.setId(null);  // id重置为空，采用数据库自增id
-                newParentDict.setUserId(bo.getUserId()); // 使用新用户id
-                getBaseDao().save(newParentDict);
-
-                // 通过父字典查询子字典数据
-                List<BaseDictEntity> sonTemplateDictList = getBaseDao().lambdaQuery()
-                        .eq(BaseDictEntity::getUserId, WebCommonConstants.DATABASE_DEFAULT_INT_VALUE)
-                        .eq(BaseDictEntity::getParentId, parentDict.getId())
-                        .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
-                        .list();
-                if (CollectionUtil.isEmpty(sonTemplateDictList)) {
-                    continue;
-                }
-                // 保存子字典数据到数据库
-                sonTemplateDictList.forEach(entity -> {
-                    entity.setId(null);
-                    entity.setParentId(newParentDict.getId());
-                    entity.setUserId(bo.getUserId());
-                });
-                getBaseDao().saveBatch(sonTemplateDictList);
-            }
-
-            // 移除用户业务字典的缓存
-            RedisUtil.delete(this.obtainDictRedisKeyByUser());
         } finally {
             RedisLockUtil.unlock(OPERATE_ADMIN_DICT_LOCK_KEY);
         }
