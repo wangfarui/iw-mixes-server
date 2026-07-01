@@ -52,9 +52,10 @@ scripts/local-backend.sh all
 scripts/local-backend.sh start external
 scripts/local-backend.sh start core
 
-# 查看状态、跟日志、停止服务
+# 查看状态、跟日志、重启、停止服务
 scripts/local-backend.sh status
 scripts/local-backend.sh logs core
+scripts/local-backend.sh restart all
 scripts/local-backend.sh stop all
 ```
 
