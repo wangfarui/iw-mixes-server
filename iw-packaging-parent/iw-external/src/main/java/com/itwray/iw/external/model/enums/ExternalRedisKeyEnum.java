@@ -30,6 +30,18 @@ public enum ExternalRedisKeyEnum implements RedisKeyManager {
      */
     DAILY_HOT_KEY("external:daily-hot:%s", 60 * 30L),
     /**
+     * 公开工具AI每日总额度:[yyyyMMdd]
+     */
+    TOOL_AI_DAILY_TOTAL("external:tool-ai:quota:total:%s", 60 * 60 * 24 * 2L),
+    /**
+     * 公开工具AI每日业务类型额度:[businessType]:[yyyyMMdd]
+     */
+    TOOL_AI_DAILY_TYPE("external:tool-ai:quota:type:%s:%s", 60 * 60 * 24 * 2L),
+    /**
+     * 公开工具AI每日IP额度:[ipHash]:[yyyyMMdd]
+     */
+    TOOL_AI_DAILY_IP("external:tool-ai:quota:ip:%s:%s", 60 * 60 * 24 * 2L),
+    /**
      * AI对话内容排序
      */
     AI_CHAT_SORT("external:ai:chat:sort:%s", 60 * 60 * 24L),

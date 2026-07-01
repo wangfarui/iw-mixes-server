@@ -10,6 +10,7 @@ import com.itwray.iw.external.model.bo.AIMessage;
 import com.itwray.iw.external.model.bo.AIRequestBody;
 import com.itwray.iw.external.model.bo.AIResponseBody;
 import com.itwray.iw.external.model.bo.AIResponseFormat;
+import com.itwray.iw.external.model.bo.AiCompletionResult;
 import com.itwray.iw.external.model.dto.AiChatMessageDto;
 import com.itwray.iw.external.model.dto.AiStructuredChatDto;
 import com.itwray.iw.external.model.enums.ExternalRedisKeyEnum;
@@ -137,6 +138,11 @@ public class AIServiceImpl implements AIService {
     }
 
     @Override
+    public AiCompletionResult complete(List<AIMessage> messages, String model, Integer maxTokens, BigDecimal temperature) {
+        return this.requestChatCompletionResult(messages, model, maxTokens, temperature);
+    }
+
+    @Override
     public HttpResponse streamChat(@NonNull String chatId, @NonNull String prompt) {
         log.info("收到对话: chatId: {}, prompt: {}", chatId, prompt);
         List<AIMessage> messageList = new ArrayList<>();
@@ -194,6 +200,10 @@ public class AIServiceImpl implements AIService {
     }
 
     private String requestChatCompletion(List<AIMessage> messages, String model, Integer maxTokens, BigDecimal temperature) {
+        return this.requestChatCompletionResult(messages, model, maxTokens, temperature).getContent();
+    }
+
+    private AiCompletionResult requestChatCompletionResult(List<AIMessage> messages, String model, Integer maxTokens, BigDecimal temperature) {
         AIRequestBody requestBody = new AIRequestBody();
         requestBody.setMessages(messages);
         requestBody.setModel(model);
@@ -214,20 +224,44 @@ public class AIServiceImpl implements AIService {
                 .execute()) {
             if (!response.isOk()) {
                 log.error("AIService#requestChatCompletion 请求失败, status: {}, body: {}", response.getStatus(), response.body());
-                return "服务请求失败, 请重试";
+                return AiCompletionResult.builder()
+                        .content("服务请求失败, 请重试")
+                        .model(model)
+                        .success(false)
+                        .failReason("AI HTTP status: " + response.getStatus())
+                        .build();
             }
             AIResponseBody responseBody = JSONUtil.toBean(response.body(), AIResponseBody.class);
             if (responseBody != null && CollUtil.isNotEmpty(responseBody.getChoices())) {
                 AIResponseBody.Choice choice = responseBody.getChoices().get(0);
                 if (choice != null && choice.getMessage() != null) {
-                    return choice.getMessage().getContent();
+                    AIResponseBody.Usage usage = responseBody.getUsage();
+                    return AiCompletionResult.builder()
+                            .content(choice.getMessage().getContent())
+                            .model(StringUtils.defaultIfBlank(responseBody.getModel(), model))
+                            .promptTokens(usage == null ? null : usage.getPrompt_tokens())
+                            .completionTokens(usage == null ? null : usage.getCompletion_tokens())
+                            .totalTokens(usage == null ? null : usage.getTotal_tokens())
+                            .finishReason(choice.getFinish_reason())
+                            .success(true)
+                            .build();
                 }
             }
         } catch (Exception e) {
             log.error("AIService#requestChatCompletion 请求异常", e);
-            return "服务请求超时, 请重试";
+            return AiCompletionResult.builder()
+                    .content("服务请求超时, 请重试")
+                    .model(model)
+                    .success(false)
+                    .failReason(e.getMessage())
+                    .build();
         }
 
-        return "服务请求超时, 请重试";
+        return AiCompletionResult.builder()
+                .content("服务请求超时, 请重试")
+                .model(model)
+                .success(false)
+                .failReason("AI response has no choices")
+                .build();
     }
 }

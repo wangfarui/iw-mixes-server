@@ -26,3 +26,34 @@ create table external_exchange_rate
     primary key (id),
     key idx_query_date (query_date)
 ) comment '货币汇率表';
+
+create table external_tool_ai_records
+(
+    id                 int unsigned                         not null auto_increment comment 'id',
+    request_id         varchar(64)                          not null comment '请求ID',
+    business_type      varchar(64)                          not null comment '业务类型',
+    request_body       text                                 null comment '请求消息体',
+    system_prompt      text                                 null comment '系统提示词',
+    user_prompt        text                                 null comment '用户提示词',
+    response_content   text                                 null comment 'AI响应内容',
+    model              varchar(64)                          null comment 'AI模型',
+    prompt_tokens      int                                  null comment '输入token数',
+    completion_tokens  int                                  null comment '输出token数',
+    total_tokens       int                                  null comment '总token数',
+    status             varchar(32)                          not null comment '状态(SUCCESS/BLOCKED/QUOTA_EXCEEDED/FAILED)',
+    fail_reason        varchar(512)                         null comment '失败原因',
+    client_ip          varchar(64)                          null comment '客户端IP',
+    client_ip_hash     char(64)                             null comment '客户端IP哈希',
+    user_agent         varchar(512)                         null comment 'User-Agent',
+    quota_total_after  int                                  null comment '调用后全局额度计数',
+    quota_type_after   int                                  null comment '调用后业务类型额度计数',
+    quota_ip_after     int                                  null comment '调用后IP额度计数',
+    deleted            tinyint(1) default 0                 not null comment '是否删除(true表示已删除, 默认false表示未删除)',
+    create_time        datetime   default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time        datetime   default CURRENT_TIMESTAMP not null comment '更新时间',
+    primary key (id),
+    unique key uk_request_id (request_id),
+    key idx_business_type_create_time (business_type, create_time),
+    key idx_status_create_time (status, create_time),
+    key idx_client_ip_hash_create_time (client_ip_hash, create_time)
+) comment '外部工具AI调用记录表';
