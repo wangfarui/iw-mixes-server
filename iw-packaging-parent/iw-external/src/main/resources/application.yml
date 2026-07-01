@@ -32,6 +32,12 @@ iw:
     tool-ai:
       total-daily-limit: ${IW_EXTERNAL_TOOL_AI_TOTAL_DAILY_LIMIT:200}
       ip-daily-limit: ${IW_EXTERNAL_TOOL_AI_IP_DAILY_LIMIT:50}
+    network-diagnostics:
+      total-daily-limit: ${IW_EXTERNAL_NETWORK_DIAGNOSTICS_TOTAL_DAILY_LIMIT:1000}
+      anonymous-daily-limit: ${IW_EXTERNAL_NETWORK_DIAGNOSTICS_ANONYMOUS_DAILY_LIMIT:5}
+      anonymous-minute-limit: ${IW_EXTERNAL_NETWORK_DIAGNOSTICS_ANONYMOUS_MINUTE_LIMIT:2}
+      user-daily-limit: ${IW_EXTERNAL_NETWORK_DIAGNOSTICS_USER_DAILY_LIMIT:200}
+      user-minute-limit: ${IW_EXTERNAL_NETWORK_DIAGNOSTICS_USER_MINUTE_LIMIT:10}
     dailyhot:
       timeout-ms: ${IW_EXTERNAL_DAILYHOT_TIMEOUT_MS:3000}
       cache-seconds: ${IW_EXTERNAL_DAILYHOT_CACHE_SECONDS:1800}

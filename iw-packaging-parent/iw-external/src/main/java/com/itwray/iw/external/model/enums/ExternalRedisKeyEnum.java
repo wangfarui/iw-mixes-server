@@ -42,6 +42,26 @@ public enum ExternalRedisKeyEnum implements RedisKeyManager {
      */
     TOOL_AI_DAILY_IP("external:tool-ai:quota:ip:%s:%s", 60 * 60 * 24 * 2L),
     /**
+     * 网络诊断每日总额度:[yyyyMMdd]
+     */
+    NETWORK_DIAGNOSTICS_DAILY_TOTAL("external:network-diagnostics:quota:total:%s", 60 * 60 * 24 * 2L),
+    /**
+     * 网络诊断匿名IP每日额度:[ipHash]:[yyyyMMdd]
+     */
+    NETWORK_DIAGNOSTICS_DAILY_ANON_IP("external:network-diagnostics:quota:anon:ip:%s:%s", 60 * 60 * 24 * 2L),
+    /**
+     * 网络诊断匿名IP分钟防抖:[ipHash]:[yyyyMMddHHmm]
+     */
+    NETWORK_DIAGNOSTICS_MINUTE_ANON_IP("external:network-diagnostics:quota:anon:ip:minute:%s:%s", 60 * 5L),
+    /**
+     * 网络诊断登录用户每日额度:[userId]:[yyyyMMdd]
+     */
+    NETWORK_DIAGNOSTICS_DAILY_USER("external:network-diagnostics:quota:user:%s:%s", 60 * 60 * 24 * 2L),
+    /**
+     * 网络诊断登录用户分钟防抖:[userId]:[yyyyMMddHHmm]
+     */
+    NETWORK_DIAGNOSTICS_MINUTE_USER("external:network-diagnostics:quota:user:minute:%s:%s", 60 * 5L),
+    /**
      * AI对话内容排序
      */
     AI_CHAT_SORT("external:ai:chat:sort:%s", 60 * 60 * 24L),
