@@ -18,6 +18,9 @@ public enum ToolAiBusinessTypeEnum {
     TEXT_GAME_ACROSTIC("TEXT_GAME_ACROSTIC", "藏头诗", 120, 512, new BigDecimal("1.1")),
     TEXT_GAME_QUOTE("TEXT_GAME_QUOTE", "随机语录", 160, 768, new BigDecimal("1.2")),
     TEXT_GAME_DANMAKU("TEXT_GAME_DANMAKU", "弹幕文案", 80, 512, new BigDecimal("1.1")),
+    TEXT_GAME_HOMOPHONE("TEXT_GAME_HOMOPHONE", "谐音梗", 80, 512, new BigDecimal("1.2")),
+    TEXT_GAME_SOCIAL_COPYWRITING("TEXT_GAME_SOCIAL_COPYWRITING", "朋友圈文案", 120, 768, new BigDecimal("1.1")),
+    TEXT_GAME_TONE_REWRITE("TEXT_GAME_TONE_REWRITE", "夸夸/阴阳怪气改写", 120, 768, new BigDecimal("1.1")),
     ;
 
     private final String type;

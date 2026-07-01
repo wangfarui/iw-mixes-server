@@ -267,6 +267,18 @@ public class ToolAiServiceImpl implements ToolAiService {
             return buildDanmakuPrompt(message);
         }
 
+        if (businessType == ToolAiBusinessTypeEnum.TEXT_GAME_HOMOPHONE) {
+            return buildHomophonePrompt(message);
+        }
+
+        if (businessType == ToolAiBusinessTypeEnum.TEXT_GAME_SOCIAL_COPYWRITING) {
+            return buildSocialCopywritingPrompt(message);
+        }
+
+        if (businessType == ToolAiBusinessTypeEnum.TEXT_GAME_TONE_REWRITE) {
+            return buildToneRewritePrompt(message);
+        }
+
         throw new IllegalArgumentException("不支持的AI工具类型");
     }
 
@@ -342,6 +354,79 @@ public class ToolAiServiceImpl implements ToolAiService {
                 3. 不要包含编号、引号、解释。
                 4. 只输出合法 JSON：{"items":["弹幕1","弹幕2"]}。
                 """.formatted(sourceText, count, speed, colorMode);
+        return new PromptPayload(prompt, count);
+    }
+
+    private PromptPayload buildHomophonePrompt(Map<String, Object> message) {
+        String keyword = sanitizePlainText(getString(message, "keyword", ""), 40);
+        if (StringUtils.isBlank(keyword)) {
+            throw new IllegalArgumentException("谐音梗关键词不能为空");
+        }
+
+        String scene = allowValue(getString(message, "scene", "daily"), List.of("daily", "workday", "love", "festival", "social"), "daily");
+        int count = getInt(message, "count", 8, 1, 12);
+
+        String prompt = """
+                生成中文谐音梗短句。
+                关键词：%s
+                使用场景：%s
+                生成数量：%d
+                硬性要求：
+                1. 每条必须围绕关键词或其近音词制造轻松谐音效果。
+                2. 每条不超过32个中文字符，适合聊天、弹幕或朋友圈配文。
+                3. 不要解释谐音原理，不要输出教程、知识问答或建议。
+                4. 只输出合法 JSON：{"items":["谐音梗1","谐音梗2"]}。
+                """.formatted(keyword, scene, count);
+        return new PromptPayload(prompt, count);
+    }
+
+    private PromptPayload buildSocialCopywritingPrompt(Map<String, Object> message) {
+        String topic = sanitizePlainText(getString(message, "topic", ""), 120);
+        if (StringUtils.isBlank(topic)) {
+            throw new IllegalArgumentException("朋友圈主题不能为空");
+        }
+
+        String mood = allowValue(getString(message, "mood", "clean"), List.of("clean", "healing", "funny", "emo", "workday"), "clean");
+        String length = allowValue(getString(message, "length", "short"), List.of("short", "medium"), "short");
+        int count = getInt(message, "count", 6, 1, 10);
+        boolean emoji = getBoolean(message, "emoji", true);
+
+        String prompt = """
+                生成中文朋友圈文案。
+                主题或素材：%s
+                情绪风格：%s
+                长度：%s
+                生成数量：%d
+                是否带emoji：%s
+                硬性要求：
+                1. short 每条不超过36个中文字符，medium 每条不超过72个中文字符。
+                2. 适合朋友圈发布，可以有轻微留白感，但不要像广告、教程或新闻标题。
+                3. 不要输出编号、解释或额外字段。
+                4. 只输出合法 JSON：{"items":["文案1","文案2"]}。
+                """.formatted(topic, mood, length, count, emoji ? "是" : "否");
+        return new PromptPayload(prompt, count);
+    }
+
+    private PromptPayload buildToneRewritePrompt(Map<String, Object> message) {
+        String sourceText = sanitizePlainText(getString(message, "sourceText", ""), 240);
+        if (StringUtils.isBlank(sourceText)) {
+            throw new IllegalArgumentException("改写文本不能为空");
+        }
+
+        String mode = allowValue(getString(message, "mode", "praise"), List.of("praise", "sarcasm", "balanced"), "praise");
+        int count = getInt(message, "count", 5, 1, 8);
+
+        String prompt = """
+                改写中文短句。
+                原文：%s
+                改写模式：%s
+                生成数量：%d
+                硬性要求：
+                1. praise 表示改写成真诚夸夸语气，sarcasm 表示改写成轻度阴阳怪气语气，balanced 表示先夸再轻微吐槽。
+                2. 每条不超过60个中文字符，适合聊天玩梗，不要做人身攻击、辱骂或恶意引导。
+                3. 只改写语气，不回答原文中的问题，不扩写成文章。
+                4. 只输出合法 JSON：{"items":["改写1","改写2"]}。
+                """.formatted(sourceText, mode, count);
         return new PromptPayload(prompt, count);
     }
 
