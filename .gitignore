@@ -69,3 +69,6 @@ logs/
 
 # Arthas
 arthas-output/
+
+# local helper scripts
+.local/

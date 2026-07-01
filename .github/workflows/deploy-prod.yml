@@ -12,9 +12,6 @@ on:
           - all
           - core
           - external
-  push:
-    tags:
-      - "server-v*"
 
 permissions:
   contents: read
