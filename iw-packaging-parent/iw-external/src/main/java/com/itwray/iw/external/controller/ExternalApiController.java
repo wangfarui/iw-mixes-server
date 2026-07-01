@@ -2,10 +2,14 @@ package com.itwray.iw.external.controller;
 
 import com.itwray.iw.auth.model.vo.WebsiteNavigationListVo;
 import com.itwray.iw.common.GeneralResponse;
+import com.itwray.iw.external.model.dto.GetExchangeRateDto;
+import com.itwray.iw.external.model.vo.GetExchangeRateVo;
 import com.itwray.iw.external.service.ExternalApiService;
+import com.itwray.iw.external.service.InternalApiService;
 import com.itwray.iw.web.annotation.SkipWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -28,9 +32,13 @@ public class ExternalApiController {
 
     private final ExternalApiService externalApiService;
 
+    private final InternalApiService internalApiService;
+
     @Autowired
-    public ExternalApiController(ExternalApiService externalApiService) {
+    public ExternalApiController(ExternalApiService externalApiService,
+                                 InternalApiService internalApiService) {
         this.externalApiService = externalApiService;
+        this.internalApiService = internalApiService;
     }
 
     @GetMapping("/heartbeat")
@@ -67,6 +75,12 @@ public class ExternalApiController {
     @Operation(summary = "查询共享网站列表")
     public List<WebsiteNavigationListVo> websiteList() {
         return externalApiService.querySharedWebsiteList();
+    }
+
+    @PostMapping("/exchange-rate/convert")
+    @Operation(summary = "公开查询汇率")
+    public GeneralResponse<GetExchangeRateVo> exchangeRateConvert(@RequestBody @Valid GetExchangeRateDto dto) {
+        return GeneralResponse.success(internalApiService.getExchangeRate(dto));
     }
 
 }

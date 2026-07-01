@@ -1,6 +1,7 @@
 package com.itwray.iw.external.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -11,6 +12,7 @@ import com.itwray.iw.external.model.entity.ExternalExchangeRateEntity;
 import com.itwray.iw.external.model.vo.GetExchangeRateVo;
 import com.itwray.iw.external.service.InternalApiService;
 import com.itwray.iw.web.constants.WebCommonConstants;
+import com.itwray.iw.web.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,24 +67,45 @@ public class InternalApiServiceImpl implements InternalApiService {
         }
 
         // 在线查询汇率
+        if (StrUtil.isBlank(exchangeRateAccessKey)) {
+            throw new BusinessException("汇率服务未配置");
+        }
         Map<String, Object> paramMap = new HashMap<>();
         paramMap.put("from", dto.getFromCurrency());
         paramMap.put("to", dto.getToCurrency());
         paramMap.put("date", dto.getQueryDate().format(DateUtils.DATE_FORMATTER));
         paramMap.put("access_key", exchangeRateAccessKey);
         paramMap.put("amount", dto.getFromAmount());
-        String res = HttpUtil.get("http://api.exchangerate.host/convert", paramMap);
-        log.info("InternalApiService#getExchangeRate paramMap: {}, res: {}", JSONUtil.toJsonStr(paramMap), res);
-        JSONObject jsonObject = JSONUtil.parseObj(res);
+        JSONObject jsonObject;
+        try {
+            String res = HttpUtil.get("http://api.exchangerate.host/convert", paramMap);
+            Map<String, Object> logParamMap = new HashMap<>(paramMap);
+            logParamMap.put("access_key", "***");
+            log.info("InternalApiService#getExchangeRate paramMap: {}, res: {}", JSONUtil.toJsonStr(logParamMap), res);
+            jsonObject = JSONUtil.parseObj(res);
+        } catch (Exception e) {
+            log.warn("InternalApiService#getExchangeRate request failed, from: {}, to: {}, date: {}",
+                    dto.getFromCurrency(), dto.getToCurrency(), dto.getQueryDate(), e);
+            throw new BusinessException("汇率查询失败，请稍后重试");
+        }
+
+        JSONObject info = jsonObject.getJSONObject("info");
+        BigDecimal exchangeRate = info == null ? null : info.getBigDecimal("quote");
+        BigDecimal toAmount = jsonObject.getBigDecimal("result");
+        if (exchangeRate == null || toAmount == null) {
+            log.warn("InternalApiService#getExchangeRate invalid response, from: {}, to: {}, date: {}, res: {}",
+                    dto.getFromCurrency(), dto.getToCurrency(), dto.getQueryDate(), jsonObject);
+            throw new BusinessException("汇率查询失败，请稍后重试");
+        }
 
         // 保存查询后的汇率
         ExternalExchangeRateEntity entity = new ExternalExchangeRateEntity();
         entity.setFromCurrency(dto.getFromCurrency());
         entity.setToCurrency(dto.getToCurrency());
-        entity.setExchangeRate(jsonObject.getJSONObject("info").getBigDecimal("quote"));
+        entity.setExchangeRate(exchangeRate);
         entity.setQueryDate(dto.getQueryDate());
         entity.setFromAmount(dto.getFromAmount());
-        entity.setToAmount(jsonObject.getBigDecimal("result"));
+        entity.setToAmount(toAmount);
         externalExchangeRateDao.save(entity);
 
         return BeanUtil.copyProperties(entity, GetExchangeRateVo.class);
