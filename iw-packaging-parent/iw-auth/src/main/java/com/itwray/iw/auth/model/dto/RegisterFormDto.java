@@ -37,4 +37,8 @@ public class RegisterFormDto {
     @NotBlank(message = "验证码不能为空")
     @Length(min = 6, max = 6, message = "验证码固定为6位数字")
     private String verificationCode;
+
+    @Schema(title = "邀请码")
+    @Length(max = 6, message = "邀请码最多6位")
+    private String inviteCode;
 }

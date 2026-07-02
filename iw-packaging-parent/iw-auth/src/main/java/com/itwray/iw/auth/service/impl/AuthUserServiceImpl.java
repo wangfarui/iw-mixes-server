@@ -11,6 +11,7 @@ import com.itwray.iw.auth.model.entity.AuthUserEntity;
 import com.itwray.iw.auth.model.enums.VerificationCodeActionEnum;
 import com.itwray.iw.auth.model.vo.UserSimpleVo;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
+import com.itwray.iw.auth.service.AuthRegisterInviteService;
 import com.itwray.iw.auth.service.AuthUserService;
 import com.itwray.iw.auth.service.AuthVerificationService;
 import com.itwray.iw.common.utils.ConstantEnumUtil;
@@ -52,6 +53,8 @@ public class AuthUserServiceImpl implements AuthUserService {
 
     private AuthVerificationService authVerificationService;
 
+    private AuthRegisterInviteService authRegisterInviteService;
+
     private InternalApiClient internalApiClient;
 
     @Autowired
@@ -62,6 +65,11 @@ public class AuthUserServiceImpl implements AuthUserService {
     @Autowired
     public void setAuthVerificationService(AuthVerificationService authVerificationService) {
         this.authVerificationService = authVerificationService;
+    }
+
+    @Autowired
+    public void setAuthRegisterInviteService(AuthRegisterInviteService authRegisterInviteService) {
+        this.authRegisterInviteService = authRegisterInviteService;
     }
 
     @Autowired
@@ -137,6 +145,9 @@ public class AuthUserServiceImpl implements AuthUserService {
         AuthUserEntity authUserEntity = authUserDao.queryOneByLoginWay(account, dto.getLoginWay());
         // 如果用户不存在，则在验证码校验通过的前提下，自动注册新用户
         if (authUserEntity == null) {
+            if (authRegisterInviteService.isInviteRegisterEnabled()) {
+                return authRegisterInviteService.createInviteRequiredResponse(dto);
+            }
             UserAddBo userAddBo = new UserAddBo();
             userAddBo.setPhoneNumber(dto.getPhoneNumber());
             userAddBo.setEmailAddress(dto.getEmailAddress());

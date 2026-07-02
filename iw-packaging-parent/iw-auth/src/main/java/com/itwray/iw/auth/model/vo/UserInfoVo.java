@@ -41,6 +41,15 @@ public class UserInfoVo {
     @JsonSerialize(using = EmailAddressSerializer.class)
     private String emailAddress;
 
+    @Schema(title = "用户角色类型")
+    private Integer roleType;
+
     @Schema(title = "新用户")
     private Boolean newUser;
+
+    @Schema(title = "是否需要邀请码")
+    private Boolean inviteRequired;
+
+    @Schema(title = "注册票据")
+    private String registerTicket;
 }

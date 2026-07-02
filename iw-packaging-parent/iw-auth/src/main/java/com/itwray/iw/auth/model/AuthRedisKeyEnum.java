@@ -53,6 +53,26 @@ public enum AuthRedisKeyEnum implements RedisKeyManager {
     USER_LOGIN_EMAIL_VERIFY_KEY("auth:user:login:email:verify:%s", 5 * 60L),
 
     /**
+     * 新用户验证码注册是否启用邀请码
+     */
+    USER_REGISTER_INVITE_ENABLED_KEY("auth:user:register:invite:enabled", 0L),
+
+    /**
+     * 新用户注册邀请码
+     */
+    USER_REGISTER_INVITE_CODE_KEY("auth:user:register:invite:current", 24 * 60 * 60L),
+
+    /**
+     * 新用户注册邀请码生成时间
+     */
+    USER_REGISTER_INVITE_CREATE_TIME_KEY("auth:user:register:invite:created", 24 * 60 * 60L),
+
+    /**
+     * 验证码已通过，等待邀请码完成注册的临时票据:[ticket]
+     */
+    USER_REGISTER_INVITE_PENDING_TICKET_KEY("auth:user:register:invite:pending:%s", 5 * 60L),
+
+    /**
      * 电话号码获取验证码时，指定ip获取验证码的次数:[ipAddress]
      */
     PHONE_VERIFY_IP_KEY("auth:phone:verify:ip:%s", 60 * 60L),

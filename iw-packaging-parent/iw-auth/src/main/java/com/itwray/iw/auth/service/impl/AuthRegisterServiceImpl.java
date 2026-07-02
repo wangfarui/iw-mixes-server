@@ -6,6 +6,7 @@ import com.itwray.iw.auth.model.bo.UserAddBo;
 import com.itwray.iw.auth.model.dto.RegisterFormDto;
 import com.itwray.iw.auth.model.entity.AuthUserEntity;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
+import com.itwray.iw.auth.service.AuthRegisterInviteService;
 import com.itwray.iw.auth.service.AuthRegisterService;
 import com.itwray.iw.auth.service.AuthVerificationService;
 import com.itwray.iw.starter.redis.RedisUtil;
@@ -31,6 +32,8 @@ public class AuthRegisterServiceImpl implements AuthRegisterService {
 
     private AuthVerificationService authVerificationService;
 
+    private AuthRegisterInviteService authRegisterInviteService;
+
     @Autowired
     public AuthRegisterServiceImpl(AuthUserDao authUserDao) {
         this.authUserDao = authUserDao;
@@ -39,6 +42,11 @@ public class AuthRegisterServiceImpl implements AuthRegisterService {
     @Autowired
     public void setAuthVerificationService(AuthVerificationService authVerificationService) {
         this.authVerificationService = authVerificationService;
+    }
+
+    @Autowired
+    public void setAuthRegisterInviteService(AuthRegisterInviteService authRegisterInviteService) {
+        this.authRegisterInviteService = authRegisterInviteService;
     }
 
     @Override
@@ -65,6 +73,8 @@ public class AuthRegisterServiceImpl implements AuthRegisterService {
             authUserDao.incrementClientIpLockCount(clientIp);
             throw new BusinessException("验证码错误，请重新输入");
         }
+
+        authRegisterInviteService.verifyInviteIfEnabled(dto.getInviteCode());
 
         // 新增用户
         UserAddBo userAddBo = new UserAddBo();

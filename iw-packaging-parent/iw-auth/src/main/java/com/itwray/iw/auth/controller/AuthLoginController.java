@@ -1,8 +1,10 @@
 package com.itwray.iw.auth.controller;
 
 import com.itwray.iw.auth.model.dto.LoginPasswordDto;
+import com.itwray.iw.auth.model.dto.LoginInviteRegisterDto;
 import com.itwray.iw.auth.model.dto.LoginVerificationCodeDto;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
+import com.itwray.iw.auth.service.AuthRegisterInviteService;
 import com.itwray.iw.auth.service.AuthUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +32,8 @@ public class AuthLoginController {
 
     private final AuthUserService authUserService;
 
+    private final AuthRegisterInviteService authRegisterInviteService;
+
     @Value("${captcha.width:130}")
     private Integer captchaWidth;
 
@@ -40,8 +44,9 @@ public class AuthLoginController {
     private Integer captchaLen;
 
     @Autowired
-    public AuthLoginController(AuthUserService authUserService) {
+    public AuthLoginController(AuthUserService authUserService, AuthRegisterInviteService authRegisterInviteService) {
         this.authUserService = authUserService;
+        this.authRegisterInviteService = authRegisterInviteService;
     }
 
     @GetMapping("/captcha.jpg")
@@ -65,5 +70,11 @@ public class AuthLoginController {
     @Operation(summary = "根据验证码登录")
     public UserInfoVo loginByVerificationCode(@RequestBody @Valid LoginVerificationCodeDto dto) {
         return authUserService.loginByVerificationCode(dto);
+    }
+
+    @PostMapping("/verificationCode/invite")
+    @Operation(summary = "根据验证码登录的邀请码完成新用户注册")
+    public UserInfoVo registerByVerificationCodeInvite(@RequestBody @Valid LoginInviteRegisterDto dto) {
+        return authRegisterInviteService.registerByInvite(dto);
     }
 }
