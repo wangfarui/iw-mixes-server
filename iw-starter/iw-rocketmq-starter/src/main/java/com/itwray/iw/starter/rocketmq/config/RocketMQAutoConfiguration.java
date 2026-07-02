@@ -107,13 +107,16 @@ public class RocketMQAutoConfiguration implements ApplicationContextAware {
         }
 
         void consume(LocalMessageEvent event) {
-            Long consumeRecordId = addConsumeRecord(event);
+            ThreadContextSnapshot callerContext = ThreadContextSnapshot.capture();
+            Long consumeRecordId = null;
             boolean success = false;
             try {
+                ThreadContextSnapshot.clear();
                 Object body = event.getBody();
                 if (body instanceof UserDto userDto) {
                     UserUtils.setUserId(userDto.getUserId());
                 }
+                consumeRecordId = addConsumeRecord(event);
                 listener.doConsume(body);
                 success = true;
                 log.info("本地消息消费成功, topic: {}, tag: {}, messageId: {}", event.getTopic(), event.getTag(), event.getMessageId());
@@ -121,12 +124,7 @@ public class RocketMQAutoConfiguration implements ApplicationContextAware {
                 log.error("本地消息消费失败, topic: {}, tag: {}, messageId: {}", event.getTopic(), event.getTag(), event.getMessageId(), e);
             } finally {
                 updateConsumeStatus(consumeRecordId, success);
-                UserUtils.removeUserId();
-                UserUtils.removeUserToken();
-                UserUtils.removeUserDataPermission();
-                UserSharedQueryUtils.removeUserSharedQuery();
-                UserSharedQueryUtils.removeUserSharedQueryOnlyMyself();
-                UserCurrentGroupUtils.removeCurrentGroupId();
+                callerContext.restore();
             }
         }
 
@@ -163,6 +161,33 @@ public class RocketMQAutoConfiguration implements ApplicationContextAware {
                     .eq(BaseMqConsumeRecordsEntity::getId, id)
                     .set(BaseMqConsumeRecordsEntity::getStatus, MQConsumeStatusEnum.of(success))
                     .update();
+        }
+    }
+
+    private record ThreadContextSnapshot(
+            UserUtils.UserContextSnapshot userContext,
+            UserSharedQueryUtils.UserSharedQueryContextSnapshot sharedQueryContext,
+            Integer currentGroupId
+    ) {
+
+        static ThreadContextSnapshot capture() {
+            return new ThreadContextSnapshot(
+                    UserUtils.snapshotContext(),
+                    UserSharedQueryUtils.snapshotContext(),
+                    UserCurrentGroupUtils.snapshotContext()
+            );
+        }
+
+        static void clear() {
+            UserUtils.clearContext();
+            UserSharedQueryUtils.clearContext();
+            UserCurrentGroupUtils.clearContext();
+        }
+
+        void restore() {
+            UserUtils.restoreContext(userContext);
+            UserSharedQueryUtils.restoreContext(sharedQueryContext);
+            UserCurrentGroupUtils.restoreContext(currentGroupId);
         }
     }
 }

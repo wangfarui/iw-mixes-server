@@ -146,6 +146,41 @@ public abstract class UserUtils {
         USER_DATA_PERMISSION.remove();
     }
 
+    public static UserContextSnapshot snapshotContext() {
+        return new UserContextSnapshot(USER_ID.get(), USER_TOKEN.get(), USER_DATA_PERMISSION.get());
+    }
+
+    public static void clearContext() {
+        removeUserId();
+        removeUserToken();
+        removeUserDataPermission();
+    }
+
+    public static void restoreContext(UserContextSnapshot snapshot) {
+        if (snapshot == null) {
+            clearContext();
+            return;
+        }
+        if (snapshot.userId() == null) {
+            removeUserId();
+        } else {
+            setUserId(snapshot.userId());
+        }
+        if (snapshot.token() == null) {
+            removeUserToken();
+        } else {
+            setToken(snapshot.token());
+        }
+        if (snapshot.userDataPermission() == null) {
+            removeUserDataPermission();
+        } else {
+            setUserDataPermission(snapshot.userDataPermission());
+        }
+    }
+
+    public record UserContextSnapshot(Integer userId, String token, Boolean userDataPermission) {
+    }
+
     private static AuthenticationClient getAuthClient() {
         if (authenticationClient == null) {
             synchronized (AUTHENTICATION_CLIENT_LOCK) {

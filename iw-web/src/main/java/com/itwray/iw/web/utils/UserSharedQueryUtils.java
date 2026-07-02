@@ -63,4 +63,33 @@ public abstract class UserSharedQueryUtils {
     public static void removeUserSharedQueryOnlyMyself() {
         USER_SHARED_QUERY_ONLY_MYSELF.remove();
     }
+
+    public static UserSharedQueryContextSnapshot snapshotContext() {
+        return new UserSharedQueryContextSnapshot(USER_SHARED_QUERY.get(), USER_SHARED_QUERY_ONLY_MYSELF.get());
+    }
+
+    public static void clearContext() {
+        removeUserSharedQuery();
+        removeUserSharedQueryOnlyMyself();
+    }
+
+    public static void restoreContext(UserSharedQueryContextSnapshot snapshot) {
+        if (snapshot == null) {
+            clearContext();
+            return;
+        }
+        if (snapshot.userSharedQuery() == null) {
+            removeUserSharedQuery();
+        } else {
+            setUserSharedQuery(snapshot.userSharedQuery());
+        }
+        if (snapshot.userSharedQueryOnlyMyself() == null) {
+            removeUserSharedQueryOnlyMyself();
+        } else {
+            setUserSharedQueryOnlyMyself(snapshot.userSharedQueryOnlyMyself());
+        }
+    }
+
+    public record UserSharedQueryContextSnapshot(Boolean userSharedQuery, Boolean userSharedQueryOnlyMyself) {
+    }
 }

@@ -34,4 +34,20 @@ public abstract class UserCurrentGroupUtils {
     public static void removeCurrentGroupId() {
         USER_CURRENT_GROUP_ID.remove();
     }
+
+    public static Integer snapshotContext() {
+        return USER_CURRENT_GROUP_ID.get();
+    }
+
+    public static void clearContext() {
+        removeCurrentGroupId();
+    }
+
+    public static void restoreContext(Integer currentGroupId) {
+        if (currentGroupId == null) {
+            removeCurrentGroupId();
+        } else {
+            setCurrentGroupId(currentGroupId);
+        }
+    }
 }
