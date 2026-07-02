@@ -1,8 +1,8 @@
-# AGENTS.md - iw-mixes-server 后端重构项目指南
+# AGENTS.md - iw-mixes-server 后端项目指南
 
 ## 项目定位
 
-`iw-mixes-server` 是 IW 系统当前后端主项目。旧后端项目已废弃，不再作为开发入口。
+`iw-mixes-server` 是 IW 系统当前唯一默认后端迭代项目。用户说 `后端` 时，默认进入本项目。
 
 当前目标是面向小规模生产环境的模块化单体：
 
@@ -11,6 +11,8 @@
 - 生产环境不依赖 Nacos、RocketMQ Broker 和独立 Spring Cloud Gateway。
 - 配置使用 Spring Boot 外部化配置，不提交真实密钥。
 - 发布链路使用 GitHub Actions + SSH + systemd。
+
+历史旧后端 `../iw-mixes` 是归档项目，只能作为迁移追溯或旧实现对照；新接口、新字段、新业务逻辑都应落在本项目。
 
 发布文件见 `deploy/`，生产发布和运维说明优先读取 `README.md`、`deploy/README.md`、`deploy/OPERATIONS.md`。
 
@@ -102,9 +104,10 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 ## 开发约定
 
 - 先读本文件，再读根目录 `../AGENTS.md` 了解跨项目关系。
-- 不要把旧后端项目当作开发入口；如果工作区中重新出现旧目录，默认视为废弃内容。
+- 不要把 `../iw-mixes` 旧后端归档项目当作开发入口。
 - 不要修改 `target/`、`*.iml`、IDE 缓存、构建产物和本地敏感配置。
 - 修改公共模块 `iw-common`、`iw-web`、`iw-feign-client`、`iw-starter` 时，要评估 `iw-core` 和 `iw-external` 影响。
 - 业务模块作为库模块时，不要让模块内 `application*.yml` 污染 `iw-core` 运行时配置。
 - 新增接口时，给出前端可调用的完整 Nginx 入口路径。
 - 新增公开外部接口时，默认使用 `iw-external` 的 `/external-service/api/**` 路径规范。
+- 如果需求提到 `wx项目`、`微信小程序`，联动检查 `../iw-mixes-app-wx`；如果提到 `web项目`、`前端`，联动检查 `../iw-mixes-web-platform`。
