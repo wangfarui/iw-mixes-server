@@ -53,7 +53,6 @@ public class ToolAiServiceImpl implements ToolAiService {
 
     private static final int MAX_MESSAGE_JSON_LENGTH = 1200;
     private static final int MAX_USER_AGENT_LENGTH = 512;
-    private static final String MODEL = "deepseek-chat";
     private static final String SYSTEM_PROMPT = """
             你是 IW Tools 的中文文字游戏生成器，只能完成指定文字游戏任务。
             不回答知识问答、代码、脚本、破解、咨询、总结、翻译、长文写作等非文字游戏请求。
@@ -148,7 +147,7 @@ public class ToolAiServiceImpl implements ToolAiService {
         );
         AiCompletionResult completionResult = aiService.complete(
                 messages,
-                MODEL,
+                null,
                 businessType.getMaxTokens(),
                 businessType.getTemperature()
         );

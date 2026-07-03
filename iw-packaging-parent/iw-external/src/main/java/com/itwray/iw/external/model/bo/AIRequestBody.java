@@ -20,8 +20,7 @@ public class AIRequestBody {
     private List<AIMessage> messages;
 
     /**
-     * 使用的模型的 ID。您可以使用 deepseek-chat。
-     * 可选值有: deepseek-chat, deepseek-reasoner
+     * 使用的模型 ID，由具体 AI 服务商决定。
      */
     private String model;
 

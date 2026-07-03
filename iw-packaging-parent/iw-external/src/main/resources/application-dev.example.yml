@@ -18,7 +18,15 @@ iw:
     external:
       base-url: http://127.0.0.1:18006
   ai:
-    api-key:
+    default:
+      api-url: https://api.deepseek.com/chat/completions
+      api-key:
+      model: gpt-5.5
+    image:
+      provider: gemini
+      api-url: https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+      api-key:
+      model: gemini-3.1-flash-image
   external:
     amap:
       key:

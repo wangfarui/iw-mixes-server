@@ -18,8 +18,15 @@ iw:
     api:
       prefix: ${IW_WEB_API_PREFIX:/}
   ai:
-    api-url: ${IW_AI_API_URL:https://api.deepseek.com/chat/completions}
-    api-key: ${IW_AI_API_KEY:}
+    default:
+      api-url: ${IW_AI_DEFAULT_API_URL:https://api.deepseek.com/chat/completions}
+      api-key: ${IW_AI_DEFAULT_API_KEY:}
+      model: ${IW_AI_DEFAULT_MODEL:gpt-5.5}
+    image:
+      provider: ${IW_AI_IMAGE_PROVIDER:gemini}
+      api-url: ${IW_AI_IMAGE_API_URL:${IW_AI_DEFAULT_API_URL:https://api.deepseek.com/chat/completions}}
+      api-key: ${IW_AI_IMAGE_API_KEY:${IW_AI_DEFAULT_API_KEY:}}
+      model: ${IW_AI_IMAGE_MODEL:}
   remote:
     auth:
       base-url: ${IW_CORE_BASE_URL:http://127.0.0.1:18080}

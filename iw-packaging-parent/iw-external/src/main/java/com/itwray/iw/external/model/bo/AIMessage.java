@@ -14,7 +14,7 @@ public class AIMessage {
     /**
      * 消息内容
      */
-    private String content;
+    private Object content;
 
     /**
      * 消息发起的角色, 可选值有: system、user、assistant、tool

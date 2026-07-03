@@ -2,11 +2,13 @@ package com.itwray.iw.external.controller;
 
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.model.ExternalClientConstants;
+import com.itwray.iw.external.model.dto.AiImageReferenceGenerateDto;
 import com.itwray.iw.external.model.dto.AiStructuredChatDto;
 import com.itwray.iw.external.model.dto.AsrSentenceRecognizeDto;
 import com.itwray.iw.external.model.dto.GetExchangeRateDto;
 import com.itwray.iw.external.model.dto.SendEmailDto;
 import com.itwray.iw.external.model.dto.SmsSendVerificationCodeDto;
+import com.itwray.iw.external.model.vo.AiImageReferenceGenerateVo;
 import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 import com.itwray.iw.external.model.vo.AsrSentenceRecognizeVo;
 import com.itwray.iw.external.model.vo.GetExchangeRateVo;
@@ -96,6 +98,18 @@ public class InternalApiController {
     @Operation(summary = "结构化AI对话")
     public GeneralResponse<AiStructuredChatVo> structuredChat(@RequestBody @Valid AiStructuredChatDto dto) {
         return GeneralResponse.success(aiService.structuredChat(dto));
+    }
+
+    @PostMapping("/ai/image/referenceGenerate/start")
+    @Operation(summary = "启动参考图生成图片任务")
+    public GeneralResponse<AiImageReferenceGenerateVo> startReferenceGenerateImage(@RequestBody @Valid AiImageReferenceGenerateDto dto) {
+        return GeneralResponse.success(aiService.startReferenceGenerateImage(dto));
+    }
+
+    @GetMapping("/ai/image/referenceGenerate/status")
+    @Operation(summary = "查询参考图生成图片任务")
+    public GeneralResponse<AiImageReferenceGenerateVo> getReferenceGenerateImageStatus(@RequestParam("taskId") String taskId) {
+        return GeneralResponse.success(aiService.getReferenceGenerateImageStatus(taskId));
     }
 
     @PostMapping("/asr/sentenceRecognition")

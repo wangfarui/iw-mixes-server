@@ -20,9 +20,6 @@ public class AiStructuredChatDto {
     @Schema(title = "对话消息列表")
     private List<AiChatMessageDto> messages;
 
-    @Schema(title = "模型名称")
-    private String model;
-
     @Schema(title = "最大token数")
     private Integer maxTokens;
 

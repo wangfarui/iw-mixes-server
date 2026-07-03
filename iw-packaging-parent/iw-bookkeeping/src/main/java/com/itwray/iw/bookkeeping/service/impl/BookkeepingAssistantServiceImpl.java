@@ -359,7 +359,6 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
 
         AiStructuredChatDto dto = new AiStructuredChatDto();
         dto.setMessages(List.of(systemMessage, userMessage));
-        dto.setModel("deepseek-chat");
         dto.setMaxTokens(512);
         dto.setTemperature(0.1D);
         return dto;

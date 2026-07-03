@@ -30,6 +30,7 @@ import java.util.Set;
         "com.itwray.iw.bookkeeping.mapper",
         "com.itwray.iw.eat.mapper",
         "com.itwray.iw.points.mapper",
+        "com.itwray.iw.wardrobe.mapper",
         "com.itwray.iw.external.mapper",
         "com.itwray.iw.starter.rocketmq.web.mapper"
 })

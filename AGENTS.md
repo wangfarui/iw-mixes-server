@@ -62,6 +62,20 @@ Controller 上的路径仍不包含内部业务服务前缀。例如后端 `@Req
 - 本地可使用环境变量或不提交的 `application-dev.yml`。
 - 不要提交真实数据库密码、Redis 密码、JWT/内部调用密钥、AI Key、阿里云 Key、Nacos 密码等。
 
+## AI 接口使用规范
+
+- AI 供应商调用统一收敛在 `iw-packaging-parent/iw-external`，业务模块不要直接请求 OpenAI、DeepSeek 或其他第三方 AI 地址。
+- 业务模块调用 AI 时通过 `iw-feign-client/iw-external-client` 的内部接口传递消息、温度、token 等业务参数；请求 DTO、Controller 入参、前端 payload 不要暴露或透传 `model` 字段。
+- 默认 AI 统一由 `iw-external` 配置 `iw.ai.default.api-url`、`iw.ai.default.api-key`、`iw.ai.default.model` 及对应环境变量 `IW_AI_DEFAULT_*` 控制，默认模型 `gpt-5.5`。不要在业务模块新增 `iw.<domain>.ai.*model` 或写死模型名。
+- 图片生成 AI 统一由 `iw.ai.image.provider`、`iw.ai.image.api-url`、`iw.ai.image.api-key`、`iw.ai.image.model` 及对应环境变量 `IW_AI_IMAGE_*` 控制。当前只有“衣物图片 AI 优化生成”使用图片生成 AI，其它 AI 调用方都使用默认 AI。
+- 旧配置 `iw.ai.api-url`、`iw.ai.api-key`、`iw.ai.model` / `IW_AI_API_URL`、`IW_AI_API_KEY`、`IW_AI_MODEL` 不再支持；AI 配置必须使用 `iw.ai.default.*` 和 `iw.ai.image.*`。
+- 如某个 AI 能力确实需要独立模型，先确认需求，再在 `iw-external` 内新增明确命名的服务端配置项；不要让 `iw-core`、微信小程序或 Web 管理端通过请求参数选择模型。
+- 默认 AI 的 OpenAI-compatible HTTP 头使用 `Authorization`，需把配置值写成完整格式，例如 `Bearer sk-xxx`。Gemini 图片生成 AI 使用 `x-goog-api-key`，配置值可以是裸 Gemini API Key；如误写成 `Bearer xxx`，服务端会自动去掉前缀。
+- 图片/多模态能力也通过 `iw-external` 的内部 AI 接口提供，业务模块只传提示词、业务上下文和图片 URL；模型兼容性由 `iw-external` 配置负责。图片生成能力使用 external 侧 AI 配置推导供应商接口地址，不在业务模块新增模型参数。
+- 图片生成供应商由 `iw.ai.image.provider` / `IW_AI_IMAGE_PROVIDER` 控制，当前支持 `gemini` 和 `openai`。`gemini` 走 Gemini Interactions 文本+图片生成图片接口，默认图片模型为 `gemini-3.1-flash-image`；`openai` 保留 OpenAI `/responses + image_generation` 实现，图片模型由 `iw.ai.image.model` / `IW_AI_IMAGE_MODEL` 控制，未配置时回退到默认 AI 模型。
+- 图片生成、图片编辑等长耗时 AI 能力不要做前端同步长等待接口。业务端应返回任务 ID，用 Redis 保存短期任务状态并提供轮询接口；如供应商支持后台任务，`iw-external` 也应使用供应商后台/状态查询能力，避免 504 或 Feign/小程序请求超时。
+- 凡是调用 `startReferenceGenerateImage` 的图片生成业务，都必须提供 `businessType`、`businessCustomCategory`、`businessId` 上下文，并在业务调用侧落通用图片生成记录。去重键统一为 `sha256(sourceImageUrl + "|" + (businessType + ":" + businessCustomCategory) + "|" + businessId)`；成功记录直接复用结果，失败记录永久阻止同 key 重试，只有更换源图或调整业务自定义分类/业务 ID 才能重新触发生成。
+
 ## 发布入口
 
 - 生产发布规则见 [README.md](README.md) 的“发布”章节和 [.github/workflows/deploy-prod.yml](.github/workflows/deploy-prod.yml)。

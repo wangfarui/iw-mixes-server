@@ -17,7 +17,7 @@ public class AiChatMessageDto {
     private String role;
 
     @Schema(title = "消息内容")
-    private String content;
+    private Object content;
 
     @Schema(title = "参与者名称")
     private String name;

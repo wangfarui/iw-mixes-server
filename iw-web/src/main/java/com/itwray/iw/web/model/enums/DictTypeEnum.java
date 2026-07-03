@@ -39,6 +39,13 @@ public enum DictTypeEnum implements ConstantEnum {
     BOOKKEEPING_MEMBERSHIP_TYPE(4004, "记账-会员类型", DataType.CODE, RoleTypeEnum.USER),
     BOOKKEEPING_MEMBERSHIP_BILLING_CYCLE(4005, "记账-会员计费周期", DataType.CODE, RoleTypeEnum.ADMIN), // MembershipBillingCycleEnum
     BOOKKEEPING_MEMBERSHIP_CYCLE_UNIT(4006, "记账-会员计费周期单位", DataType.CODE, RoleTypeEnum.ADMIN), // MembershipCycleUnitEnum
+
+    /** iw-wardrobe 衣柜模块 **/
+    WARDROBE_TAG(5001, "衣柜模块", DataType.ID, RoleTypeEnum.SUPER_ADMIN),
+    WARDROBE_ITEM_CATEGORY(5002, "衣柜-衣物分类", DataType.CODE, RoleTypeEnum.USER),
+    WARDROBE_ITEM_COLOR(5003, "衣柜-衣物颜色", DataType.CODE, RoleTypeEnum.USER),
+    WARDROBE_ITEM_SCENE(5004, "衣柜-衣物场景", DataType.CODE, RoleTypeEnum.USER),
+    WARDROBE_ITEM_STYLE(5005, "衣柜-衣物风格", DataType.CODE, RoleTypeEnum.USER),
     ;
 
     private final Integer code;

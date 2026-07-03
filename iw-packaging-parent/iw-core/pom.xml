@@ -27,6 +27,11 @@
             <artifactId>iw-bookkeeping</artifactId>
             <version>${revision}</version>
         </dependency>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-wardrobe</artifactId>
+            <version>${revision}</version>
+        </dependency>
     </dependencies>
 
     <build>

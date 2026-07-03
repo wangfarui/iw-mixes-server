@@ -19,6 +19,7 @@
         <module>iw-eat</module>
         <module>iw-bookkeeping</module>
         <module>iw-points</module>
+        <module>iw-wardrobe</module>
         <module>iw-external</module>
     </modules>
 
