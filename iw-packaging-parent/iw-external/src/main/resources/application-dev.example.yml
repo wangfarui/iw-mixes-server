@@ -30,7 +30,7 @@ iw:
   external:
     amap:
       key:
-    exchangeRate:
+    exchange-rate:
       key:
     uptimerobot:
       key:

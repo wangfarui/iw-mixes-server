@@ -36,6 +36,12 @@ iw:
     dataPermission:
       enabled: false
   external:
+    amap:
+      key: ${IW_EXTERNAL_AMAP_KEY:}
+    exchange-rate:
+      key: ${IW_EXTERNAL_EXCHANGE_RATE_KEY:}
+    uptimerobot:
+      key: ${IW_EXTERNAL_UPTIMEROBOT_KEY:}
     tool-ai:
       total-daily-limit: ${IW_EXTERNAL_TOOL_AI_TOTAL_DAILY_LIMIT:200}
       ip-daily-limit: ${IW_EXTERNAL_TOOL_AI_IP_DAILY_LIMIT:50}

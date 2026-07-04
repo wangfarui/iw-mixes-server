@@ -39,7 +39,7 @@ public class InternalApiServiceImpl implements InternalApiService {
     /**
      * 汇率api的accessKey
      */
-    @Value("${iw.external.exchangeRate.key:}")
+    @Value("${iw.external.exchange-rate.key:${iw.external.exchangeRate.key:}}")
     private String exchangeRateAccessKey;
 
     @Override
