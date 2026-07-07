@@ -87,6 +87,13 @@ spring:
     name: iw-core-service
   profiles:
     default: dev
+  cloud:
+    openfeign:
+      client:
+        config:
+          internal-client:
+            connectTimeout: ${IW_EXTERNAL_FEIGN_CONNECT_TIMEOUT_MS:5000}
+            readTimeout: ${IW_EXTERNAL_FEIGN_READ_TIMEOUT_MS:180000}
   servlet:
     multipart:
       max-file-size: 10MB

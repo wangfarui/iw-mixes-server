@@ -42,10 +42,15 @@ import java.util.*;
 public class AIServiceImpl implements AIService {
 
     private static final String IMAGE_PROVIDER_OPENAI = "openai";
+    private static final String IMAGE_PROVIDER_OPENAI_RESPONSES = "openai-responses";
     private static final String IMAGE_PROVIDER_GEMINI = "gemini";
+    private static final String OPENAI_DEFAULT_IMAGE_MODEL = "gpt-image-2";
+    private static final String OPENAI_DEFAULT_IMAGES_EDITS_URL = "https://api.openai.com/v1/images/edits";
     private static final String GEMINI_DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
+    private static final String GEMINI_DEFAULT_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
     private static final int IMAGE_REFERENCE_DOWNLOAD_TIMEOUT_MS = 30 * 1000;
     private static final int IMAGE_GENERATE_TIMEOUT_MS = 60 * 1000;
+    private static final int OPENAI_IMAGE_GENERATE_TIMEOUT_MS = 8 * 60 * 1000;
     private static final int GEMINI_INLINE_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
 
     @Value("${iw.ai.default.api-url:https://api.deepseek.com/chat/completions}")
@@ -165,8 +170,11 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public AiImageReferenceGenerateVo startReferenceGenerateImage(AiImageReferenceGenerateDto dto) {
+        if (this.isOpenAiResponsesImageProvider()) {
+            return this.startOpenAiResponsesReferenceGenerateImage(dto);
+        }
         if (this.isOpenAiImageProvider()) {
-            return this.startOpenAiReferenceGenerateImage(dto);
+            return this.generateOpenAiReferenceImage(dto);
         }
         if (this.isGeminiImageProvider()) {
             return this.generateGeminiReferenceImage(dto);
@@ -174,9 +182,42 @@ public class AIServiceImpl implements AIService {
         return this.failedReferenceImageResponse("不支持的AI图片生成供应商：" + StringUtils.defaultString(this.imageProvider));
     }
 
-    private AiImageReferenceGenerateVo startOpenAiReferenceGenerateImage(AiImageReferenceGenerateDto dto) {
+    private AiImageReferenceGenerateVo generateOpenAiReferenceImage(AiImageReferenceGenerateDto dto) {
         JSONObject requestBody = new JSONObject();
         requestBody.set("model", this.resolveOpenAiImageModel());
+        requestBody.set("prompt", dto.getPrompt());
+        requestBody.set("images", List.of(Map.of("image_url", dto.getImageUrl())));
+        requestBody.set("n", 1);
+        requestBody.set("output_format", "png");
+
+        try (HttpResponse response = HttpUtil.createPost(this.resolveOpenAiImagesEditsUrl())
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("Authorization", this.imageApiKey)
+                .body(JSONUtil.toJsonStr(requestBody))
+                .timeout(OPENAI_IMAGE_GENERATE_TIMEOUT_MS)
+                .execute()) {
+            if (!response.isOk()) {
+                log.error("AIService#generateOpenAiReferenceImage 请求失败, status: {}, body: {}", response.getStatus(), response.body());
+                if (response.getStatus() == 429) {
+                    return this.tooManyRequestsReferenceImageResponse("OpenAI");
+                }
+                return this.failedReferenceImageResponse("OpenAI图片生成失败，供应商HTTP "
+                        + response.getStatus() + this.formatProviderError(response.body()));
+            }
+            return this.parseOpenAiImageResponse(response.body());
+        } catch (Exception e) {
+            if (e instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            log.error("AIService#generateOpenAiReferenceImage 请求异常", e);
+            return this.failedReferenceImageResponse("OpenAI图片生成异常：" + StringUtils.defaultString(e.getMessage()));
+        }
+    }
+
+    private AiImageReferenceGenerateVo startOpenAiResponsesReferenceGenerateImage(AiImageReferenceGenerateDto dto) {
+        JSONObject requestBody = new JSONObject();
+        requestBody.set("model", this.resolveOpenAiResponsesImageModel());
         requestBody.set("background", true);
         requestBody.set("input", List.of(Map.of(
                 "role", "user",
@@ -214,7 +255,7 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public AiImageReferenceGenerateVo getReferenceGenerateImageStatus(String taskId) {
-        if (!this.isOpenAiImageProvider()) {
+        if (!this.isOpenAiResponsesImageProvider()) {
             return this.failedReferenceImageResponse("当前AI图片生成供应商不使用后台任务状态查询");
         }
         if (StringUtils.isBlank(taskId)) {
@@ -247,22 +288,18 @@ public class AIServiceImpl implements AIService {
         ImagePayload referenceImage = this.downloadImagePayload(dto.getImageUrl());
 
         JSONObject requestBody = new JSONObject();
-        requestBody.set("model", this.resolveGeminiImageModel());
-        requestBody.set("input", List.of(
-                Map.of("type", "text", "text", dto.getPrompt()),
-                Map.of(
-                        "type", "image",
-                        "mime_type", referenceImage.mimeType(),
-                        "data", referenceImage.base64()
+        requestBody.set("contents", List.of(Map.of(
+                "parts", List.of(
+                        Map.of("text", dto.getPrompt()),
+                        Map.of("inline_data", Map.of(
+                                "mime_type", referenceImage.mimeType(),
+                                "data", referenceImage.base64()
+                        ))
                 )
-        ));
-        requestBody.set("response_format", Map.of(
-                "type", "image",
-                "mime_type", "image/jpeg",
-                "aspect_ratio", "1:1"
-        ));
+        )));
+        requestBody.set("generationConfig", Map.of("responseModalities", List.of("TEXT", "IMAGE")));
 
-        try (HttpResponse response = HttpUtil.createPost(this.resolveGeminiInteractionsUrl())
+        try (HttpResponse response = HttpUtil.createPost(this.resolveGeminiGenerateContentUrl())
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .header("x-goog-api-key", this.resolveGeminiApiKey())
@@ -421,6 +458,10 @@ public class AIServiceImpl implements AIService {
     }
 
     private String resolveOpenAiImageModel() {
+        return StringUtils.defaultIfBlank(this.imageModel, OPENAI_DEFAULT_IMAGE_MODEL);
+    }
+
+    private String resolveOpenAiResponsesImageModel() {
         return StringUtils.defaultIfBlank(this.imageModel, this.resolveModel(null));
     }
 
@@ -429,7 +470,11 @@ public class AIServiceImpl implements AIService {
     }
 
     private boolean isOpenAiImageProvider() {
-        return StringUtils.equalsAnyIgnoreCase(StringUtils.trimToEmpty(this.imageProvider), IMAGE_PROVIDER_OPENAI, "openai-responses");
+        return StringUtils.equalsAnyIgnoreCase(StringUtils.trimToEmpty(this.imageProvider), IMAGE_PROVIDER_OPENAI);
+    }
+
+    private boolean isOpenAiResponsesImageProvider() {
+        return StringUtils.equalsAnyIgnoreCase(StringUtils.trimToEmpty(this.imageProvider), IMAGE_PROVIDER_OPENAI_RESPONSES);
     }
 
     private boolean isGeminiImageProvider() {
@@ -445,22 +490,103 @@ public class AIServiceImpl implements AIService {
         return "https://api.openai.com/v1/responses";
     }
 
-    private String resolveGeminiInteractionsUrl() {
+    private String resolveOpenAiImagesEditsUrl() {
         String url = StringUtils.trimToEmpty(this.imageApiUrl);
-        if (StringUtils.contains(url, "/openai/chat/completions")) {
-            return StringUtils.substringBefore(url, "/openai/chat/completions") + "/interactions";
+        if (StringUtils.isBlank(url) || this.isKnownNonOpenAiImageApiUrl(url)) {
+            return OPENAI_DEFAULT_IMAGES_EDITS_URL;
         }
-        if (StringUtils.endsWith(url, "/chat/completions")) {
-            String baseUrl = StringUtils.removeEnd(url, "/chat/completions");
+
+        String cleanUrl = StringUtils.removeEnd(StringUtils.substringBefore(url, "?"), "/");
+        if (StringUtils.endsWith(cleanUrl, "/images/edits")) {
+            return cleanUrl;
+        }
+        if (StringUtils.endsWith(cleanUrl, "/images/generations")) {
+            return this.appendOpenAiImagesEditsPath(StringUtils.substringBefore(cleanUrl, "/images/generations"));
+        }
+        if (StringUtils.endsWith(cleanUrl, "/responses")) {
+            return this.appendOpenAiImagesEditsPath(StringUtils.removeEnd(cleanUrl, "/responses"));
+        }
+        if (StringUtils.endsWith(cleanUrl, "/chat/completions")) {
+            return this.appendOpenAiImagesEditsPath(StringUtils.removeEnd(cleanUrl, "/chat/completions"));
+        }
+        return this.appendOpenAiImagesEditsPath(cleanUrl);
+    }
+
+    private boolean isKnownNonOpenAiImageApiUrl(String url) {
+        return StringUtils.contains(StringUtils.lowerCase(StringUtils.trimToEmpty(url)), "api.deepseek.com");
+    }
+
+    private String appendOpenAiImagesEditsPath(String baseUrl) {
+        String normalized = StringUtils.removeEnd(StringUtils.trimToEmpty(baseUrl), "/");
+        if (StringUtils.endsWith(normalized, "/v1")) {
+            return normalized + "/images/edits";
+        }
+        return normalized + "/v1/images/edits";
+    }
+
+    private String resolveGeminiGenerateContentUrl() {
+        String model = this.normalizeGeminiModelName(this.resolveGeminiImageModel());
+        String url = StringUtils.trimToEmpty(this.imageApiUrl);
+        if (StringUtils.isBlank(url) || this.isKnownNonGeminiChatCompletionUrl(url)) {
+            return this.buildGeminiGenerateContentUrl(GEMINI_DEFAULT_API_BASE_URL, model);
+        }
+
+        String cleanUrl = StringUtils.removeEnd(StringUtils.substringBefore(url, "?"), "/");
+        if (StringUtils.endsWith(cleanUrl, ":generateContent")) {
+            return cleanUrl;
+        }
+        if (StringUtils.contains(cleanUrl, "/models/")) {
+            return this.buildGeminiGenerateContentUrl(StringUtils.substringBefore(cleanUrl, "/models/"), model);
+        }
+        if (StringUtils.contains(url, "/openai/chat/completions")) {
+            return this.buildGeminiGenerateContentUrl(StringUtils.substringBefore(cleanUrl, "/openai/chat/completions"), model);
+        }
+        if (StringUtils.endsWith(cleanUrl, "/chat/completions")) {
+            String baseUrl = StringUtils.removeEnd(cleanUrl, "/chat/completions");
             if (StringUtils.endsWith(baseUrl, "/openai")) {
                 baseUrl = StringUtils.removeEnd(baseUrl, "/openai");
             }
-            return baseUrl + "/interactions";
+            return this.buildGeminiGenerateContentUrl(this.toGeminiNativeBaseUrl(baseUrl), model);
         }
-        if (StringUtils.endsWith(url, "/interactions")) {
-            return url;
+        if (StringUtils.endsWith(cleanUrl, "/interactions")) {
+            return this.buildGeminiGenerateContentUrl(this.toGeminiNativeBaseUrl(StringUtils.removeEnd(cleanUrl, "/interactions")), model);
         }
-        return "https://generativelanguage.googleapis.com/v1beta/interactions";
+        if (StringUtils.endsWith(cleanUrl, "/models")) {
+            return cleanUrl + "/" + model + ":generateContent";
+        }
+        return this.buildGeminiGenerateContentUrl(this.toGeminiNativeBaseUrl(cleanUrl), model);
+    }
+
+    private boolean isKnownNonGeminiChatCompletionUrl(String url) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(url));
+        return StringUtils.contains(normalized, "api.deepseek.com")
+                || StringUtils.contains(normalized, "api.openai.com");
+    }
+
+    private String normalizeGeminiModelName(String model) {
+        String normalized = StringUtils.removeEnd(StringUtils.trimToEmpty(model), ":generateContent");
+        if (StringUtils.contains(normalized, "/models/")) {
+            normalized = StringUtils.substringAfter(normalized, "/models/");
+        }
+        if (StringUtils.startsWith(normalized, "models/")) {
+            normalized = StringUtils.substringAfter(normalized, "models/");
+        }
+        return StringUtils.defaultIfBlank(normalized, GEMINI_DEFAULT_IMAGE_MODEL);
+    }
+
+    private String toGeminiNativeBaseUrl(String baseUrl) {
+        String normalized = StringUtils.removeEnd(StringUtils.trimToEmpty(baseUrl), "/");
+        if (StringUtils.endsWith(normalized, "/v1beta")) {
+            return normalized;
+        }
+        if (StringUtils.endsWith(normalized, "/v1")) {
+            return StringUtils.removeEnd(normalized, "/v1") + "/v1beta";
+        }
+        return normalized + "/v1beta";
+    }
+
+    private String buildGeminiGenerateContentUrl(String baseUrl, String model) {
+        return StringUtils.removeEnd(baseUrl, "/") + "/models/" + model + ":generateContent";
     }
 
     private String resolveGeminiApiKey() {
@@ -496,9 +622,9 @@ public class AIServiceImpl implements AIService {
         return vo;
     }
 
-    private AiImageReferenceGenerateVo parseGeminiImageResponse(String body) {
+    private AiImageReferenceGenerateVo parseOpenAiImageResponse(String body) {
         AiImageReferenceGenerateVo vo = new AiImageReferenceGenerateVo();
-        vo.setMimeType("image/jpeg");
+        vo.setMimeType("image/png");
         vo.setStatus("completed");
         JSONObject responseBody = JSONUtil.parseObj(body);
         vo.setTaskId(StringUtils.trimToEmpty(responseBody.getStr("id")));
@@ -510,6 +636,70 @@ public class AIServiceImpl implements AIService {
             return vo;
         }
 
+        String outputFormat = StringUtils.trimToEmpty(responseBody.getStr("output_format"));
+        JSONArray data = responseBody.getJSONArray("data");
+        if (data == null || data.isEmpty()) {
+            vo.setStatus("failed");
+            vo.setErrorMessage("OpenAI图片生成响应未包含图片数据");
+            return vo;
+        }
+        for (Object item : data) {
+            JSONObject imageObject = JSONUtil.parseObj(item);
+            if (this.fillOpenAiImageFromDataItem(vo, imageObject, outputFormat)) {
+                return vo;
+            }
+        }
+
+        vo.setStatus("failed");
+        vo.setErrorMessage("OpenAI图片生成响应未包含Base64图片数据");
+        return vo;
+    }
+
+    private boolean fillOpenAiImageFromDataItem(AiImageReferenceGenerateVo vo, JSONObject imageObject, String outputFormat) {
+        String imageBase64 = StringUtils.trimToEmpty(imageObject.getStr("b64_json"));
+        if (StringUtils.isNotBlank(imageBase64)) {
+            vo.setImageBase64(imageBase64);
+            vo.setMimeType(this.openAiOutputMimeType(outputFormat));
+            vo.setRevisedPrompt(StringUtils.trimToEmpty(imageObject.getStr("revised_prompt")));
+            return true;
+        }
+
+        String imageUrl = StringUtils.trimToEmpty(imageObject.getStr("url"));
+        if (!StringUtils.startsWithIgnoreCase(imageUrl, "data:")) {
+            return false;
+        }
+        ImagePayload imagePayload = this.parseDataUrlImagePayload(imageUrl);
+        vo.setImageBase64(imagePayload.base64());
+        vo.setMimeType(imagePayload.mimeType());
+        vo.setRevisedPrompt(StringUtils.trimToEmpty(imageObject.getStr("revised_prompt")));
+        return true;
+    }
+
+    private String openAiOutputMimeType(String outputFormat) {
+        return switch (StringUtils.lowerCase(StringUtils.trimToEmpty(outputFormat))) {
+            case "jpeg", "jpg" -> "image/jpeg";
+            case "webp" -> "image/webp";
+            default -> "image/png";
+        };
+    }
+
+    private AiImageReferenceGenerateVo parseGeminiImageResponse(String body) {
+        AiImageReferenceGenerateVo vo = new AiImageReferenceGenerateVo();
+        vo.setMimeType("image/jpeg");
+        vo.setStatus("completed");
+        JSONObject responseBody = JSONUtil.parseObj(body);
+        vo.setTaskId(this.firstNonBlank(responseBody.getStr("id"), responseBody.getStr("responseId")));
+
+        Object error = responseBody.get("error");
+        if (error != null) {
+            vo.setStatus("failed");
+            vo.setErrorMessage(StringUtils.left(String.valueOf(error), 500));
+            return vo;
+        }
+
+        if (this.fillGeminiImageFromCandidates(vo, responseBody.getJSONArray("candidates"))) {
+            return vo;
+        }
         if (this.fillGeminiImageFromOutputImage(vo, responseBody.getJSONObject("output_image"))) {
             return vo;
         }
@@ -520,6 +710,56 @@ public class AIServiceImpl implements AIService {
         vo.setStatus("failed");
         vo.setErrorMessage("Gemini图片生成响应未包含图片数据");
         return vo;
+    }
+
+    private boolean fillGeminiImageFromCandidates(AiImageReferenceGenerateVo vo, JSONArray candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return false;
+        }
+        for (Object candidate : candidates) {
+            JSONObject candidateObject = JSONUtil.parseObj(candidate);
+            JSONObject content = candidateObject.getJSONObject("content");
+            JSONArray parts = content == null ? candidateObject.getJSONArray("parts") : content.getJSONArray("parts");
+            if (this.fillGeminiImageFromParts(vo, parts)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean fillGeminiImageFromParts(AiImageReferenceGenerateVo vo, JSONArray parts) {
+        if (parts == null || parts.isEmpty()) {
+            return false;
+        }
+        StringBuilder textContent = new StringBuilder();
+        for (Object part : parts) {
+            JSONObject partObject = JSONUtil.parseObj(part);
+            String text = StringUtils.trimToEmpty(partObject.getStr("text"));
+            if (StringUtils.isNotBlank(text)) {
+                textContent.append(text);
+            }
+            if (this.fillGeminiImageFromInlineData(vo, this.firstNonNullObject(
+                    partObject.getJSONObject("inlineData"),
+                    partObject.getJSONObject("inline_data")
+            ))) {
+                vo.setRevisedPrompt(StringUtils.left(textContent.toString(), 500));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean fillGeminiImageFromInlineData(AiImageReferenceGenerateVo vo, JSONObject inlineData) {
+        if (inlineData == null) {
+            return false;
+        }
+        String imageBase64 = StringUtils.trimToEmpty(inlineData.getStr("data"));
+        if (StringUtils.isBlank(imageBase64)) {
+            return false;
+        }
+        vo.setImageBase64(imageBase64);
+        vo.setMimeType(this.firstNonBlank(inlineData.getStr("mimeType"), inlineData.getStr("mime_type"), "image/jpeg"));
+        return true;
     }
 
     private boolean fillGeminiImageFromOutputImage(AiImageReferenceGenerateVo vo, JSONObject outputImage) {
@@ -661,6 +901,16 @@ public class AIServiceImpl implements AIService {
             }
         }
         return "";
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNullObject(T... values) {
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private record ImagePayload(String mimeType, String base64) {

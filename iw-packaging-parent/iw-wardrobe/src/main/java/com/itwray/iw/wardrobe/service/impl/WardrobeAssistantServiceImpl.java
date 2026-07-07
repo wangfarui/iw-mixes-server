@@ -284,7 +284,21 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         aiRequest.setBusinessCustomCategory(StringUtils.defaultString(request.getCategoryName()));
         aiRequest.setBusinessId(String.valueOf(request.getItemId()));
 
-        AiImageReferenceGenerateVo aiResponse = remoteService.startReferenceGenerateImage(aiRequest);
+        long startMillis = System.currentTimeMillis();
+        AiImageReferenceGenerateVo aiResponse;
+        try {
+            aiResponse = remoteService.startReferenceGenerateImage(aiRequest);
+            log.info("WardrobeAssistantService#executeOptimizeItemImage 调用AI图片生成完成, itemId: {}, elapsedMillis: {}, status: {}, taskId: {}, hasImage: {}",
+                    request.getItemId(),
+                    System.currentTimeMillis() - startMillis,
+                    aiResponse == null ? null : aiResponse.getStatus(),
+                    aiResponse == null ? null : aiResponse.getTaskId(),
+                    this.hasGeneratedImage(aiResponse));
+        } catch (Exception e) {
+            log.error("WardrobeAssistantService#executeOptimizeItemImage 调用AI图片生成异常, itemId: {}, elapsedMillis: {}",
+                    request.getItemId(), System.currentTimeMillis() - startMillis, e);
+            throw e;
+        }
         String externalTaskId = aiResponse == null ? "" : StringUtils.defaultString(aiResponse.getTaskId());
         aiResponse = this.waitForGeneratedImage(aiResponse);
         if (aiResponse == null || StringUtils.isBlank(aiResponse.getImageBase64())) {
