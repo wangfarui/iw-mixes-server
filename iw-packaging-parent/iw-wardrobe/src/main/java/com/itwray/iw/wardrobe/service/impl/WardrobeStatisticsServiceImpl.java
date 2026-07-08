@@ -7,6 +7,7 @@ import com.itwray.iw.wardrobe.dao.WardrobeWearRecordDao;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeWearRecordEntity;
+import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeStatisticItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeStatisticsOverviewVo;
@@ -35,11 +36,7 @@ import java.util.stream.Collectors;
 @Service
 public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService {
 
-    private static final int STATUS_ACTIVE = 1;
-    private static final int STATUS_IDLE = 2;
-    private static final int STATUS_CLEANING = 3;
-    private static final int STATUS_MAINTENANCE = 4;
-    private static final int STATUS_ELIMINATED = 5;
+    private static final int OUTFIT_STATUS_ACTIVE = 1;
     private static final int RECORD_TYPE_PLAN = 1;
     private static final int RECORD_TYPE_WORN = 2;
 
@@ -61,11 +58,11 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
     @Override
     public WardrobeStatisticsOverviewVo overview() {
         List<WardrobeItemEntity> activeItems = wardrobeItemDao.lambdaQuery()
-                .eq(WardrobeItemEntity::getStatus, STATUS_ACTIVE)
+                .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .list();
         Long totalItems = wardrobeItemDao.lambdaQuery().count();
         Long totalOutfits = wardrobeOutfitDao.lambdaQuery()
-                .eq(WardrobeOutfitEntity::getStatus, STATUS_ACTIVE)
+                .eq(WardrobeOutfitEntity::getStatus, OUTFIT_STATUS_ACTIVE)
                 .count();
         Long totalWearRecords = wearRecordDao.lambdaQuery()
                 .eq(WardrobeWearRecordEntity::getRecordType, RECORD_TYPE_WORN)
@@ -89,9 +86,7 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
         vo.setTotalWearRecords(totalWearRecords);
         vo.setNeverWornItems(activeItems.stream().filter(item -> Objects.equals(item.getWearCount(), 0)).count());
         vo.setIdleItems(activeItems.stream().filter(this::isIdleItem).count());
-        vo.setCleaningItems(this.countByStatus(STATUS_CLEANING));
-        vo.setMaintenanceItems(this.countByStatus(STATUS_MAINTENANCE));
-        vo.setEliminatedItems(this.countByStatus(STATUS_ELIMINATED));
+        vo.setEliminatedItems(this.countByStatus(WardrobeItemStatusEnum.ELIMINATED.getCode()));
         vo.setPlannedRecords(plannedRecords);
         vo.setTotalValue(totalValue);
         vo.setAvgItemPrice(activeItems.isEmpty() ? BigDecimal.ZERO : totalValue.divide(BigDecimal.valueOf(activeItems.size()), 2, RoundingMode.HALF_UP));
@@ -176,11 +171,9 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
 
     private List<WardrobeStatisticItemVo> buildStatusStats() {
         return List.of(
-                new WardrobeStatisticItemVo("在穿", this.countByStatus(STATUS_ACTIVE).intValue()),
-                new WardrobeStatisticItemVo("闲置", this.countByStatus(STATUS_IDLE).intValue()),
-                new WardrobeStatisticItemVo("清洗中", this.countByStatus(STATUS_CLEANING).intValue()),
-                new WardrobeStatisticItemVo("待维修", this.countByStatus(STATUS_MAINTENANCE).intValue()),
-                new WardrobeStatisticItemVo("已淘汰", this.countByStatus(STATUS_ELIMINATED).intValue())
+                new WardrobeStatisticItemVo(WardrobeItemStatusEnum.WEARING.getName(), this.countByStatus(WardrobeItemStatusEnum.WEARING.getCode()).intValue()),
+                new WardrobeStatisticItemVo(WardrobeItemStatusEnum.IDLE.getName(), this.countByStatus(WardrobeItemStatusEnum.IDLE.getCode()).intValue()),
+                new WardrobeStatisticItemVo(WardrobeItemStatusEnum.ELIMINATED.getName(), this.countByStatus(WardrobeItemStatusEnum.ELIMINATED.getCode()).intValue())
         );
     }
 
@@ -191,7 +184,7 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
     }
 
     private boolean isIdleItem(WardrobeItemEntity item) {
-        if (Objects.equals(item.getStatus(), STATUS_IDLE)) {
+        if (WardrobeItemStatusEnum.isIdle(item.getStatus())) {
             return true;
         }
         LocalDate lastWearDate = item.getLastWearDate();

@@ -8,6 +8,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeItemBatchAddDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeItemPageDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeItemUpdateDto;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
+import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeTagSummaryVo;
@@ -36,8 +37,6 @@ import java.util.Set;
  */
 @Service
 public class WardrobeItemServiceImpl implements WardrobeItemService {
-
-    private static final int STATUS_ACTIVE = 1;
 
     private final WardrobeItemDao wardrobeItemDao;
 
@@ -94,6 +93,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     @Override
     public PageVo<WardrobeItemPageVo> page(WardrobeItemPageDto dto) {
         LambdaQueryWrapper<WardrobeItemEntity> queryWrapper = new LambdaQueryWrapper<>();
+        Integer statusFilter = Objects.nonNull(dto.getStatus()) ? WardrobeItemStatusEnum.normalizeCode(dto.getStatus()) : null;
         queryWrapper.like(StringUtils.isNotBlank(dto.getItemName()), WardrobeItemEntity::getItemName, dto.getItemName())
                 .eq(Objects.nonNull(dto.getCategory()), WardrobeItemEntity::getCategory, dto.getCategory())
                 .like(StringUtils.isNotBlank(dto.getColorName()), WardrobeItemEntity::getColorName, dto.getColorName())
@@ -106,7 +106,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
                 .like(StringUtils.isNotBlank(dto.getPurchaseChannel()), WardrobeItemEntity::getPurchaseChannel, dto.getPurchaseChannel())
                 .like(StringUtils.isNotBlank(dto.getStorageLocation()), WardrobeItemEntity::getStorageLocation, dto.getStorageLocation())
                 .like(StringUtils.isNotBlank(dto.getCustomTag()), WardrobeItemEntity::getCustomTags, dto.getCustomTag())
-                .eq(Objects.nonNull(dto.getStatus()), WardrobeItemEntity::getStatus, dto.getStatus())
+                .eq(Objects.nonNull(statusFilter), WardrobeItemEntity::getStatus, statusFilter)
                 .ge(Objects.nonNull(dto.getMinPrice()), WardrobeItemEntity::getPrice, dto.getMinPrice())
                 .le(Objects.nonNull(dto.getMaxPrice()), WardrobeItemEntity::getPrice, dto.getMaxPrice())
                 .ge(Objects.nonNull(dto.getPurchaseStartDate()), WardrobeItemEntity::getPurchaseDate, dto.getPurchaseStartDate())
@@ -137,7 +137,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     @Override
     public WardrobeTagSummaryVo tagSummary() {
         List<WardrobeItemEntity> itemList = wardrobeItemDao.lambdaQuery()
-                .eq(WardrobeItemEntity::getStatus, STATUS_ACTIVE)
+                .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .list();
         WardrobeTagSummaryVo vo = new WardrobeTagSummaryVo();
         vo.setBrands(this.collectValues(itemList, WardrobeItemEntity::getBrand));
@@ -156,7 +156,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         }
         return wardrobeItemDao.lambdaQuery()
                 .in(WardrobeItemEntity::getId, itemIds)
-                .eq(WardrobeItemEntity::getStatus, STATUS_ACTIVE)
+                .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .list();
     }
 
@@ -191,7 +191,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         entity.setStorageLocation(StringUtils.defaultString(entity.getStorageLocation()));
         entity.setCustomTags(StringUtils.defaultString(entity.getCustomTags()));
         entity.setPrice(entity.getPrice() == null ? BigDecimal.ZERO : entity.getPrice());
-        entity.setStatus(Objects.requireNonNullElse(entity.getStatus(), STATUS_ACTIVE));
+        entity.setStatus(WardrobeItemStatusEnum.normalizeCode(entity.getStatus()));
         entity.setRemark(StringUtils.defaultString(entity.getRemark()));
     }
 

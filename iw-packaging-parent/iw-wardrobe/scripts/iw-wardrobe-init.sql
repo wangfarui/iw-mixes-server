@@ -17,7 +17,7 @@ create table wardrobe_item
     purchase_date  date                                   null comment '购买日期',
     price          decimal(10,2) default 0                 not null comment '价格',
     custom_tags    varchar(255)  default ''                not null comment '自定义标签',
-    status         tinyint       default 1                 not null comment '状态(1在穿 2闲置 3清洗中 4待维修 5已淘汰)',
+    status         tinyint       default 1                 not null comment '状态(1在穿 2闲置 5已淘汰)',
     wear_count     int unsigned  default 0                 not null comment '穿着次数',
     last_wear_date date                                   null comment '最近穿着日期',
     remark         varchar(255)  default ''                not null comment '备注',

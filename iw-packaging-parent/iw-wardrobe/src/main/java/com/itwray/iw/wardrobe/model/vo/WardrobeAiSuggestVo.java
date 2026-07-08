@@ -15,10 +15,10 @@ import java.util.List;
 @Schema(name = "衣柜AI搭配建议VO")
 public class WardrobeAiSuggestVo {
 
-    @Schema(title = "来源(ai/rule)")
+    @Schema(title = "来源(ai/candidate)")
     private String source;
 
-    @Schema(title = "AI或规则摘要")
+    @Schema(title = "搭配建议摘要")
     private String summary;
 
     @Schema(title = "AI原始内容")

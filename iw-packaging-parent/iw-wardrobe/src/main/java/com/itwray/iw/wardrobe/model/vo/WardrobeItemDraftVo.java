@@ -78,6 +78,6 @@ public class WardrobeItemDraftVo {
     @Schema(title = "原始AI响应")
     private String rawAiContent;
 
-    @Schema(title = "来源，ai/rule")
+    @Schema(title = "来源，ai/candidate")
     private String source;
 }

@@ -28,6 +28,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeItemRecognizeDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitSuggestDto;
 import com.itwray.iw.wardrobe.model.entity.AiImageGenerateRecordEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
+import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.vo.WardrobeAiSuggestVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemDraftVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemImageOptimizeTaskVo;
@@ -138,7 +139,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         List<WardrobeOutfitSuggestionVo> suggestions = wardrobeOutfitService.suggest(ruleDto);
 
         WardrobeAiSuggestVo vo = new WardrobeAiSuggestVo();
-        vo.setSource("rule");
+        vo.setSource("candidate");
         vo.setSuggestions(suggestions);
         vo.setSummary(this.buildRuleSummary(request, suggestions));
         if (Boolean.FALSE.equals(request.getUseAi()) || suggestions.isEmpty()) {
@@ -672,7 +673,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                 seasonTags只能使用spring,summer,autumn,winter。
                 sceneTags只能使用用户衣物场景字典编码，多个用英文逗号拼接：%s。
                 styleTags只能使用用户衣物风格字典编码，多个用英文逗号拼接：%s。
-                无法从图片判断的字段返回空字符串，status默认1，price默认0。名称要短，优先使用颜色+品类。
+                status只能使用1在穿、2闲置、5已淘汰，无法判断时默认1。无法从图片判断的其它字段返回空字符串，price默认0。名称要短，优先使用颜色+品类。
                 用户补充提示：%s
                 """.formatted(
                 this.formatCodeOptions(DictTypeEnum.WARDROBE_ITEM_CATEGORY),
@@ -733,7 +734,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         vo.setStatus(1);
         vo.setPrice(BigDecimal.ZERO);
         vo.setPrompt(prompt);
-        vo.setSource("rule");
+        vo.setSource("candidate");
         vo.setRemark("图片已上传，可核对名称、分类、颜色后保存。");
         return vo;
     }
@@ -1030,21 +1031,18 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
     private Integer normalizeStatus(Object value) {
         String text = this.cleanText(value);
         if (StringUtils.isBlank(text)) {
-            return 1;
+            return WardrobeItemStatusEnum.defaultCode();
         }
         try {
             int status = new BigDecimal(text).intValue();
-            if (status >= 1 && status <= 5) {
-                return status;
-            }
+            return WardrobeItemStatusEnum.normalizeCode(status);
         } catch (Exception ignored) {
             // Continue with semantic matching.
         }
-        if (StringUtils.contains(text, "闲置")) return 2;
-        if (StringUtils.contains(text, "清洗")) return 3;
-        if (StringUtils.containsAny(text, "维修", "修补")) return 4;
-        if (StringUtils.containsAny(text, "淘汰", "捐赠", "丢弃")) return 5;
-        return 1;
+        if (StringUtils.containsAny(text, "淘汰", "捐赠", "丢弃")) return WardrobeItemStatusEnum.ELIMINATED.getCode();
+        if (StringUtils.contains(text, "闲置")) return WardrobeItemStatusEnum.IDLE.getCode();
+        if (StringUtils.containsAny(text, "清洗", "维修", "修补")) return WardrobeItemStatusEnum.IDLE.getCode();
+        return WardrobeItemStatusEnum.defaultCode();
     }
 
     private String formatSuggestions(List<WardrobeOutfitSuggestionVo> suggestions) {

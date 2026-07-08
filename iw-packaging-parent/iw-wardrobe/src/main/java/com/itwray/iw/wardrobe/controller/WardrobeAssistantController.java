@@ -30,7 +30,7 @@ public class WardrobeAssistantController {
     }
 
     @PostMapping("/suggest")
-    @Operation(summary = "AI或规则生成搭配建议")
+    @Operation(summary = "AI生成搭配建议")
     public WardrobeAiSuggestVo suggest(@RequestBody WardrobeAiSuggestDto dto) {
         return wardrobeAssistantService.suggest(dto);
     }

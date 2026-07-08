@@ -11,6 +11,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitPageDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitSuggestDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitUpdateDto;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
+import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitItemEntity;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitDetailVo;
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
 @Service
 public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
 
-    private static final int STATUS_ACTIVE = 1;
+    private static final int OUTFIT_STATUS_ACTIVE = 1;
     private static final int CATEGORY_TOP = 1;
     private static final int CATEGORY_BOTTOM = 2;
     private static final int CATEGORY_OUTER = 3;
@@ -191,7 +192,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         List<Integer> distinctIds = itemIds.stream().filter(Objects::nonNull).distinct().toList();
         List<WardrobeItemEntity> itemList = wardrobeItemDao.lambdaQuery()
                 .in(WardrobeItemEntity::getId, distinctIds)
-                .eq(WardrobeItemEntity::getStatus, STATUS_ACTIVE)
+                .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .list();
         if (itemList.size() != distinctIds.size()) {
             throw new BusinessException("存在不可用的衣物，请刷新后重试");
@@ -210,7 +211,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         entity.setSceneTags(StringUtils.defaultString(entity.getSceneTags()));
         entity.setStyleTags(StringUtils.defaultString(entity.getStyleTags()));
         entity.setCustomTags(StringUtils.defaultString(entity.getCustomTags()));
-        entity.setStatus(Objects.requireNonNullElse(entity.getStatus(), STATUS_ACTIVE));
+        entity.setStatus(Objects.requireNonNullElse(entity.getStatus(), OUTFIT_STATUS_ACTIVE));
         entity.setRemark(StringUtils.defaultString(entity.getRemark()));
         entity.setItemCount(itemList.size());
         entity.setColorSummary(itemList.stream()
@@ -283,7 +284,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
 
     private List<WardrobeItemEntity> querySuggestCandidates(WardrobeOutfitSuggestDto dto) {
         LambdaQueryWrapper<WardrobeItemEntity> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(WardrobeItemEntity::getStatus, STATUS_ACTIVE)
+        queryWrapper.in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .like(StringUtils.isNotBlank(dto.getSeason()), WardrobeItemEntity::getSeasonTags, dto.getSeason())
                 .like(StringUtils.isNotBlank(dto.getScene()), WardrobeItemEntity::getSceneTags, dto.getScene())
                 .like(StringUtils.isNotBlank(dto.getStyle()), WardrobeItemEntity::getStyleTags, dto.getStyle());
@@ -315,7 +316,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             return null;
         }
         WardrobeItemEntity item = wardrobeItemDao.queryById(lockedItemId);
-        if (!Objects.equals(item.getStatus(), STATUS_ACTIVE)) {
+        if (!WardrobeItemStatusEnum.isAvailable(item.getStatus())) {
             throw new BusinessException("锁定衣物不可用");
         }
         return item;

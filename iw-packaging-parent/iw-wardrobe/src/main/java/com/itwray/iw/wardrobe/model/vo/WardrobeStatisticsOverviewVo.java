@@ -28,10 +28,6 @@ public class WardrobeStatisticsOverviewVo {
 
     private Long idleItems;
 
-    private Long cleaningItems;
-
-    private Long maintenanceItems;
-
     private Long eliminatedItems;
 
     private Long plannedRecords;
