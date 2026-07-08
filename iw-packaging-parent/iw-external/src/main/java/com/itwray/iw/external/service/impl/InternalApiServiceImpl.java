@@ -78,7 +78,7 @@ public class InternalApiServiceImpl implements InternalApiService {
         paramMap.put("amount", dto.getFromAmount());
         JSONObject jsonObject;
         try {
-            String res = HttpUtil.get("http://api.exchangerate.host/convert", paramMap);
+            String res = HttpUtil.get("https://api.exchangerate.host/convert", paramMap);
             Map<String, Object> logParamMap = new HashMap<>(paramMap);
             logParamMap.put("access_key", "***");
             log.info("InternalApiService#getExchangeRate paramMap: {}, res: {}", JSONUtil.toJsonStr(logParamMap), res);
