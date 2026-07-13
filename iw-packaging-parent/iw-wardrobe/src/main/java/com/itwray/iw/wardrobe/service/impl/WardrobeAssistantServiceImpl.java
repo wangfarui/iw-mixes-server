@@ -77,7 +77,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
     private static final String TASK_STATUS_PROCESSING = "processing";
     private static final String TASK_STATUS_SUCCESS = "success";
     private static final String TASK_STATUS_FAILED = "failed";
-    private static final String IMAGE_RECORD_RETRY_BLOCK_MESSAGE = "当前图片在该业务规则下已生成失败，请更换图片或调整业务分类后重新生成";
+    private static final String IMAGE_OPTIMIZE_DEFAULT_ERROR_MESSAGE = "图片优化失败，请稍后重试";
     private static final AtomicInteger IMAGE_OPTIMIZE_THREAD_INDEX = new AtomicInteger(1);
     private static final ExecutorService IMAGE_OPTIMIZE_EXECUTOR = Executors.newFixedThreadPool(1, runnable -> {
         Thread thread = new Thread(runnable, "wardrobe-image-optimize-" + IMAGE_OPTIMIZE_THREAD_INDEX.getAndIncrement());
@@ -206,25 +206,26 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         OptimizeImageRecordContext recordContext = this.buildOptimizeImageRecordContext(request);
         AiImageGenerateRecordEntity existingRecord = this.getImageGenerateRecord(recordContext.dedupeKey());
         if (existingRecord != null) {
-            return this.handleExistingOptimizeImageRecord(existingRecord, request);
+            return this.handleExistingOptimizeImageRecord(existingRecord, request, recordContext);
         }
 
-        String taskId = IdUtil.fastSimpleUUID();
-        WardrobeItemImageOptimizeTaskVo taskVo = new WardrobeItemImageOptimizeTaskVo();
-        taskVo.setTaskId(taskId);
-        taskVo.setItemId(request.getItemId());
-        taskVo.setUserId(UserUtils.getUserId());
-        taskVo.setStatus(TASK_STATUS_PROCESSING);
-        AiImageGenerateRecordEntity recordEntity = this.createOptimizeImageRecord(recordContext, taskId);
+        WardrobeItemImageOptimizeTaskVo taskVo = this.buildProcessingOptimizeTask(request.getItemId());
+        this.saveOptimizeTask(taskVo);
+        AiImageGenerateRecordEntity recordEntity;
+        try {
+            recordEntity = this.createOptimizeImageRecord(recordContext, taskVo.getTaskId());
+        } catch (RuntimeException e) {
+            this.deleteOptimizeTask(taskVo.getTaskId());
+            throw e;
+        }
         if (!Objects.equals(recordContext.dedupeKey(), recordEntity.getDedupeKey())
                 || !StringUtils.equals(recordEntity.getStatus(), TASK_STATUS_PROCESSING)
-                || !StringUtils.equals(recordEntity.getTaskId(), taskId)) {
-            return this.handleExistingOptimizeImageRecord(recordEntity, request);
+                || !StringUtils.equals(recordEntity.getTaskId(), taskVo.getTaskId())) {
+            this.deleteOptimizeTask(taskVo.getTaskId());
+            return this.handleExistingOptimizeImageRecord(recordEntity, request, recordContext);
         }
-        this.saveOptimizeTask(taskVo);
 
-        UserUtils.UserContextSnapshot userContextSnapshot = UserUtils.snapshotContext();
-        IMAGE_OPTIMIZE_EXECUTOR.execute(() -> this.runOptimizeItemImageTask(taskId, request, recordEntity.getId(), recordContext.prompt(), userContextSnapshot));
+        this.submitOptimizeItemImageTask(taskVo.getTaskId(), request, recordEntity.getId(), recordContext.prompt());
         return taskVo;
     }
 
@@ -256,7 +257,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             taskVo.setStatus(TASK_STATUS_SUCCESS);
             taskVo.setItemImage(itemImage);
             taskVo.setErrorMessage("");
-            this.updateImageGenerateRecordSuccess(recordId, optimizeImageResult);
+            this.updateImageGenerateRecordSuccess(recordId, taskId, optimizeImageResult);
             this.saveOptimizeTask(taskVo);
         } catch (Exception e) {
             log.error("WardrobeAssistantService#runOptimizeItemImageTask failed, taskId: {}, itemId: {}", taskId, request.getItemId(), e);
@@ -268,8 +269,8 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                 taskVo.setUserId(UserUtils.getUserId(false));
             }
             taskVo.setStatus(TASK_STATUS_FAILED);
-            taskVo.setErrorMessage(StringUtils.defaultIfBlank(e.getMessage(), "图片优化失败，请稍后重试"));
-            this.updateImageGenerateRecordFailed(recordId, taskVo.getErrorMessage());
+            taskVo.setErrorMessage(StringUtils.defaultIfBlank(e.getMessage(), IMAGE_OPTIMIZE_DEFAULT_ERROR_MESSAGE));
+            this.updateImageGenerateRecordFailed(recordId, taskId, taskVo.getErrorMessage());
             this.saveOptimizeTask(taskVo);
         } finally {
             UserUtils.clearContext();
@@ -394,10 +395,11 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
     }
 
     private WardrobeItemImageOptimizeTaskVo handleExistingOptimizeImageRecord(AiImageGenerateRecordEntity recordEntity,
-                                                                              WardrobeItemImageOptimizeDto request) {
-        this.touchImageGenerateRecord(recordEntity.getId());
+                                                                              WardrobeItemImageOptimizeDto request,
+                                                                              OptimizeImageRecordContext recordContext) {
         if (StringUtils.equals(recordEntity.getStatus(), TASK_STATUS_SUCCESS)
                 && StringUtils.isNotBlank(recordEntity.getResultImageUrl())) {
+            this.touchImageGenerateRecord(recordEntity.getId());
             this.updateItemImage(request.getItemId(), recordEntity.getResultImageUrl());
             WardrobeItemImageOptimizeTaskVo taskVo = this.buildOptimizeTaskVo(
                     IdUtil.fastSimpleUUID(),
@@ -413,30 +415,127 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         if (StringUtils.equals(recordEntity.getStatus(), TASK_STATUS_PROCESSING)) {
             WardrobeItemImageOptimizeTaskVo processingTask = this.getOptimizeTask(recordEntity.getTaskId());
             if (processingTask != null) {
+                this.touchImageGenerateRecord(recordEntity.getId());
                 return processingTask;
             }
-            String errorMessage = "AI图片生成任务状态已过期，请更换图片或调整业务分类后重新生成";
-            this.markImageGenerateRecordFailed(recordEntity.getId(), errorMessage);
-            WardrobeItemImageOptimizeTaskVo taskVo = this.buildOptimizeTaskVo(
-                    IdUtil.fastSimpleUUID(),
-                    request.getItemId(),
-                    TASK_STATUS_FAILED,
-                    "",
-                    errorMessage
-            );
-            this.saveOptimizeTask(taskVo);
-            return taskVo;
+            if (!this.isOptimizeImageRecordExpired(recordEntity)) {
+                WardrobeItemImageOptimizeTaskVo recoveredTask = this.buildOptimizeTaskVo(
+                        recordEntity.getTaskId(),
+                        request.getItemId(),
+                        TASK_STATUS_PROCESSING,
+                        "",
+                        ""
+                );
+                this.saveOptimizeTask(recoveredTask);
+                return recoveredTask;
+            }
+            String errorMessage = "AI图片生成任务状态已过期";
+            this.markImageGenerateRecordFailed(recordEntity.getId(), recordEntity.getTaskId(), errorMessage);
+            AiImageGenerateRecordEntity latestRecord = this.getImageGenerateRecord(recordContext.dedupeKey());
+            if (latestRecord == null) {
+                throw new BusinessException("图片优化记录不存在，请稍后重试");
+            }
+            return this.handleExistingOptimizeImageRecord(latestRecord, request, recordContext);
         }
 
+        if (StringUtils.equals(recordEntity.getStatus(), TASK_STATUS_FAILED)) {
+            return this.retryFailedOptimizeImageRecord(recordEntity, request, recordContext);
+        }
+
+        this.touchImageGenerateRecord(recordEntity.getId());
         WardrobeItemImageOptimizeTaskVo taskVo = this.buildOptimizeTaskVo(
                 IdUtil.fastSimpleUUID(),
                 request.getItemId(),
                 TASK_STATUS_FAILED,
                 "",
-                StringUtils.defaultIfBlank(recordEntity.getErrorMessage(), IMAGE_RECORD_RETRY_BLOCK_MESSAGE)
+                StringUtils.defaultIfBlank(recordEntity.getErrorMessage(), IMAGE_OPTIMIZE_DEFAULT_ERROR_MESSAGE)
         );
         this.saveOptimizeTask(taskVo);
         return taskVo;
+    }
+
+    private WardrobeItemImageOptimizeTaskVo retryFailedOptimizeImageRecord(AiImageGenerateRecordEntity recordEntity,
+                                                                           WardrobeItemImageOptimizeDto request,
+                                                                           OptimizeImageRecordContext recordContext) {
+        WardrobeItemImageOptimizeTaskVo taskVo = this.buildProcessingOptimizeTask(request.getItemId());
+        this.saveOptimizeTask(taskVo);
+        boolean claimed = this.claimFailedImageGenerateRecord(recordEntity.getId(), taskVo.getTaskId(), recordContext);
+        if (!claimed) {
+            this.deleteOptimizeTask(taskVo.getTaskId());
+            AiImageGenerateRecordEntity latestRecord = this.getImageGenerateRecord(recordContext.dedupeKey());
+            if (latestRecord == null) {
+                throw new BusinessException("图片优化记录不存在，请稍后重试");
+            }
+            if (StringUtils.equals(latestRecord.getStatus(), TASK_STATUS_FAILED)) {
+                throw new BusinessException("图片优化任务状态已变化，请稍后重试");
+            }
+            return this.handleExistingOptimizeImageRecord(latestRecord, request, recordContext);
+        }
+
+        this.submitOptimizeItemImageTask(taskVo.getTaskId(), request, recordEntity.getId(), recordContext.prompt());
+        return taskVo;
+    }
+
+    private boolean claimFailedImageGenerateRecord(Integer recordId,
+                                                   String taskId,
+                                                   OptimizeImageRecordContext recordContext) {
+        LocalDateTime now = LocalDateTime.now();
+        return aiImageGenerateRecordDao.lambdaUpdate()
+                .eq(AiImageGenerateRecordEntity::getId, recordId)
+                .eq(AiImageGenerateRecordEntity::getDedupeKey, recordContext.dedupeKey())
+                .eq(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_FAILED)
+                .set(AiImageGenerateRecordEntity::getBusinessType, recordContext.businessType())
+                .set(AiImageGenerateRecordEntity::getBusinessCustomCategory, recordContext.businessCustomCategory())
+                .set(AiImageGenerateRecordEntity::getBusinessCategory, recordContext.businessCategory())
+                .set(AiImageGenerateRecordEntity::getBusinessId, recordContext.businessId())
+                .set(AiImageGenerateRecordEntity::getSourceImageUrl, recordContext.sourceImageUrl())
+                .set(AiImageGenerateRecordEntity::getPrompt, recordContext.prompt())
+                .set(AiImageGenerateRecordEntity::getTaskId, taskId)
+                .set(AiImageGenerateRecordEntity::getExternalTaskId, "")
+                .set(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_PROCESSING)
+                .set(AiImageGenerateRecordEntity::getResultImageUrl, "")
+                .set(AiImageGenerateRecordEntity::getResultMimeType, "")
+                .set(AiImageGenerateRecordEntity::getRevisedPrompt, "")
+                .set(AiImageGenerateRecordEntity::getErrorMessage, "")
+                .set(AiImageGenerateRecordEntity::getLastHitTime, now)
+                .set(AiImageGenerateRecordEntity::getUpdateTime, now)
+                .setSql("hit_count = hit_count + 1")
+                .update();
+    }
+
+    private boolean isOptimizeImageRecordExpired(AiImageGenerateRecordEntity recordEntity) {
+        LocalDateTime referenceTime = recordEntity.getLastHitTime();
+        if (referenceTime == null) {
+            referenceTime = recordEntity.getUpdateTime();
+        }
+        if (referenceTime == null) {
+            referenceTime = recordEntity.getCreateTime();
+        }
+        return referenceTime == null || !referenceTime.isAfter(LocalDateTime.now().minusSeconds(IMAGE_OPTIMIZE_TASK_TTL_SECONDS));
+    }
+
+    private WardrobeItemImageOptimizeTaskVo buildProcessingOptimizeTask(Integer itemId) {
+        return this.buildOptimizeTaskVo(
+                IdUtil.fastSimpleUUID(),
+                itemId,
+                TASK_STATUS_PROCESSING,
+                "",
+                ""
+        );
+    }
+
+    private void submitOptimizeItemImageTask(String taskId,
+                                             WardrobeItemImageOptimizeDto request,
+                                             Integer recordId,
+                                             String prompt) {
+        UserUtils.UserContextSnapshot userContextSnapshot = UserUtils.snapshotContext();
+        IMAGE_OPTIMIZE_EXECUTOR.execute(() -> this.runOptimizeItemImageTask(
+                taskId,
+                request,
+                recordId,
+                prompt,
+                userContextSnapshot
+        ));
     }
 
     private WardrobeItemImageOptimizeTaskVo buildOptimizeTaskVo(String taskId,
@@ -461,37 +560,50 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         aiImageGenerateRecordDao.lambdaUpdate()
                 .eq(AiImageGenerateRecordEntity::getId, recordId)
                 .set(AiImageGenerateRecordEntity::getLastHitTime, LocalDateTime.now())
+                .set(AiImageGenerateRecordEntity::getUpdateTime, LocalDateTime.now())
                 .setSql("hit_count = hit_count + 1")
                 .update();
     }
 
-    private void updateImageGenerateRecordSuccess(Integer recordId, OptimizeImageResult optimizeImageResult) {
+    private void updateImageGenerateRecordSuccess(Integer recordId,
+                                                  String taskId,
+                                                  OptimizeImageResult optimizeImageResult) {
         if (recordId == null || optimizeImageResult == null) {
             return;
         }
-        aiImageGenerateRecordDao.lambdaUpdate()
+        boolean updated = aiImageGenerateRecordDao.lambdaUpdate()
                 .eq(AiImageGenerateRecordEntity::getId, recordId)
+                .eq(AiImageGenerateRecordEntity::getTaskId, taskId)
+                .eq(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_PROCESSING)
                 .set(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_SUCCESS)
                 .set(AiImageGenerateRecordEntity::getResultImageUrl, optimizeImageResult.itemImage())
                 .set(AiImageGenerateRecordEntity::getResultMimeType, optimizeImageResult.mimeType())
                 .set(AiImageGenerateRecordEntity::getExternalTaskId, optimizeImageResult.externalTaskId())
                 .set(AiImageGenerateRecordEntity::getRevisedPrompt, optimizeImageResult.revisedPrompt())
                 .set(AiImageGenerateRecordEntity::getErrorMessage, "")
+                .set(AiImageGenerateRecordEntity::getUpdateTime, LocalDateTime.now())
                 .update();
+        if (!updated) {
+            log.warn("WardrobeAssistantService#updateImageGenerateRecordSuccess ignored stale task, recordId: {}, taskId: {}",
+                    recordId, taskId);
+        }
     }
 
-    private void updateImageGenerateRecordFailed(Integer recordId, String errorMessage) {
+    private void updateImageGenerateRecordFailed(Integer recordId, String taskId, String errorMessage) {
         if (recordId == null) {
             return;
         }
-        this.markImageGenerateRecordFailed(recordId, errorMessage);
+        this.markImageGenerateRecordFailed(recordId, taskId, errorMessage);
     }
 
-    private void markImageGenerateRecordFailed(Integer recordId, String errorMessage) {
-        aiImageGenerateRecordDao.lambdaUpdate()
+    private boolean markImageGenerateRecordFailed(Integer recordId, String taskId, String errorMessage) {
+        return aiImageGenerateRecordDao.lambdaUpdate()
                 .eq(AiImageGenerateRecordEntity::getId, recordId)
+                .eq(StringUtils.isNotBlank(taskId), AiImageGenerateRecordEntity::getTaskId, taskId)
+                .eq(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_PROCESSING)
                 .set(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_FAILED)
-                .set(AiImageGenerateRecordEntity::getErrorMessage, StringUtils.defaultIfBlank(errorMessage, IMAGE_RECORD_RETRY_BLOCK_MESSAGE))
+                .set(AiImageGenerateRecordEntity::getErrorMessage, StringUtils.defaultIfBlank(errorMessage, IMAGE_OPTIMIZE_DEFAULT_ERROR_MESSAGE))
+                .set(AiImageGenerateRecordEntity::getUpdateTime, LocalDateTime.now())
                 .update();
     }
 
@@ -579,6 +691,12 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
 
     private void saveOptimizeTask(WardrobeItemImageOptimizeTaskVo taskVo) {
         RedisUtil.set(this.optimizeTaskKey(taskVo.getTaskId()), JSONUtil.toJsonStr(taskVo), IMAGE_OPTIMIZE_TASK_TTL_SECONDS);
+    }
+
+    private void deleteOptimizeTask(String taskId) {
+        if (StringUtils.isNotBlank(taskId)) {
+            RedisUtil.delete(this.optimizeTaskKey(taskId));
+        }
     }
 
     private WardrobeItemImageOptimizeTaskVo getOptimizeTask(String taskId) {

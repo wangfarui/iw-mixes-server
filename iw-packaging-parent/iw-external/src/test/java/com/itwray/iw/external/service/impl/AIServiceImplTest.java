@@ -147,6 +147,16 @@ class AIServiceImplTest {
         assertEquals("已优化提示词", vo.getRevisedPrompt());
     }
 
+    @Test
+    void tooManyRequestsReferenceImageResponseUsesImageTooLargeMessage() {
+        AIServiceImpl service = new AIServiceImpl();
+
+        AiImageReferenceGenerateVo vo = ReflectionTestUtils.invokeMethod(service, "tooManyRequestsReferenceImageResponse");
+
+        assertEquals("failed", vo.getStatus());
+        assertEquals("图片过大，优化失败", vo.getErrorMessage());
+    }
+
     private AIServiceImpl createGeminiService(String imageApiUrl) {
         AIServiceImpl service = new AIServiceImpl();
         ReflectionTestUtils.setField(service, "defaultApiUrl", "https://api.deepseek.com/chat/completions");

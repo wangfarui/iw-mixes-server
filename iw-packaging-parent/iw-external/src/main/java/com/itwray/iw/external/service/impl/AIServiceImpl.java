@@ -200,7 +200,7 @@ public class AIServiceImpl implements AIService {
             if (!response.isOk()) {
                 log.error("AIService#generateOpenAiReferenceImage 请求失败, status: {}, body: {}", response.getStatus(), response.body());
                 if (response.getStatus() == 429) {
-                    return this.tooManyRequestsReferenceImageResponse("OpenAI");
+                    return this.tooManyRequestsReferenceImageResponse();
                 }
                 return this.failedReferenceImageResponse("OpenAI图片生成失败，供应商HTTP "
                         + response.getStatus() + this.formatProviderError(response.body()));
@@ -238,7 +238,7 @@ public class AIServiceImpl implements AIService {
             if (!response.isOk()) {
                 log.error("AIService#startReferenceGenerateImage 请求失败, status: {}, body: {}", response.getStatus(), response.body());
                 if (response.getStatus() == 429) {
-                    return this.tooManyRequestsReferenceImageResponse("OpenAI");
+                    return this.tooManyRequestsReferenceImageResponse();
                 }
                 return this.failedReferenceImageResponse("OpenAI图片生成任务启动失败，供应商HTTP "
                         + response.getStatus() + this.formatProviderError(response.body()));
@@ -269,7 +269,7 @@ public class AIServiceImpl implements AIService {
             if (!response.isOk()) {
                 log.error("AIService#getReferenceGenerateImageStatus 请求失败, taskId: {}, status: {}, body: {}", taskId, response.getStatus(), response.body());
                 if (response.getStatus() == 429) {
-                    return this.tooManyRequestsReferenceImageResponse("OpenAI");
+                    return this.tooManyRequestsReferenceImageResponse();
                 }
                 return this.failedReferenceImageResponse("OpenAI图片生成任务查询失败，供应商HTTP "
                         + response.getStatus() + this.formatProviderError(response.body()));
@@ -309,7 +309,7 @@ public class AIServiceImpl implements AIService {
             if (!response.isOk()) {
                 log.error("AIService#generateGeminiReferenceImage 请求失败, status: {}, body: {}", response.getStatus(), response.body());
                 if (response.getStatus() == 429) {
-                    return this.tooManyRequestsReferenceImageResponse("Gemini");
+                    return this.tooManyRequestsReferenceImageResponse();
                 }
                 return this.failedReferenceImageResponse("Gemini图片生成失败，供应商HTTP "
                         + response.getStatus() + this.formatProviderError(response.body()));
@@ -819,8 +819,8 @@ public class AIServiceImpl implements AIService {
         return vo;
     }
 
-    private AiImageReferenceGenerateVo tooManyRequestsReferenceImageResponse(String provider) {
-        return this.failedReferenceImageResponse(provider + "图片生成调用过于频繁或额度不足，请稍后再试");
+    private AiImageReferenceGenerateVo tooManyRequestsReferenceImageResponse() {
+        return this.failedReferenceImageResponse("图片过大，优化失败");
     }
 
     private ImagePayload downloadImagePayload(String imageUrl) {
