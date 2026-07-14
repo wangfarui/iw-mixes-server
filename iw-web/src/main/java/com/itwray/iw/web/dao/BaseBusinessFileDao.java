@@ -1,7 +1,6 @@
 package com.itwray.iw.web.dao;
 
 import cn.hutool.core.collection.CollUtil;
-import com.itwray.iw.web.config.IwAliyunProperties;
 import com.itwray.iw.web.mapper.BaseBusinessFileMapper;
 import com.itwray.iw.web.model.dto.FileDto;
 import com.itwray.iw.web.model.entity.BaseBusinessFileEntity;
@@ -10,7 +9,10 @@ import com.itwray.iw.web.model.vo.FileVo;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 业务文件关联表 DAO
@@ -20,8 +22,6 @@ import java.util.List;
  */
 @Component
 public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBusinessFileEntity> {
-
-    private IwAliyunProperties iwAliyunProperties;
 
     /**
      * 更新保存业务文件关联信息
@@ -108,5 +108,29 @@ public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBus
         return entityList.stream()
                 .map(t -> new FileVo(t.getFileName(), t.getFileUrl()))
                 .toList();
+    }
+
+    /**
+     * 批量获取每个业务最新的有效文件。
+     */
+    public Map<Integer, FileVo> getLatestBusinessFileMap(Collection<Integer> businessIds,
+                                                         BusinessFileTypeEnum businessFileTypeEnum) {
+        if (CollUtil.isEmpty(businessIds)) {
+            return Collections.emptyMap();
+        }
+        List<BaseBusinessFileEntity> entityList = this.lambdaQuery()
+                .eq(BaseBusinessFileEntity::getBusinessType, businessFileTypeEnum)
+                .in(BaseBusinessFileEntity::getBusinessId, businessIds)
+                .orderByDesc(BaseBusinessFileEntity::getId)
+                .select(BaseBusinessFileEntity::getId,
+                        BaseBusinessFileEntity::getBusinessId,
+                        BaseBusinessFileEntity::getFileName,
+                        BaseBusinessFileEntity::getFileUrl)
+                .list();
+        Map<Integer, FileVo> result = new LinkedHashMap<>();
+        for (BaseBusinessFileEntity entity : entityList) {
+            result.putIfAbsent(entity.getBusinessId(), new FileVo(entity.getFileName(), entity.getFileUrl()));
+        }
+        return result;
     }
 }

@@ -29,6 +29,8 @@ public interface WardrobeItemService {
 
     void delete(Integer id);
 
+    void deleteOptimizedImage(Integer id);
+
     PageVo<WardrobeItemPageVo> page(WardrobeItemPageDto dto);
 
     WardrobeItemDetailVo detail(Integer id);

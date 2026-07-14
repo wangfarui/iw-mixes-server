@@ -13,6 +13,7 @@ public enum BusinessFileTypeEnum implements BusinessConstantEnum {
 
     BOOKKEEPING_RECORDS(1, "记账记录附件"),
     POINTS_TASK_BASICS(20, "任务详情附件"),
+    WARDROBE_ITEM_OPTIMIZED_IMAGE(30, "衣物优化图"),
     ;
 
     private final Integer code;

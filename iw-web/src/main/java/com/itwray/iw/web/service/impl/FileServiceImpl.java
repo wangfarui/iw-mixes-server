@@ -11,6 +11,7 @@ import com.itwray.iw.web.exception.IwWebException;
 import com.itwray.iw.web.model.vo.FileRecordVo;
 import com.itwray.iw.web.service.FileService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -74,8 +75,45 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    @Override
+    public void delete(String fileUrl) {
+        if (StringUtils.isBlank(fileUrl)) {
+            return;
+        }
+        OSS ossClient = null;
+        try {
+            String objectName = this.resolveObjectName(fileUrl);
+            ossClient = new OSSClientBuilder().build(this.getOSS().getEndpoint(), this.getOSS().getAccessKeyId(), this.getOSS().getAccessKeySecret());
+            ossClient.deleteObject(this.getOSS().getBucketName(), objectName);
+        } catch (OSSException e) {
+            log.error("OSS文件删除客户端异常, fileUrl: {}", fileUrl, e);
+            throw new IwWebException("文件删除异常");
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
+    }
+
     protected IwAliyunProperties.OSS getOSS() {
         return iwAliyunProperties.getOss();
+    }
+
+    private String resolveObjectName(String fileUrl) {
+        String normalizedUrl = StringUtils.substringBefore(StringUtils.substringBefore(fileUrl.trim(), "?"), "#");
+        String baseUrl = StringUtils.removeEnd(StringUtils.trimToEmpty(this.getOSS().getBaseUrl()), "/");
+        String objectName;
+        if (StringUtils.isNotBlank(baseUrl) && normalizedUrl.startsWith(baseUrl + "/")) {
+            objectName = normalizedUrl.substring(baseUrl.length() + 1);
+        } else if (normalizedUrl.startsWith("/")) {
+            objectName = normalizedUrl.substring(1);
+        } else {
+            throw new IwWebException("文件地址不属于当前OSS");
+        }
+        if (StringUtils.isBlank(objectName)) {
+            throw new IwWebException("文件地址无效");
+        }
+        return objectName;
     }
 
     /**

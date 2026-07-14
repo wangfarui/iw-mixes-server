@@ -23,7 +23,16 @@ public class WardrobeItemPageVo {
     private String itemName;
 
     @JsonSerialize(using = FullImageSerializer.class)
+    @Schema(title = "封面图片，优先优化图")
     private String itemImage;
+
+    @JsonSerialize(using = FullImageSerializer.class)
+    @Schema(title = "原图")
+    private String originalImage;
+
+    @JsonSerialize(using = FullImageSerializer.class)
+    @Schema(title = "优化后的图片")
+    private String optimizedImage;
 
     private Integer category;
 

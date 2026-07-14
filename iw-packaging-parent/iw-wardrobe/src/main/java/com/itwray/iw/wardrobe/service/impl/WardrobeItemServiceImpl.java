@@ -12,6 +12,7 @@ import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeTagSummaryVo;
+import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
@@ -26,6 +27,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -39,9 +41,12 @@ import java.util.Set;
 public class WardrobeItemServiceImpl implements WardrobeItemService {
 
     private final WardrobeItemDao wardrobeItemDao;
+    private final WardrobeItemImageService wardrobeItemImageService;
 
-    public WardrobeItemServiceImpl(WardrobeItemDao wardrobeItemDao) {
+    public WardrobeItemServiceImpl(WardrobeItemDao wardrobeItemDao,
+                                   WardrobeItemImageService wardrobeItemImageService) {
         this.wardrobeItemDao = wardrobeItemDao;
+        this.wardrobeItemImageService = wardrobeItemImageService;
     }
 
     @Override
@@ -91,6 +96,13 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     }
 
     @Override
+    @Transactional
+    public void deleteOptimizedImage(Integer id) {
+        wardrobeItemDao.queryById(id);
+        wardrobeItemImageService.deleteOptimizedImage(id);
+    }
+
+    @Override
     public PageVo<WardrobeItemPageVo> page(WardrobeItemPageDto dto) {
         LambdaQueryWrapper<WardrobeItemEntity> queryWrapper = new LambdaQueryWrapper<>();
         Integer statusFilter = Objects.nonNull(dto.getStatus()) ? WardrobeItemStatusEnum.normalizeCode(dto.getStatus()) : null;
@@ -131,12 +143,17 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         } else {
             this.applySort(queryWrapper, dto.getSortType());
         }
-        return wardrobeItemDao.page(dto, queryWrapper, WardrobeItemPageVo.class);
+        PageVo<WardrobeItemPageVo> pageVo = wardrobeItemDao.page(dto, queryWrapper, this::toItemPageVo);
+        this.fillItemImages(pageVo.getRecords());
+        return pageVo;
     }
 
     @Override
     public WardrobeItemDetailVo detail(Integer id) {
-        return BeanUtil.copyProperties(wardrobeItemDao.queryById(id), WardrobeItemDetailVo.class);
+        WardrobeItemDetailVo detailVo = BeanUtil.copyProperties(wardrobeItemDao.queryById(id), WardrobeItemDetailVo.class);
+        detailVo.setOriginalImage(detailVo.getItemImage());
+        this.fillItemImages(List.of(detailVo));
+        return detailVo;
     }
 
     @Override
@@ -159,10 +176,12 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         if (itemIds == null || itemIds.isEmpty()) {
             return Collections.emptyList();
         }
-        return wardrobeItemDao.lambdaQuery()
+        List<WardrobeItemEntity> itemList = wardrobeItemDao.lambdaQuery()
                 .in(WardrobeItemEntity::getId, itemIds)
                 .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .list();
+        wardrobeItemImageService.applyCoverImages(itemList);
+        return itemList;
     }
 
     @Override
@@ -183,6 +202,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
             throw new BusinessException("衣物名称不能为空");
         }
         entity.setItemName(entity.getItemName().trim());
+        entity.setItemImage(StringUtils.defaultString(entity.getItemImage()));
         entity.setCategory(Objects.requireNonNullElse(entity.getCategory(), 0));
         entity.setItemStyle(Objects.requireNonNullElse(entity.getItemStyle(), 0));
         entity.setColorName(StringUtils.defaultString(entity.getColorName()));
@@ -199,6 +219,26 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         entity.setPrice(entity.getPrice() == null ? BigDecimal.ZERO : entity.getPrice());
         entity.setStatus(WardrobeItemStatusEnum.normalizeCode(entity.getStatus()));
         entity.setRemark(StringUtils.defaultString(entity.getRemark()));
+    }
+
+    private WardrobeItemPageVo toItemPageVo(WardrobeItemEntity entity) {
+        WardrobeItemPageVo vo = BeanUtil.copyProperties(entity, WardrobeItemPageVo.class);
+        vo.setOriginalImage(entity.getItemImage());
+        return vo;
+    }
+
+    private void fillItemImages(List<? extends WardrobeItemPageVo> itemList) {
+        if (itemList == null || itemList.isEmpty()) {
+            return;
+        }
+        Map<Integer, String> optimizedImageMap = wardrobeItemImageService.getOptimizedImageUrlMap(
+                itemList.stream().map(WardrobeItemPageVo::getId).filter(Objects::nonNull).toList()
+        );
+        itemList.forEach(item -> {
+            String optimizedImage = StringUtils.defaultString(optimizedImageMap.get(item.getId()));
+            item.setOptimizedImage(optimizedImage);
+            item.setItemImage(StringUtils.defaultIfBlank(optimizedImage, item.getOriginalImage()));
+        });
     }
 
     private void applySort(LambdaQueryWrapper<WardrobeItemEntity> queryWrapper, String sortType) {

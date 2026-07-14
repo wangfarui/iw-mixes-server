@@ -11,6 +11,7 @@ import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeStatisticItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeStatisticsOverviewVo;
+import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import com.itwray.iw.wardrobe.service.WardrobeStatisticsService;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
 import org.apache.commons.lang3.StringUtils;
@@ -44,15 +45,18 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
     private final WardrobeOutfitDao wardrobeOutfitDao;
     private final WardrobeWearRecordDao wearRecordDao;
     private final WardrobeWearRecordService wearRecordService;
+    private final WardrobeItemImageService wardrobeItemImageService;
 
     public WardrobeStatisticsServiceImpl(WardrobeItemDao wardrobeItemDao,
                                          WardrobeOutfitDao wardrobeOutfitDao,
                                          WardrobeWearRecordDao wearRecordDao,
-                                         WardrobeWearRecordService wearRecordService) {
+                                         WardrobeWearRecordService wearRecordService,
+                                         WardrobeItemImageService wardrobeItemImageService) {
         this.wardrobeItemDao = wardrobeItemDao;
         this.wardrobeOutfitDao = wardrobeOutfitDao;
         this.wearRecordDao = wearRecordDao;
         this.wearRecordService = wearRecordService;
+        this.wardrobeItemImageService = wardrobeItemImageService;
     }
 
     @Override
@@ -60,6 +64,7 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
         List<WardrobeItemEntity> activeItems = wardrobeItemDao.lambdaQuery()
                 .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
                 .list();
+        wardrobeItemImageService.applyCoverImages(activeItems);
         Long totalItems = wardrobeItemDao.lambdaQuery().count();
         Long totalOutfits = wardrobeOutfitDao.lambdaQuery()
                 .eq(WardrobeOutfitEntity::getStatus, OUTFIT_STATUS_ACTIVE)

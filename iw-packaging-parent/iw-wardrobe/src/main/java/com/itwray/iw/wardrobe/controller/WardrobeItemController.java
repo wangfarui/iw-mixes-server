@@ -57,6 +57,12 @@ public class WardrobeItemController {
         wardrobeItemService.delete(id);
     }
 
+    @DeleteMapping("/optimized-image/delete")
+    @Operation(summary = "删除衣物优化图")
+    public void deleteOptimizedImage(@RequestParam("id") Integer id) {
+        wardrobeItemService.deleteOptimizedImage(id);
+    }
+
     @PostMapping("/page")
     @Operation(summary = "分页查询衣物")
     public PageVo<WardrobeItemPageVo> page(@RequestBody @Valid WardrobeItemPageDto dto) {

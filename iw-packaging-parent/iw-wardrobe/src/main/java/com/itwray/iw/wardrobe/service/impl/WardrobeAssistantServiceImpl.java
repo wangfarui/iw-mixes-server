@@ -36,6 +36,7 @@ import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitSuggestionVo;
 import com.itwray.iw.wardrobe.service.WardrobeAssistantRemoteService;
 import com.itwray.iw.wardrobe.service.WardrobeAssistantService;
+import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -123,19 +124,22 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
     private final WardrobeItemDao wardrobeItemDao;
     private final AiImageGenerateRecordDao aiImageGenerateRecordDao;
     private final BaseDictClient baseDictClient;
+    private final WardrobeItemImageService wardrobeItemImageService;
 
     public WardrobeAssistantServiceImpl(WardrobeOutfitService wardrobeOutfitService,
                                         WardrobeAssistantRemoteService remoteService,
                                         FileService fileService,
                                         WardrobeItemDao wardrobeItemDao,
                                         AiImageGenerateRecordDao aiImageGenerateRecordDao,
-                                        BaseDictClient baseDictClient) {
+                                        BaseDictClient baseDictClient,
+                                        WardrobeItemImageService wardrobeItemImageService) {
         this.wardrobeOutfitService = wardrobeOutfitService;
         this.remoteService = remoteService;
         this.fileService = fileService;
         this.wardrobeItemDao = wardrobeItemDao;
         this.aiImageGenerateRecordDao = aiImageGenerateRecordDao;
         this.baseDictClient = baseDictClient;
+        this.wardrobeItemImageService = wardrobeItemImageService;
     }
 
     @Override
@@ -354,8 +358,12 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                 mimeType,
                 imageBytes
         ));
-
-        this.updateItemImage(request.getItemId(), fileRecord.getFileUrl());
+        try {
+            wardrobeItemImageService.replaceOptimizedImage(request.getItemId(), fileRecord);
+        } catch (RuntimeException e) {
+            this.deleteUploadedOptimizedImageQuietly(fileRecord.getFileUrl());
+            throw e;
+        }
         return new OptimizeImageResult(
                 fileRecord.getFileUrl(),
                 mimeType,
@@ -461,7 +469,10 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         if (StringUtils.equals(recordEntity.getStatus(), TASK_STATUS_SUCCESS)
                 && StringUtils.isNotBlank(recordEntity.getResultImageUrl())) {
             this.touchImageGenerateRecord(recordEntity.getId());
-            this.updateItemImage(request.getItemId(), recordEntity.getResultImageUrl());
+            FileRecordVo fileRecord = new FileRecordVo();
+            fileRecord.setFileName(this.optimizedImageFilename(recordEntity.getResultMimeType()));
+            fileRecord.setFileUrl(recordEntity.getResultImageUrl());
+            wardrobeItemImageService.replaceOptimizedImage(request.getItemId(), fileRecord);
             WardrobeItemImageOptimizeTaskVo taskVo = this.buildOptimizeTaskVo(
                     IdUtil.fastSimpleUUID(),
                     request.getItemId(),
@@ -712,13 +723,11 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                 .update();
     }
 
-    private void updateItemImage(Integer itemId, String itemImage) {
-        boolean updated = wardrobeItemDao.lambdaUpdate()
-                .eq(WardrobeItemEntity::getId, itemId)
-                .set(WardrobeItemEntity::getItemImage, itemImage)
-                .update();
-        if (!updated) {
-            throw new BusinessException("衣物图片更新失败");
+    private void deleteUploadedOptimizedImageQuietly(String fileUrl) {
+        try {
+            fileService.delete(fileUrl);
+        } catch (RuntimeException cleanupException) {
+            log.warn("WardrobeAssistantService#deleteUploadedOptimizedImageQuietly failed, fileUrl: {}", fileUrl, cleanupException);
         }
     }
 

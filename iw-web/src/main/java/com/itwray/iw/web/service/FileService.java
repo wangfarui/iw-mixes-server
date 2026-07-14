@@ -12,4 +12,6 @@ import org.springframework.web.multipart.MultipartFile;
 public interface FileService {
 
     FileRecordVo upload(MultipartFile file);
+
+    void delete(String fileUrl);
 }

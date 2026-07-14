@@ -18,6 +18,7 @@ import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitSuggestionVo;
+import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
 import com.itwray.iw.web.exception.BusinessException;
@@ -60,15 +61,18 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     private final WardrobeOutfitItemDao outfitItemDao;
     private final WardrobeItemDao wardrobeItemDao;
     private final WardrobeWearRecordService wearRecordService;
+    private final WardrobeItemImageService wardrobeItemImageService;
 
     public WardrobeOutfitServiceImpl(WardrobeOutfitDao wardrobeOutfitDao,
                                      WardrobeOutfitItemDao outfitItemDao,
                                      WardrobeItemDao wardrobeItemDao,
-                                     @Lazy WardrobeWearRecordService wearRecordService) {
+                                     @Lazy WardrobeWearRecordService wearRecordService,
+                                     WardrobeItemImageService wardrobeItemImageService) {
         this.wardrobeOutfitDao = wardrobeOutfitDao;
         this.outfitItemDao = outfitItemDao;
         this.wardrobeItemDao = wardrobeItemDao;
         this.wearRecordService = wearRecordService;
+        this.wardrobeItemImageService = wardrobeItemImageService;
     }
 
     @Override
@@ -198,6 +202,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         if (itemList.size() != distinctIds.size()) {
             throw new BusinessException("存在不可用的衣物，请刷新后重试");
         }
+        wardrobeItemImageService.applyCoverImages(itemList);
         Map<Integer, WardrobeItemEntity> itemMap = itemList.stream()
                 .collect(Collectors.toMap(WardrobeItemEntity::getId, Function.identity()));
         return distinctIds.stream().map(itemMap::get).filter(Objects::nonNull).toList();
@@ -311,7 +316,9 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             queryWrapper.orderByAsc(WardrobeItemEntity::getWearCount)
                     .orderByDesc(WardrobeItemEntity::getId);
         }
-        return wardrobeItemDao.list(queryWrapper);
+        List<WardrobeItemEntity> itemList = wardrobeItemDao.list(queryWrapper);
+        wardrobeItemImageService.applyCoverImages(itemList);
+        return itemList;
     }
 
     private WardrobeItemEntity resolveLockedItem(Integer lockedItemId) {
@@ -322,6 +329,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         if (!WardrobeItemStatusEnum.isAvailable(item.getStatus())) {
             throw new BusinessException("锁定衣物不可用");
         }
+        wardrobeItemImageService.applyCoverImages(List.of(item));
         return item;
     }
 
