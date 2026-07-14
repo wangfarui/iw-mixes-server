@@ -254,6 +254,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
             relation.setItemName(item.getItemName());
             relation.setItemImage(item.getItemImage());
             relation.setCategory(item.getCategory());
+            relation.setItemStyle(item.getItemStyle());
             relation.setSort(i + 1);
             relationList.add(relation);
         }
@@ -297,6 +298,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         vo.setItemName(entity.getItemName());
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
+        vo.setItemStyle(entity.getItemStyle());
         vo.setSort(entity.getSort());
         return vo;
     }
@@ -307,6 +309,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         vo.setItemName(entity.getItemName());
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
+        vo.setItemStyle(entity.getItemStyle());
         vo.setSort(entity.getSort());
         return vo;
     }
@@ -317,6 +320,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         vo.setItemName(entity.getItemName());
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
+        vo.setItemStyle(entity.getItemStyle());
         return vo;
     }
 }

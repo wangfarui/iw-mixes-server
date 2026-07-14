@@ -95,7 +95,12 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         LambdaQueryWrapper<WardrobeItemEntity> queryWrapper = new LambdaQueryWrapper<>();
         Integer statusFilter = Objects.nonNull(dto.getStatus()) ? WardrobeItemStatusEnum.normalizeCode(dto.getStatus()) : null;
         queryWrapper.like(StringUtils.isNotBlank(dto.getItemName()), WardrobeItemEntity::getItemName, dto.getItemName())
+                .and(StringUtils.isNotBlank(dto.getKeyword()), wrapper -> wrapper
+                        .like(WardrobeItemEntity::getItemName, dto.getKeyword())
+                        .or()
+                        .like(WardrobeItemEntity::getCustomTags, dto.getKeyword()))
                 .eq(Objects.nonNull(dto.getCategory()), WardrobeItemEntity::getCategory, dto.getCategory())
+                .eq(Objects.nonNull(dto.getItemStyle()), WardrobeItemEntity::getItemStyle, dto.getItemStyle())
                 .like(StringUtils.isNotBlank(dto.getColorName()), WardrobeItemEntity::getColorName, dto.getColorName())
                 .like(StringUtils.isNotBlank(dto.getSeason()), WardrobeItemEntity::getSeasonTags, dto.getSeason())
                 .like(StringUtils.isNotBlank(dto.getScene()), WardrobeItemEntity::getSceneTags, dto.getScene())
@@ -179,6 +184,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         }
         entity.setItemName(entity.getItemName().trim());
         entity.setCategory(Objects.requireNonNullElse(entity.getCategory(), 0));
+        entity.setItemStyle(Objects.requireNonNullElse(entity.getItemStyle(), 0));
         entity.setColorName(StringUtils.defaultString(entity.getColorName()));
         entity.setColorHex(StringUtils.defaultString(entity.getColorHex()));
         entity.setSeasonTags(StringUtils.defaultString(entity.getSeasonTags()));

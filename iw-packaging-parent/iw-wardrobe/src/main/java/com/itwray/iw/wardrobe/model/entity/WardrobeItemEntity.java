@@ -30,6 +30,8 @@ public class WardrobeItemEntity extends UserEntity<Integer> {
 
     private Integer category;
 
+    private Integer itemStyle;
+
     private String colorName;
 
     private String colorHex;

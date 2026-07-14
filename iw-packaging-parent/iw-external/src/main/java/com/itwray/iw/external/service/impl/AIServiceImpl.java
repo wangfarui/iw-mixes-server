@@ -21,6 +21,7 @@ import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 import com.itwray.iw.external.service.AIService;
 import com.itwray.iw.starter.redis.RedisUtil;
 import com.itwray.iw.web.exception.BusinessException;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -73,6 +74,21 @@ public class AIServiceImpl implements AIService {
 
     @Value("${iw.ai.image.api-key:${iw.ai.default.api-key:}}")
     private String imageApiKey;
+
+    @PostConstruct
+    void logImageAiConfiguration() {
+        log.info("AIService图片生成配置已解析, provider: {}, endpoint: {}, model: {}, apiKeyConfigured: {}",
+                this.resolveImageProviderNameForLog(),
+                this.resolveImageEndpointForLog(),
+                this.resolveImageModelForLog(),
+                StringUtils.isNotBlank(this.imageApiKey));
+        if (this.isOpenAiResponsesImageProvider()) {
+            log.warn("AIService图片生成当前使用openai-responses旧分支；单次参考图优化优先使用provider=openai或provider=gemini");
+        }
+        if (StringUtils.isBlank(this.imageApiKey)) {
+            log.warn("AIService图片生成API Key为空，图片生成请求会失败");
+        }
+    }
 
     @Override
     public String answer(String content) {
@@ -484,10 +500,17 @@ public class AIServiceImpl implements AIService {
 
     private String resolveResponsesUrl() {
         String url = StringUtils.trimToEmpty(this.imageApiUrl);
-        if (StringUtils.endsWith(url, "/chat/completions")) {
-            return StringUtils.removeEnd(url, "/chat/completions") + "/responses";
+        if (StringUtils.isBlank(url) || this.isKnownNonOpenAiImageApiUrl(url)) {
+            return "https://api.openai.com/v1/responses";
         }
-        return "https://api.openai.com/v1/responses";
+        String cleanUrl = StringUtils.removeEnd(StringUtils.substringBefore(url, "?"), "/");
+        if (StringUtils.endsWith(cleanUrl, "/responses")) {
+            return cleanUrl;
+        }
+        if (StringUtils.endsWith(cleanUrl, "/chat/completions")) {
+            return StringUtils.removeEnd(cleanUrl, "/chat/completions") + "/responses";
+        }
+        return this.appendOpenAiResponsesPath(cleanUrl);
     }
 
     private String resolveOpenAiImagesEditsUrl() {
@@ -522,6 +545,14 @@ public class AIServiceImpl implements AIService {
             return normalized + "/images/edits";
         }
         return normalized + "/v1/images/edits";
+    }
+
+    private String appendOpenAiResponsesPath(String baseUrl) {
+        String normalized = StringUtils.removeEnd(StringUtils.trimToEmpty(baseUrl), "/");
+        if (StringUtils.endsWith(normalized, "/v1")) {
+            return normalized + "/responses";
+        }
+        return normalized + "/v1/responses";
     }
 
     private String resolveGeminiGenerateContentUrl() {
@@ -587,6 +618,37 @@ public class AIServiceImpl implements AIService {
 
     private String buildGeminiGenerateContentUrl(String baseUrl, String model) {
         return StringUtils.removeEnd(baseUrl, "/") + "/models/" + model + ":generateContent";
+    }
+
+    private String resolveImageProviderNameForLog() {
+        String provider = StringUtils.trimToEmpty(this.imageProvider);
+        return StringUtils.defaultIfBlank(StringUtils.lowerCase(provider), IMAGE_PROVIDER_GEMINI);
+    }
+
+    private String resolveImageEndpointForLog() {
+        if (this.isOpenAiResponsesImageProvider()) {
+            return this.resolveResponsesUrl();
+        }
+        if (this.isOpenAiImageProvider()) {
+            return this.resolveOpenAiImagesEditsUrl();
+        }
+        if (this.isGeminiImageProvider()) {
+            return this.resolveGeminiGenerateContentUrl();
+        }
+        return StringUtils.trimToEmpty(this.imageApiUrl);
+    }
+
+    private String resolveImageModelForLog() {
+        if (this.isOpenAiResponsesImageProvider()) {
+            return this.resolveOpenAiResponsesImageModel();
+        }
+        if (this.isOpenAiImageProvider()) {
+            return this.resolveOpenAiImageModel();
+        }
+        if (this.isGeminiImageProvider()) {
+            return this.resolveGeminiImageModel();
+        }
+        return StringUtils.trimToEmpty(this.imageModel);
     }
 
     private String resolveGeminiApiKey() {

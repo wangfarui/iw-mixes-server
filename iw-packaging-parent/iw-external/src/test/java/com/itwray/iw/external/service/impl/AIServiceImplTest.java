@@ -36,6 +36,33 @@ class AIServiceImplTest {
     }
 
     @Test
+    void resolveResponsesUrlKeepsCustomResponsesEndpoint() {
+        AIServiceImpl service = createOpenAiResponsesService("https://ai.example.com/v1/responses");
+
+        String url = ReflectionTestUtils.invokeMethod(service, "resolveResponsesUrl");
+
+        assertEquals("https://ai.example.com/v1/responses", url);
+    }
+
+    @Test
+    void resolveResponsesUrlNormalizesCustomBaseUrl() {
+        AIServiceImpl service = createOpenAiResponsesService("https://ai.example.com");
+
+        String url = ReflectionTestUtils.invokeMethod(service, "resolveResponsesUrl");
+
+        assertEquals("https://ai.example.com/v1/responses", url);
+    }
+
+    @Test
+    void resolveResponsesUrlFallsBackFromDefaultDeepSeekEndpoint() {
+        AIServiceImpl service = createOpenAiResponsesService("https://api.deepseek.com/chat/completions");
+
+        String url = ReflectionTestUtils.invokeMethod(service, "resolveResponsesUrl");
+
+        assertEquals("https://api.openai.com/v1/responses", url);
+    }
+
+    @Test
     void resolveOpenAiImageModelDefaultsToImageModel() {
         AIServiceImpl service = createOpenAiService("https://ai.example.com/v1/images/edits");
 
@@ -166,6 +193,13 @@ class AIServiceImplTest {
     }
 
     private AIServiceImpl createOpenAiService(String imageApiUrl) {
+        AIServiceImpl service = new AIServiceImpl();
+        ReflectionTestUtils.setField(service, "defaultApiUrl", "https://api.deepseek.com/chat/completions");
+        ReflectionTestUtils.setField(service, "imageApiUrl", imageApiUrl);
+        return service;
+    }
+
+    private AIServiceImpl createOpenAiResponsesService(String imageApiUrl) {
         AIServiceImpl service = new AIServiceImpl();
         ReflectionTestUtils.setField(service, "defaultApiUrl", "https://api.deepseek.com/chat/completions");
         ReflectionTestUtils.setField(service, "imageApiUrl", imageApiUrl);

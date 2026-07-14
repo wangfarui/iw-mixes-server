@@ -85,15 +85,18 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         return thread;
     });
 
-    private static final Map<Integer, String> FALLBACK_CATEGORY_NAMES = Map.of(
-            1, "上装",
-            2, "下装",
-            3, "外套",
-            4, "连衣/套装",
-            5, "鞋履",
-            6, "包袋",
-            7, "配饰",
-            8, "其他"
+    private static final Map<Integer, String> FALLBACK_CATEGORY_NAMES = Map.ofEntries(
+            Map.entry(1, "上装"),
+            Map.entry(2, "下装"),
+            Map.entry(3, "连衣裙"),
+            Map.entry(4, "内衣"),
+            Map.entry(5, "袜子"),
+            Map.entry(6, "鞋履"),
+            Map.entry(7, "配饰"),
+            Map.entry(8, "帽子"),
+            Map.entry(9, "包袋"),
+            Map.entry(10, "首饰"),
+            Map.entry(11, "其他")
     );
 
     private static final Map<String, String> FALLBACK_COLOR_HEX = Map.ofEntries(
@@ -108,6 +111,9 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             Map.entry("紫色", "#7e57c2"),
             Map.entry("棕色", "#8d6e63"),
             Map.entry("米色", "#d8c7a3"),
+            Map.entry("卡其色", "#c3a36b"),
+            Map.entry("牛仔蓝", "#3f6f9f"),
+            Map.entry("藏青色", "#1f2a44"),
             Map.entry("彩色", "#6c8cff")
     );
 
@@ -232,10 +238,40 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
     @Override
     public WardrobeItemImageOptimizeTaskVo getOptimizeItemImageStatus(String taskId) {
         WardrobeItemImageOptimizeTaskVo taskVo = this.getOptimizeTask(taskId);
-        if (taskVo == null || !Objects.equals(taskVo.getUserId(), UserUtils.getUserId())) {
+        Integer userId = UserUtils.getUserId();
+        if (taskVo != null) {
+            if (!Objects.equals(taskVo.getUserId(), userId)) {
+                throw new BusinessException("任务不存在或已过期");
+            }
+            return taskVo;
+        }
+
+        AiImageGenerateRecordEntity recordEntity = this.getImageGenerateRecordByTaskId(taskId, userId);
+        if (recordEntity == null) {
             throw new BusinessException("任务不存在或已过期");
         }
-        return taskVo;
+        return this.buildOptimizeTaskVo(recordEntity);
+    }
+
+    @Override
+    public WardrobeItemImageOptimizeTaskVo getLatestOptimizeItemImageTask(Integer itemId) {
+        if (itemId == null) {
+            throw new BusinessException("衣物ID不能为空");
+        }
+        wardrobeItemDao.queryById(itemId);
+        Integer userId = UserUtils.getUserId();
+        AiImageGenerateRecordEntity recordEntity = this.getLatestImageGenerateRecordByItemId(itemId, userId);
+        if (recordEntity == null) {
+            return null;
+        }
+
+        if (StringUtils.equals(recordEntity.getStatus(), TASK_STATUS_PROCESSING)) {
+            WardrobeItemImageOptimizeTaskVo taskVo = this.getOptimizeTask(recordEntity.getTaskId());
+            if (taskVo != null && Objects.equals(taskVo.getUserId(), userId)) {
+                return taskVo;
+            }
+        }
+        return this.buildOptimizeTaskVo(recordEntity);
     }
 
     private void runOptimizeItemImageTask(String taskId,
@@ -283,7 +319,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         aiRequest.setImageUrl(request.getImageUrl());
         aiRequest.setPrompt(prompt);
         aiRequest.setBusinessType(AiImageGenerateBusinessTypeEnum.WARDROBE_ITEM_IMAGE_OPTIMIZE.name());
-        aiRequest.setBusinessCustomCategory(StringUtils.defaultString(request.getCategoryName()));
+        aiRequest.setBusinessCustomCategory(this.itemTypeSummary(request.getCategoryName(), request.getItemStyleName()));
         aiRequest.setBusinessId(String.valueOf(request.getItemId()));
 
         long startMillis = System.currentTimeMillis();
@@ -330,7 +366,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
 
     private OptimizeImageRecordContext buildOptimizeImageRecordContext(WardrobeItemImageOptimizeDto request) {
         String businessType = AiImageGenerateBusinessTypeEnum.WARDROBE_ITEM_IMAGE_OPTIMIZE.name();
-        String businessCustomCategory = StringUtils.defaultString(request.getCategoryName());
+        String businessCustomCategory = this.itemTypeSummary(request.getCategoryName(), request.getItemStyleName());
         String businessCategory = this.buildBusinessCategory(businessType, businessCustomCategory);
         String businessId = String.valueOf(request.getItemId());
         String sourceImageUrl = StringUtils.defaultString(request.getImageUrl());
@@ -365,6 +401,31 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         }
         return aiImageGenerateRecordDao.lambdaQuery()
                 .eq(AiImageGenerateRecordEntity::getDedupeKey, dedupeKey)
+                .last("limit 1")
+                .one();
+    }
+
+    private AiImageGenerateRecordEntity getImageGenerateRecordByTaskId(String taskId, Integer userId) {
+        if (StringUtils.isBlank(taskId) || userId == null) {
+            return null;
+        }
+        return aiImageGenerateRecordDao.lambdaQuery()
+                .eq(AiImageGenerateRecordEntity::getTaskId, taskId)
+                .eq(AiImageGenerateRecordEntity::getBusinessType, AiImageGenerateBusinessTypeEnum.WARDROBE_ITEM_IMAGE_OPTIMIZE.name())
+                .eq(AiImageGenerateRecordEntity::getUserId, userId)
+                .last("limit 1")
+                .one();
+    }
+
+    private AiImageGenerateRecordEntity getLatestImageGenerateRecordByItemId(Integer itemId, Integer userId) {
+        if (itemId == null || userId == null) {
+            return null;
+        }
+        return aiImageGenerateRecordDao.lambdaQuery()
+                .eq(AiImageGenerateRecordEntity::getBusinessType, AiImageGenerateBusinessTypeEnum.WARDROBE_ITEM_IMAGE_OPTIMIZE.name())
+                .eq(AiImageGenerateRecordEntity::getBusinessId, String.valueOf(itemId))
+                .eq(AiImageGenerateRecordEntity::getUserId, userId)
+                .orderByDesc(AiImageGenerateRecordEntity::getId)
                 .last("limit 1")
                 .one();
     }
@@ -543,14 +604,58 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                                                                 String status,
                                                                 String itemImage,
                                                                 String errorMessage) {
+        return this.buildOptimizeTaskVo(
+                taskId,
+                itemId,
+                UserUtils.getUserId(false),
+                status,
+                itemImage,
+                errorMessage
+        );
+    }
+
+    private WardrobeItemImageOptimizeTaskVo buildOptimizeTaskVo(String taskId,
+                                                                Integer itemId,
+                                                                Integer userId,
+                                                                String status,
+                                                                String itemImage,
+                                                                String errorMessage) {
         WardrobeItemImageOptimizeTaskVo taskVo = new WardrobeItemImageOptimizeTaskVo();
         taskVo.setTaskId(taskId);
         taskVo.setItemId(itemId);
-        taskVo.setUserId(UserUtils.getUserId(false));
+        taskVo.setUserId(userId);
         taskVo.setStatus(status);
         taskVo.setItemImage(StringUtils.defaultString(itemImage));
         taskVo.setErrorMessage(StringUtils.defaultString(errorMessage));
         return taskVo;
+    }
+
+    private WardrobeItemImageOptimizeTaskVo buildOptimizeTaskVo(AiImageGenerateRecordEntity recordEntity) {
+        if (recordEntity == null) {
+            return null;
+        }
+        String status = StringUtils.defaultIfBlank(recordEntity.getStatus(), TASK_STATUS_PROCESSING);
+        String itemImage = StringUtils.equals(status, TASK_STATUS_SUCCESS) ? recordEntity.getResultImageUrl() : "";
+        String errorMessage = StringUtils.equals(status, TASK_STATUS_FAILED) ? recordEntity.getErrorMessage() : "";
+        return this.buildOptimizeTaskVo(
+                recordEntity.getTaskId(),
+                this.parseInteger(recordEntity.getBusinessId()),
+                recordEntity.getUserId(),
+                status,
+                itemImage,
+                errorMessage
+        );
+    }
+
+    private Integer parseInteger(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private void touchImageGenerateRecord(Integer recordId) {
@@ -679,6 +784,8 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         if (StringUtils.isBlank(request.getItemName())) request.setItemName(itemEntity.getItemName());
         if (request.getCategory() == null) request.setCategory(itemEntity.getCategory());
         if (StringUtils.isBlank(request.getCategoryName())) request.setCategoryName(this.categoryName(request.getCategory()));
+        if (request.getItemStyle() == null) request.setItemStyle(itemEntity.getItemStyle());
+        if (StringUtils.isBlank(request.getItemStyleName())) request.setItemStyleName(this.itemStyleName(request.getItemStyle()));
         if (StringUtils.isBlank(request.getColorName())) request.setColorName(itemEntity.getColorName());
         if (StringUtils.isBlank(request.getSeasonTags())) request.setSeasonTags(itemEntity.getSeasonTags());
         if (StringUtils.isBlank(request.getSceneTags())) request.setSceneTags(itemEntity.getSceneTags());
@@ -785,16 +892,18 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         return """
                 请观察用户提供的衣物图片，为新增衣物表单生成草稿。
                 只能返回JSON对象，字段如下：
-                itemName、category、categoryName、colorName、colorHex、seasonTags、sceneTags、styleTags、brand、size、material、purchaseChannel、storageLocation、purchaseDate、price、customTags、status、remark。
-                category只能使用用户衣物分类字典编码：%s。
+                itemName、category、categoryName、itemStyle、itemStyleName、colorName、colorHex、seasonTags、sceneTags、styleTags、brand、size、material、purchaseChannel、storageLocation、purchaseDate、price、customTags、status、remark。
+                category只能使用用户衣物品类字典编码：%s。
+                itemStyle只能使用用户衣物款式字典编码，优先选择与category品类匹配的款式；无法判断时返回0：%s。
                 colorName只能使用用户衣物颜色字典名称：%s。
                 seasonTags只能使用spring,summer,autumn,winter。
                 sceneTags只能使用用户衣物场景字典编码，多个用英文逗号拼接：%s。
                 styleTags只能使用用户衣物风格字典编码，多个用英文逗号拼接：%s。
-                status只能使用1在穿、2闲置、5已淘汰，无法判断时默认1。无法从图片判断的其它字段返回空字符串，price默认0。名称要短，优先使用颜色+品类。
+                status只能使用1在穿、2闲置、5已淘汰，无法判断时默认1。无法从图片判断的其它字段返回空字符串，price默认0。名称要短，优先使用颜色+款式，其次使用颜色+品类。
                 用户补充提示：%s
                 """.formatted(
                 this.formatCodeOptions(DictTypeEnum.WARDROBE_ITEM_CATEGORY),
+                this.formatCodeOptions(DictTypeEnum.WARDROBE_ITEM_SUBCATEGORY),
                 this.formatNameOptions(DictTypeEnum.WARDROBE_ITEM_COLOR),
                 this.formatCodeOptions(DictTypeEnum.WARDROBE_ITEM_SCENE),
                 this.formatCodeOptions(DictTypeEnum.WARDROBE_ITEM_STYLE),
@@ -804,13 +913,15 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
 
     private String buildItemImageOptimizePrompt(WardrobeItemImageOptimizeDto request) {
         String categoryName = StringUtils.defaultIfBlank(request.getCategoryName(), this.categoryName(request.getCategory()));
+        String itemStyleName = StringUtils.defaultIfBlank(request.getItemStyleName(), this.itemStyleName(request.getItemStyle()));
         return """
                 参考用户提供的衣物图片，为衣柜应用生成一张新的单品图片。
                 目标：只保留并重绘“%s”这一件衣物，不要生成真人、模特、全身穿搭、其它衣物或配饰。
                 如果参考图是全身图、多人图或整套搭配，请根据当前衣物信息提取目标单品并生成单独的商品图。
                 当前衣物信息：
                 名称：%s
-                分类：%s
+                品类：%s
+                款式：%s
                 颜色：%s
                 品牌：%s
                 材质：%s
@@ -822,9 +933,10 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                 用户补充要求：%s
                 生成要求：白色或浅灰纯净背景，衣物完整居中，保留原图可见的颜色、材质、版型、领型、袖长、图案和装饰细节，适合衣柜列表缩略图。不要添加文字、水印、价格、吊牌或不存在的品牌标识。
                 """.formatted(
-                categoryName,
+                this.itemTypeSummary(categoryName, itemStyleName),
                 StringUtils.defaultIfBlank(request.getItemName(), "未命名衣物"),
                 categoryName,
+                itemStyleName,
                 StringUtils.defaultIfBlank(request.getColorName(), "按参考图判断"),
                 StringUtils.defaultIfBlank(request.getBrand(), "无"),
                 StringUtils.defaultIfBlank(request.getMaterial(), "按参考图判断"),
@@ -843,12 +955,14 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         vo.setItemImage(request == null ? "" : StringUtils.defaultString(request.getImageUrl()));
         vo.setCategory(this.inferItemCategory(userPrompt));
         vo.setCategoryName(this.categoryName(vo.getCategory()));
+        vo.setItemStyle(this.inferItemStyle(userPrompt));
+        vo.setItemStyleName(this.itemStyleName(vo.getItemStyle()));
         vo.setColorName(this.inferColorName(userPrompt));
         vo.setColorHex(StringUtils.defaultString(FALLBACK_COLOR_HEX.get(vo.getColorName())));
         vo.setSeasonTags(this.inferSeason(userPrompt));
         vo.setSceneTags(this.inferScene(userPrompt));
         vo.setStyleTags(this.inferStyle(userPrompt));
-        vo.setItemName(this.defaultItemName("", vo.getColorName(), vo.getCategoryName()));
+        vo.setItemName(this.defaultItemName("", vo.getColorName(), vo.getCategoryName(), vo.getItemStyleName()));
         vo.setStatus(1);
         vo.setPrice(BigDecimal.ZERO);
         vo.setPrompt(prompt);
@@ -873,6 +987,13 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             vo.setCategory(category == null ? fallback.getCategory() : category);
             vo.setCategoryName(this.categoryName(vo.getCategory()));
 
+            Integer itemStyle = this.normalizeItemStyle(this.firstNonBlank(
+                    this.cleanText(json.get("itemStyle")),
+                    this.cleanText(json.get("itemStyleName"))
+            ));
+            vo.setItemStyle(itemStyle == null ? fallback.getItemStyle() : itemStyle);
+            vo.setItemStyleName(this.itemStyleName(vo.getItemStyle()));
+
             String colorName = this.normalizeColorName(json.get("colorName"), json.get("color"));
             vo.setColorName(StringUtils.defaultIfBlank(colorName, fallback.getColorName()));
             vo.setColorHex(this.normalizeColorHex(vo.getColorName(), json.get("colorHex")));
@@ -880,7 +1001,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             vo.setSeasonTags(StringUtils.defaultIfBlank(this.normalizeTags(json.get("seasonTags"), "season"), fallback.getSeasonTags()));
             vo.setSceneTags(StringUtils.defaultIfBlank(this.normalizeTags(json.get("sceneTags"), "scene"), fallback.getSceneTags()));
             vo.setStyleTags(StringUtils.defaultIfBlank(this.normalizeTags(json.get("styleTags"), "style"), fallback.getStyleTags()));
-            vo.setItemName(this.defaultItemName(this.cleanText(json.get("itemName")), vo.getColorName(), vo.getCategoryName()));
+            vo.setItemName(this.defaultItemName(this.cleanText(json.get("itemName")), vo.getColorName(), vo.getCategoryName(), vo.getItemStyleName()));
             vo.setBrand(this.cleanText(json.get("brand")));
             vo.setSize(this.cleanText(json.get("size")));
             vo.setMaterial(this.cleanText(json.get("material")));
@@ -938,19 +1059,22 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         if (dictCode != null) {
             return dictCode;
         }
-        if (StringUtils.containsAny(text, "鞋", "靴", "拖鞋")) return 5;
-        if (StringUtils.containsAny(text, "包", "背包", "手袋")) return 6;
-        if (StringUtils.containsAny(text, "帽", "围巾", "项链", "耳环", "腰带", "配饰", "饰品")) return 7;
-        if (StringUtils.containsAny(text, "外套", "大衣", "风衣", "羽绒服", "夹克", "西装")) return 3;
-        if (StringUtils.containsAny(text, "连衣", "套装", "裙")) return 4;
+        if (StringUtils.containsAny(text, "项链", "耳环", "耳钉", "戒指", "手链", "手镯", "胸针", "脚链", "手表", "首饰", "饰品")) return 10;
+        if (StringUtils.containsAny(text, "包", "背包", "手袋", "卡包", "钱包")) return 9;
+        if (StringUtils.containsAny(text, "帽", "棒球帽", "渔夫帽", "贝雷帽")) return 8;
+        if (StringUtils.containsAny(text, "围巾", "披肩", "腰带", "手套", "领带", "领结", "丝巾", "发饰", "眼镜", "墨镜", "配饰")) return 7;
+        if (StringUtils.containsAny(text, "鞋", "靴", "拖鞋", "凉鞋", "高跟鞋")) return 6;
+        if (StringUtils.containsAny(text, "袜", "连裤袜", "打底袜")) return 5;
+        if (StringUtils.containsAny(text, "内衣", "文胸", "内裤", "睡衣", "家居服", "泳衣")) return 4;
+        if (StringUtils.containsAny(text, "连衣", "旗袍", "连体裤", "礼服裙")) return 3;
         if (StringUtils.containsAny(text, "裤", "半裙")) return 2;
-        if (StringUtils.containsAny(text, "上装", "上衣", "衬衫", "T恤", "短袖", "卫衣", "毛衣", "背心")) return 1;
-        if (StringUtils.contains(text, "其他")) return 8;
+        if (StringUtils.containsAny(text, "上装", "上衣", "衬衫", "T恤", "短袖", "卫衣", "毛衣", "背心", "外套", "大衣", "风衣", "羽绒服", "夹克", "西装")) return 1;
+        if (StringUtils.contains(text, "其他")) return 11;
         return null;
     }
 
     private Integer inferItemCategory(String prompt) {
-        return Objects.requireNonNullElse(this.normalizeCategory(prompt), 8);
+        return Objects.requireNonNullElse(this.normalizeCategory(prompt), 11);
     }
 
     private String categoryName(Integer category) {
@@ -962,6 +1086,71 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                 .map(DictListVo::getDictName)
                 .findFirst()
                 .orElse(FALLBACK_CATEGORY_NAMES.getOrDefault(category, "其他"));
+    }
+
+    private Integer normalizeItemStyle(String value) {
+        String text = StringUtils.trimToEmpty(value);
+        if (StringUtils.isBlank(text)) {
+            return null;
+        }
+        Integer dictCode = this.matchDictCode(DictTypeEnum.WARDROBE_ITEM_SUBCATEGORY, text);
+        if (dictCode != null) {
+            return dictCode;
+        }
+        if (StringUtils.contains(text, "五分裤") || StringUtils.contains(text, "七分裤")) return 202;
+        if (StringUtils.contains(text, "T恤") || StringUtils.containsAny(text, "短袖", "长袖T")) return 101;
+        if (StringUtils.contains(text, "衬衫")) return 102;
+        if (StringUtils.contains(text, "Polo")) return 103;
+        if (StringUtils.contains(text, "卫衣")) return 104;
+        if (StringUtils.contains(text, "毛衣")) return 105;
+        if (StringUtils.contains(text, "针织")) return 106;
+        if (StringUtils.contains(text, "打底衫")) return 107;
+        if (StringUtils.contains(text, "背心")) return 108;
+        if (StringUtils.contains(text, "吊带")) return 109;
+        if (StringUtils.contains(text, "抹胸")) return 110;
+        if (StringUtils.contains(text, "雪纺")) return 111;
+        if (StringUtils.contains(text, "马甲")) return 112;
+        if (StringUtils.contains(text, "开衫")) return 113;
+        if (StringUtils.contains(text, "防晒衣")) return 114;
+        if (StringUtils.contains(text, "牛仔裤")) return 201;
+        if (StringUtils.contains(text, "休闲裤")) return 202;
+        if (StringUtils.contains(text, "西裤")) return 203;
+        if (StringUtils.contains(text, "运动裤")) return 204;
+        if (StringUtils.contains(text, "工装裤")) return 205;
+        if (StringUtils.contains(text, "阔腿裤")) return 206;
+        if (StringUtils.contains(text, "短裤")) return 207;
+        if (StringUtils.contains(text, "半身裙")) return 208;
+        if (StringUtils.contains(text, "短裙")) return 209;
+        if (StringUtils.contains(text, "长裙")) return 210;
+        if (StringUtils.contains(text, "打底裤")) return 211;
+        if (StringUtils.contains(text, "瑜伽裤")) return 212;
+        if (StringUtils.contains(text, "背带裤")) return 213;
+        if (StringUtils.contains(text, "连衣裙")) return 301;
+        if (StringUtils.contains(text, "衬衫裙")) return 302;
+        if (StringUtils.contains(text, "针织裙")) return 303;
+        if (StringUtils.contains(text, "吊带裙")) return 304;
+        if (StringUtils.contains(text, "背心裙")) return 305;
+        if (StringUtils.contains(text, "背带裙")) return 306;
+        if (StringUtils.contains(text, "礼服裙")) return 307;
+        if (StringUtils.contains(text, "旗袍")) return 308;
+        if (StringUtils.contains(text, "连体裤")) return 309;
+        if (StringUtils.contains(text, "套装裙")) return 310;
+        return null;
+    }
+
+    private Integer inferItemStyle(String prompt) {
+        return Objects.requireNonNullElse(this.normalizeItemStyle(prompt), 0);
+    }
+
+    private String itemStyleName(Integer itemStyle) {
+        if (itemStyle == null || itemStyle <= 0) {
+            return "";
+        }
+        return this.getDictList(DictTypeEnum.WARDROBE_ITEM_SUBCATEGORY).stream()
+                .filter(dict -> Objects.equals(dict.getDictCode(), itemStyle))
+                .map(DictListVo::getDictName)
+                .findFirst()
+                .orElse("");
     }
 
     private String normalizeColorName(Object... values) {
@@ -985,14 +1174,17 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             if (StringUtils.containsAny(text, "黑", "玄")) return "黑色";
             if (StringUtils.containsAny(text, "白", "乳白")) return "白色";
             if (StringUtils.containsAny(text, "灰", "银")) return "灰色";
-            if (StringUtils.containsAny(text, "蓝", "牛仔", "藏青")) return "蓝色";
+            if (StringUtils.contains(text, "牛仔蓝")) return "牛仔蓝";
+            if (StringUtils.contains(text, "藏青")) return "藏青色";
+            if (StringUtils.containsAny(text, "卡其")) return "卡其色";
+            if (StringUtils.containsAny(text, "蓝", "牛仔")) return "蓝色";
             if (StringUtils.containsAny(text, "绿", "军绿")) return "绿色";
             if (StringUtils.containsAny(text, "红", "酒红")) return "红色";
             if (StringUtils.containsAny(text, "黄", "金")) return "黄色";
             if (StringUtils.containsAny(text, "粉", "玫")) return "粉色";
             if (StringUtils.containsAny(text, "紫")) return "紫色";
             if (StringUtils.containsAny(text, "棕", "咖", "褐")) return "棕色";
-            if (StringUtils.containsAny(text, "米", "杏", "卡其")) return "米色";
+            if (StringUtils.containsAny(text, "米", "杏")) return "米色";
             if (StringUtils.containsAny(text, "彩", "拼色", "多色")) return "彩色";
         }
         return "";
@@ -1094,6 +1286,8 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         if (StringUtils.equals(lower, "travel") || StringUtils.containsAny(text, "旅行", "出差")) return "5";
         if (StringUtils.equals(lower, "formal") || StringUtils.containsAny(text, "正式", "会议", "面试")) return "6";
         if (StringUtils.equals(lower, "home") || StringUtils.containsAny(text, "居家", "在家")) return "7";
+        if (StringUtils.equals(lower, "outdoor") || StringUtils.containsAny(text, "户外", "露营")) return "8";
+        if (StringUtils.equals(lower, "party") || StringUtils.containsAny(text, "聚会", "派对")) return "9";
         return "";
     }
 
@@ -1107,7 +1301,17 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         if (StringUtils.equals(lower, "street") || StringUtils.contains(text, "街头")) return "5";
         if (StringUtils.equals(lower, "retro") || StringUtils.contains(text, "复古")) return "6";
         if (StringUtils.equals(lower, "outdoor") || StringUtils.containsAny(text, "户外", "露营")) return "7";
+        if (StringUtils.equals(lower, "sport") || StringUtils.containsAny(text, "运动", "健身")) return "8";
+        if (StringUtils.equals(lower, "commute") || StringUtils.containsAny(text, "通勤", "职场")) return "9";
+        if (StringUtils.equals(lower, "elegant") || StringUtils.containsAny(text, "优雅", "精致")) return "10";
+        if (StringUtils.equals(lower, "neutral") || StringUtils.containsAny(text, "中性", "无性别")) return "11";
+        if (StringUtils.equals(lower, "college") || StringUtils.containsAny(text, "学院", "校园")) return "12";
+        if (StringUtils.equals(lower, "vacation") || StringUtils.containsAny(text, "度假", "海边")) return "13";
         return "";
+    }
+
+    private String defaultItemName(String itemName, String colorName, String categoryName, String itemStyleName) {
+        return this.defaultItemName(itemName, colorName, StringUtils.defaultIfBlank(itemStyleName, categoryName));
     }
 
     private String defaultItemName(String itemName, String colorName, String categoryName) {
@@ -1121,6 +1325,15 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             return categoryName;
         }
         return "待识别衣物";
+    }
+
+    private String itemTypeSummary(String categoryName, String itemStyleName) {
+        String category = StringUtils.defaultString(categoryName);
+        String itemStyle = StringUtils.defaultString(itemStyleName);
+        if (StringUtils.isNotBlank(category) && StringUtils.isNotBlank(itemStyle)) {
+            return category + "/" + itemStyle;
+        }
+        return StringUtils.defaultIfBlank(itemStyle, category);
     }
 
     private BigDecimal normalizePrice(Object value) {
@@ -1279,12 +1492,15 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
             case WARDROBE_ITEM_CATEGORY -> List.of(
                     this.dict(1, "上装"),
                     this.dict(2, "下装"),
-                    this.dict(3, "外套"),
-                    this.dict(4, "连衣/套装"),
-                    this.dict(5, "鞋履"),
-                    this.dict(6, "包袋"),
+                    this.dict(3, "连衣裙"),
+                    this.dict(4, "内衣"),
+                    this.dict(5, "袜子"),
+                    this.dict(6, "鞋履"),
                     this.dict(7, "配饰"),
-                    this.dict(8, "其他")
+                    this.dict(8, "帽子"),
+                    this.dict(9, "包袋"),
+                    this.dict(10, "首饰"),
+                    this.dict(11, "其他")
             );
             case WARDROBE_ITEM_COLOR -> List.of(
                     this.dict(1, "黑色"),
@@ -1298,7 +1514,10 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                     this.dict(9, "紫色"),
                     this.dict(10, "棕色"),
                     this.dict(11, "米色"),
-                    this.dict(12, "彩色")
+                    this.dict(12, "卡其色"),
+                    this.dict(13, "牛仔蓝"),
+                    this.dict(14, "藏青色"),
+                    this.dict(15, "彩色")
             );
             case WARDROBE_ITEM_SCENE -> List.of(
                     this.dict(1, "日常"),
@@ -1307,7 +1526,9 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                     this.dict(4, "运动"),
                     this.dict(5, "旅行"),
                     this.dict(6, "正式"),
-                    this.dict(7, "居家")
+                    this.dict(7, "居家"),
+                    this.dict(8, "户外"),
+                    this.dict(9, "聚会")
             );
             case WARDROBE_ITEM_STYLE -> List.of(
                     this.dict(1, "休闲"),
@@ -1316,7 +1537,136 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
                     this.dict(4, "甜美"),
                     this.dict(5, "街头"),
                     this.dict(6, "复古"),
-                    this.dict(7, "户外")
+                    this.dict(7, "户外"),
+                    this.dict(8, "运动"),
+                    this.dict(9, "通勤"),
+                    this.dict(10, "优雅"),
+                    this.dict(11, "中性"),
+                    this.dict(12, "学院"),
+                    this.dict(13, "度假")
+            );
+            case WARDROBE_ITEM_SUBCATEGORY -> List.of(
+                    this.dict(101, "T恤"),
+                    this.dict(102, "衬衫"),
+                    this.dict(103, "Polo衫"),
+                    this.dict(104, "卫衣"),
+                    this.dict(105, "毛衣"),
+                    this.dict(106, "针织衫"),
+                    this.dict(107, "打底衫"),
+                    this.dict(108, "背心"),
+                    this.dict(109, "吊带"),
+                    this.dict(110, "抹胸"),
+                    this.dict(111, "雪纺衫"),
+                    this.dict(112, "马甲"),
+                    this.dict(113, "开衫"),
+                    this.dict(114, "防晒衣"),
+                    this.dict(115, "其他上装"),
+                    this.dict(201, "牛仔裤"),
+                    this.dict(202, "休闲裤"),
+                    this.dict(203, "西裤"),
+                    this.dict(204, "运动裤"),
+                    this.dict(205, "工装裤"),
+                    this.dict(206, "阔腿裤"),
+                    this.dict(207, "短裤"),
+                    this.dict(208, "半身裙"),
+                    this.dict(209, "短裙"),
+                    this.dict(210, "长裙"),
+                    this.dict(211, "打底裤"),
+                    this.dict(212, "瑜伽裤"),
+                    this.dict(213, "背带裤"),
+                    this.dict(214, "其他下装"),
+                    this.dict(301, "连衣裙"),
+                    this.dict(302, "衬衫裙"),
+                    this.dict(303, "针织裙"),
+                    this.dict(304, "吊带裙"),
+                    this.dict(305, "背心裙"),
+                    this.dict(306, "背带裙"),
+                    this.dict(307, "礼服裙"),
+                    this.dict(308, "旗袍"),
+                    this.dict(309, "连体裤"),
+                    this.dict(310, "套装裙"),
+                    this.dict(311, "其他连衣裙"),
+                    this.dict(401, "文胸"),
+                    this.dict(402, "内裤"),
+                    this.dict(403, "保暖内衣"),
+                    this.dict(404, "睡衣"),
+                    this.dict(405, "家居服"),
+                    this.dict(406, "塑身衣"),
+                    this.dict(407, "打底背心"),
+                    this.dict(408, "抹胸内衣"),
+                    this.dict(409, "泳衣"),
+                    this.dict(410, "其他内衣"),
+                    this.dict(501, "短袜"),
+                    this.dict(502, "中筒袜"),
+                    this.dict(503, "长筒袜"),
+                    this.dict(504, "船袜"),
+                    this.dict(505, "隐形袜"),
+                    this.dict(506, "堆堆袜"),
+                    this.dict(507, "连裤袜"),
+                    this.dict(508, "打底袜"),
+                    this.dict(509, "运动袜"),
+                    this.dict(510, "保暖袜"),
+                    this.dict(511, "其他袜子"),
+                    this.dict(601, "运动鞋"),
+                    this.dict(602, "休闲鞋"),
+                    this.dict(603, "板鞋"),
+                    this.dict(604, "帆布鞋"),
+                    this.dict(605, "皮鞋"),
+                    this.dict(606, "乐福鞋"),
+                    this.dict(607, "靴子"),
+                    this.dict(608, "短靴"),
+                    this.dict(609, "长靴"),
+                    this.dict(610, "凉鞋"),
+                    this.dict(611, "拖鞋"),
+                    this.dict(612, "高跟鞋"),
+                    this.dict(613, "雨鞋"),
+                    this.dict(614, "其他鞋履"),
+                    this.dict(701, "围巾"),
+                    this.dict(702, "披肩"),
+                    this.dict(703, "腰带"),
+                    this.dict(704, "手套"),
+                    this.dict(705, "领带"),
+                    this.dict(706, "领结"),
+                    this.dict(707, "丝巾"),
+                    this.dict(708, "发饰"),
+                    this.dict(709, "眼镜"),
+                    this.dict(710, "墨镜"),
+                    this.dict(711, "口罩"),
+                    this.dict(712, "其他配饰"),
+                    this.dict(801, "棒球帽"),
+                    this.dict(802, "渔夫帽"),
+                    this.dict(803, "贝雷帽"),
+                    this.dict(804, "毛线帽"),
+                    this.dict(805, "鸭舌帽"),
+                    this.dict(806, "遮阳帽"),
+                    this.dict(807, "礼帽"),
+                    this.dict(808, "草帽"),
+                    this.dict(809, "空顶帽"),
+                    this.dict(810, "其他帽子"),
+                    this.dict(901, "双肩包"),
+                    this.dict(902, "托特包"),
+                    this.dict(903, "斜挎包"),
+                    this.dict(904, "单肩包"),
+                    this.dict(905, "手提包"),
+                    this.dict(906, "腰包"),
+                    this.dict(907, "胸包"),
+                    this.dict(908, "钱包"),
+                    this.dict(909, "卡包"),
+                    this.dict(910, "化妆包"),
+                    this.dict(911, "旅行包"),
+                    this.dict(912, "其他包袋"),
+                    this.dict(1001, "项链"),
+                    this.dict(1002, "耳钉"),
+                    this.dict(1003, "耳环"),
+                    this.dict(1004, "戒指"),
+                    this.dict(1005, "手链"),
+                    this.dict(1006, "手镯"),
+                    this.dict(1007, "胸针"),
+                    this.dict(1008, "脚链"),
+                    this.dict(1009, "手表"),
+                    this.dict(1010, "其他首饰"),
+                    this.dict(1101, "其他款式"),
+                    this.dict(1102, "待分类")
             );
             default -> List.of();
         };

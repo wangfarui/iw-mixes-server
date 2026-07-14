@@ -22,4 +22,6 @@ public interface WardrobeAssistantService {
     WardrobeItemImageOptimizeTaskVo startOptimizeItemImage(WardrobeItemImageOptimizeDto dto);
 
     WardrobeItemImageOptimizeTaskVo getOptimizeItemImageStatus(String taskId);
+
+    WardrobeItemImageOptimizeTaskVo getLatestOptimizeItemImageTask(Integer itemId);
 }

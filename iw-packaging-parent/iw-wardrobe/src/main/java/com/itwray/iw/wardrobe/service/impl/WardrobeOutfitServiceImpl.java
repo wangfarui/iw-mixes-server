@@ -49,11 +49,12 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     private static final int OUTFIT_STATUS_ACTIVE = 1;
     private static final int CATEGORY_TOP = 1;
     private static final int CATEGORY_BOTTOM = 2;
-    private static final int CATEGORY_OUTER = 3;
-    private static final int CATEGORY_DRESS = 4;
-    private static final int CATEGORY_SHOES = 5;
-    private static final int CATEGORY_BAG = 6;
+    private static final int CATEGORY_DRESS = 3;
+    private static final int CATEGORY_SHOES = 6;
     private static final int CATEGORY_ACCESSORY = 7;
+    private static final int CATEGORY_HAT = 8;
+    private static final int CATEGORY_BAG = 9;
+    private static final int CATEGORY_JEWELRY = 10;
 
     private final WardrobeOutfitDao wardrobeOutfitDao;
     private final WardrobeOutfitItemDao outfitItemDao;
@@ -238,6 +239,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             relation.setItemName(item.getItemName());
             relation.setItemImage(item.getItemImage());
             relation.setCategory(item.getCategory());
+            relation.setItemStyle(item.getItemStyle());
             relation.setSort(i + 1);
             relationList.add(relation);
         }
@@ -279,6 +281,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         vo.setItemName(entity.getItemName());
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
+        vo.setItemStyle(entity.getItemStyle());
         return vo;
     }
 
@@ -333,12 +336,13 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         if (!hasDress) {
             this.addByCategory(selected, categoryMap, CATEGORY_TOP, offset);
             this.addByCategory(selected, categoryMap, CATEGORY_BOTTOM, offset);
-            this.addByCategory(selected, categoryMap, CATEGORY_OUTER, offset);
         }
         this.addByCategory(selected, categoryMap, CATEGORY_DRESS, offset);
         this.addByCategory(selected, categoryMap, CATEGORY_SHOES, offset);
         this.addByCategory(selected, categoryMap, CATEGORY_BAG, offset);
         this.addByCategory(selected, categoryMap, CATEGORY_ACCESSORY, offset);
+        this.addByCategory(selected, categoryMap, CATEGORY_HAT, offset);
+        this.addByCategory(selected, categoryMap, CATEGORY_JEWELRY, offset);
         return new ArrayList<>(selected.values());
     }
 

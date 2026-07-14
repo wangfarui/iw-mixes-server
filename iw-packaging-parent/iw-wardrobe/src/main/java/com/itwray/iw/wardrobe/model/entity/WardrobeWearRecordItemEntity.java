@@ -31,5 +31,7 @@ public class WardrobeWearRecordItemEntity extends UserEntity<Integer> {
 
     private Integer category;
 
+    private Integer itemStyle;
+
     private Integer sort;
 }

@@ -26,11 +26,17 @@ public class WardrobeItemImageOptimizeDto {
     @Schema(title = "衣物名称")
     private String itemName;
 
-    @Schema(title = "衣物分类")
+    @Schema(title = "衣物品类")
     private Integer category;
 
-    @Schema(title = "分类名称")
+    @Schema(title = "品类名称")
     private String categoryName;
+
+    @Schema(title = "衣物款式")
+    private Integer itemStyle;
+
+    @Schema(title = "款式名称")
+    private String itemStyleName;
 
     @Schema(title = "颜色名称")
     private String colorName;

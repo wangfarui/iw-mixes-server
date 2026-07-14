@@ -91,7 +91,8 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
         vo.setTotalValue(totalValue);
         vo.setAvgItemPrice(activeItems.isEmpty() ? BigDecimal.ZERO : totalValue.divide(BigDecimal.valueOf(activeItems.size()), 2, RoundingMode.HALF_UP));
         vo.setAvgCostPerWear(totalWearCount <= 0 ? BigDecimal.ZERO : totalValue.divide(BigDecimal.valueOf(totalWearCount), 2, RoundingMode.HALF_UP));
-        vo.setCategoryStats(this.buildCategoryStats(activeItems));
+        vo.setCategoryStats(this.buildCodeStats(activeItems.stream().map(WardrobeItemEntity::getCategory).toList()));
+        vo.setItemStyleStats(this.buildCodeStats(activeItems.stream().map(WardrobeItemEntity::getItemStyle).toList()));
         vo.setColorStats(this.buildColorStats(activeItems));
         vo.setSeasonStats(this.buildTagStats(activeItems.stream().map(WardrobeItemEntity::getSeasonTags).toList()));
         vo.setSceneStats(this.buildTagStats(activeItems.stream().map(WardrobeItemEntity::getSceneTags).toList()));
@@ -125,9 +126,9 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
         return vo;
     }
 
-    private List<WardrobeStatisticItemVo> buildCategoryStats(List<WardrobeItemEntity> itemList) {
-        Map<Integer, Long> countMap = itemList.stream()
-                .collect(Collectors.groupingBy(item -> Objects.requireNonNullElse(item.getCategory(), 0), Collectors.counting()));
+    private List<WardrobeStatisticItemVo> buildCodeStats(List<Integer> codeList) {
+        Map<Integer, Long> countMap = codeList.stream()
+                .collect(Collectors.groupingBy(code -> Objects.requireNonNullElse(code, 0), Collectors.counting()));
         return countMap.entrySet().stream()
                 .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
                 .map(entry -> new WardrobeStatisticItemVo(String.valueOf(entry.getKey()), entry.getValue().intValue()))

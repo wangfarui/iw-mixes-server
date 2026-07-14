@@ -115,14 +115,15 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
                                     // 对每个分组的 List<BaseDictEntity> 按 sort 字段排序
                                     list.sort(Comparator.comparing(BaseDictEntity::getSort));
 
-                                    // 将排序后的 BaseDictEntity 转换为 DictAllListVo
-                                    return list.stream()
-                                            .map(baseDictEntity -> new DictAllListVo(
-                                                    baseDictEntity.getId(),
-                                                    baseDictEntity.getDictCode(),
-                                                    baseDictEntity.getDictName())
-                                            )
-                                            .collect(Collectors.toList());
+                                            // 将排序后的 BaseDictEntity 转换为 DictAllListVo
+                                            return list.stream()
+                                                    .map(baseDictEntity -> new DictAllListVo(
+                                                            baseDictEntity.getId(),
+                                                            baseDictEntity.getParentId(),
+                                                            baseDictEntity.getDictCode(),
+                                                            baseDictEntity.getDictName())
+                                                    )
+                                                    .collect(Collectors.toList());
                                 }
                         )));
 
@@ -296,7 +297,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     @Override
     @Transactional
     public Integer repairUserVisibleDictData() {
-        if (!this.isAdminUser(UserUtils.getUserId())) {
+        if (!this.isSuperAdminUser(UserUtils.getUserId())) {
             throw new BusinessException("权限不足");
         }
 
@@ -324,7 +325,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
                 .orderByAsc(BaseDictEntity::getSort)
                 .list()
                 .stream()
-                .map(t -> new DictAllListVo(t.getId(), t.getDictCode(), t.getDictName()))
+                .map(t -> new DictAllListVo(t.getId(), t.getParentId(), t.getDictCode(), t.getDictName()))
                 .collect(Collectors.toList());
     }
 
@@ -367,18 +368,25 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     }
 
     private int copyMissingVisibleDictData(Integer userId) {
-        Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict()));
+        List<BaseDictEntity> templateDictList = this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict());
+        Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(templateDictList);
         Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(this.queryDictListByUser(userId, DictTypeEnum.getUserVisibleDict()));
         List<BaseDictEntity> insertList = templateDictMap.entrySet().stream()
                 .filter(entry -> !userDictMap.containsKey(entry.getKey()))
                 .map(entry -> this.copyDictEntity(entry.getValue(), userId))
                 .collect(Collectors.toList());
+        int updateCount = 0;
         if (CollectionUtil.isEmpty(insertList)) {
-            return 0;
+            updateCount = this.remapUserDictParentIds(userId, templateDictList);
+            if (updateCount > 0) {
+                RedisUtil.delete(this.obtainDictRedisKeyByUser(userId));
+            }
+            return updateCount;
         }
         getBaseDao().saveBatch(insertList);
+        updateCount = this.remapUserDictParentIds(userId, templateDictList);
         RedisUtil.delete(this.obtainDictRedisKeyByUser(userId));
-        return insertList.size();
+        return insertList.size() + updateCount;
     }
 
     private List<BaseDictEntity> queryTemplateDictList(List<DictTypeEnum> dictTypeList) {
@@ -452,6 +460,38 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         return dictEntity;
     }
 
+    private int remapUserDictParentIds(Integer userId, List<BaseDictEntity> templateDictList) {
+        Map<Integer, BaseDictEntity> templateIdMap = templateDictList.stream()
+                .collect(Collectors.toMap(BaseDictEntity::getId, t -> t, (a, b) -> a));
+        Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(templateDictList);
+        List<BaseDictEntity> userDictList = this.queryDictListByUser(userId, DictTypeEnum.getUserVisibleDict());
+        Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(userDictList);
+        int updateCount = 0;
+        for (BaseDictEntity userDict : userDictList) {
+            BaseDictEntity templateDict = templateDictMap.get(this.buildDictUniqueKey(userDict));
+            if (templateDict == null || NumberUtils.isNullOrZero(templateDict.getParentId())) {
+                continue;
+            }
+            BaseDictEntity templateParent = templateIdMap.get(templateDict.getParentId());
+            if (templateParent == null) {
+                continue;
+            }
+            BaseDictEntity userParent = userDictMap.get(this.buildDictUniqueKey(templateParent));
+            if (userParent == null || Objects.equals(userDict.getParentId(), userParent.getId())) {
+                continue;
+            }
+            boolean updated = getBaseDao().lambdaUpdate()
+                    .eq(BaseDictEntity::getId, userDict.getId())
+                    .eq(BaseDictEntity::getUserId, userId)
+                    .set(BaseDictEntity::getParentId, userParent.getId())
+                    .update();
+            if (updated) {
+                updateCount++;
+            }
+        }
+        return updateCount;
+    }
+
     private List<Integer> toDictTypeCodeList(List<DictTypeEnum> dictTypeList) {
         return dictTypeList.stream().map(DictTypeEnum::getCode).collect(Collectors.toList());
     }
@@ -494,6 +534,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         if (dictTypeEnum == null) {
             throw new BusinessException("字典类型错误");
         }
+        this.checkWardrobeItemSubcategoryParent(dto, dictTypeEnum);
 
         Integer oldDictId = null;
         // 如果是更新操作
@@ -546,6 +587,25 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         }
     }
 
+    private void checkWardrobeItemSubcategoryParent(DictAddDto dto, DictTypeEnum dictTypeEnum) {
+        if (!DictTypeEnum.WARDROBE_ITEM_SUBCATEGORY.equals(dictTypeEnum)) {
+            return;
+        }
+        if (Objects.equals(BoolEnum.TRUE.getCode(), dto.getIsSyncAll())) {
+            throw new BusinessException("衣物款式不支持同步所有用户，请通过模板字典和修复接口初始化");
+        }
+        if (NumberUtils.isNullOrZero(dto.getParentId())) {
+            throw new BusinessException("衣物款式必须选择所属品类");
+        }
+        BaseDictEntity parentDict = getBaseDao().queryById(dto.getParentId(), "请选择有效的衣物品类");
+        if (!Objects.equals(parentDict.getDictType(), DictTypeEnum.WARDROBE_ITEM_CATEGORY.getCode())) {
+            throw new BusinessException("衣物款式只能归属衣物品类");
+        }
+        if (!Objects.equals(parentDict.getDictStatus(), EnableEnum.ENABLE.getCode())) {
+            throw new BusinessException("衣物款式不能归属已禁用的品类");
+        }
+    }
+
     /**
      * 校验用户操作字典的角色权限
      *
@@ -583,6 +643,11 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     private boolean isAdminUser(Integer userId) {
         AuthUserEntity authUserEntity = authUserDao.queryById(userId);
         return RoleTypeEnum.isAdminRole(authUserEntity.getRoleType());
+    }
+
+    private boolean isSuperAdminUser(Integer userId) {
+        AuthUserEntity authUserEntity = authUserDao.queryById(userId);
+        return RoleTypeEnum.SUPER_ADMIN.getCode().equals(authUserEntity.getRoleType());
     }
 
     /**

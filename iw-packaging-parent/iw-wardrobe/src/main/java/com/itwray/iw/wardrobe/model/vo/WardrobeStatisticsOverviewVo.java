@@ -40,6 +40,8 @@ public class WardrobeStatisticsOverviewVo {
 
     private List<WardrobeStatisticItemVo> categoryStats;
 
+    private List<WardrobeStatisticItemVo> itemStyleStats;
+
     private List<WardrobeStatisticItemVo> colorStats;
 
     private List<WardrobeStatisticItemVo> seasonStats;

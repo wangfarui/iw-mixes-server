@@ -29,8 +29,11 @@ public class WardrobeItemAddDto implements AddDto {
     @Schema(title = "衣物图片")
     private String itemImage;
 
-    @Schema(title = "分类")
+    @Schema(title = "衣物品类")
     private Integer category;
+
+    @Schema(title = "衣物款式")
+    private Integer itemStyle;
 
     @Schema(title = "颜色名称")
     private String colorName;

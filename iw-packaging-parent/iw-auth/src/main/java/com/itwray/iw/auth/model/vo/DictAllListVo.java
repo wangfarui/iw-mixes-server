@@ -20,6 +20,9 @@ public class DictAllListVo {
     @Schema(title = "id")
     private Integer id;
 
+    @Schema(title = "父字典id")
+    private Integer parentId;
+
     @Schema(title = "字典code")
     private Integer dictCode;
 

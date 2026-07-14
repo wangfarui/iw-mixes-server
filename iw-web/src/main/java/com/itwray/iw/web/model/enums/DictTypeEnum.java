@@ -42,10 +42,11 @@ public enum DictTypeEnum implements ConstantEnum {
 
     /** iw-wardrobe 衣柜模块 **/
     WARDROBE_TAG(5001, "衣柜模块", DataType.ID, RoleTypeEnum.SUPER_ADMIN),
-    WARDROBE_ITEM_CATEGORY(5002, "衣柜-衣物分类", DataType.CODE, RoleTypeEnum.USER),
+    WARDROBE_ITEM_CATEGORY(5002, "衣柜-衣物品类", DataType.CODE, RoleTypeEnum.USER),
     WARDROBE_ITEM_COLOR(5003, "衣柜-衣物颜色", DataType.CODE, RoleTypeEnum.USER),
     WARDROBE_ITEM_SCENE(5004, "衣柜-衣物场景", DataType.CODE, RoleTypeEnum.USER),
     WARDROBE_ITEM_STYLE(5005, "衣柜-衣物风格", DataType.CODE, RoleTypeEnum.USER),
+    WARDROBE_ITEM_SUBCATEGORY(5006, "衣柜-衣物款式", DataType.CODE, RoleTypeEnum.USER),
     ;
 
     private final Integer code;

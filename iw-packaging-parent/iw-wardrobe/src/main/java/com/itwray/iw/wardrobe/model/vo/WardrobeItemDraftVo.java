@@ -21,11 +21,17 @@ public class WardrobeItemDraftVo {
     @Schema(title = "图片地址")
     private String itemImage;
 
-    @Schema(title = "分类")
+    @Schema(title = "衣物品类")
     private Integer category;
 
-    @Schema(title = "分类名称")
+    @Schema(title = "品类名称")
     private String categoryName;
+
+    @Schema(title = "衣物款式")
+    private Integer itemStyle;
+
+    @Schema(title = "款式名称")
+    private String itemStyleName;
 
     @Schema(title = "颜色名称")
     private String colorName;

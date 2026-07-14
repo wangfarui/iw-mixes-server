@@ -19,8 +19,14 @@ public class WardrobeItemPageDto extends PageDto {
     @Schema(title = "衣物名称")
     private String itemName;
 
-    @Schema(title = "分类")
+    @Schema(title = "关键词，匹配名称或自定义标签")
+    private String keyword;
+
+    @Schema(title = "衣物品类")
     private Integer category;
+
+    @Schema(title = "衣物款式")
+    private Integer itemStyle;
 
     @Schema(title = "颜色名称")
     private String colorName;

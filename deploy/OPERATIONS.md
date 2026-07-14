@@ -384,6 +384,45 @@ ss -lntp | grep -E '18080|18006|80|443'
 
 如果 `curl` 内网服务不通，优先检查目标服务状态和防火墙；如果 `curl` 正常但域名 504，优先检查 Nginx `proxy_pass`、upstream 地址和超时配置。
 
+### AI 图片生成 502
+
+衣柜“衣物编辑”页的“AI优化”最终由 `iw-external` 调用图片生成供应商。若日志出现：
+
+```text
+AIService#startReferenceGenerateImage 请求失败, status: 502
+```
+
+这表示生产实际进入了 `openai-responses` 旧分支，不是小程序轮询超时。先看 `iw-external` 启动日志确认实际配置：
+
+```bash
+journalctl -u iw-external -n 200 --no-pager | grep 'AIService图片生成配置'
+```
+
+推荐生产配置为 Gemini：
+
+```text
+IW_AI_IMAGE_PROVIDER=gemini
+IW_AI_IMAGE_API_URL=https://generativelanguage.googleapis.com/v1beta
+IW_AI_IMAGE_API_KEY=<gemini-api-key>
+IW_AI_IMAGE_MODEL=gemini-3.1-flash-image
+```
+
+如改用 OpenAI Image API，使用 `openai` 分支，不要使用 `openai-responses`：
+
+```text
+IW_AI_IMAGE_PROVIDER=openai
+IW_AI_IMAGE_API_URL=https://api.openai.com/v1
+IW_AI_IMAGE_API_KEY=Bearer <openai-api-key>
+IW_AI_IMAGE_MODEL=gpt-image-2
+```
+
+修改 `/etc/iw-mixes/iw-external.env` 后只需重启 `iw-external`：
+
+```bash
+systemctl restart iw-external
+journalctl -u iw-external -n 80 --no-pager
+```
+
 ### 跨域问题
 
 查看 API 响应头：

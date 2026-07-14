@@ -52,4 +52,10 @@ public class WardrobeAssistantController {
     public WardrobeItemImageOptimizeTaskVo getOptimizeItemImageStatus(@RequestParam("taskId") String taskId) {
         return wardrobeAssistantService.getOptimizeItemImageStatus(taskId);
     }
+
+    @GetMapping("/item-image/optimize/latest")
+    @Operation(summary = "查询衣物最近图片优化任务")
+    public WardrobeItemImageOptimizeTaskVo getLatestOptimizeItemImageTask(@RequestParam("itemId") Integer itemId) {
+        return wardrobeAssistantService.getLatestOptimizeItemImageTask(itemId);
+    }
 }

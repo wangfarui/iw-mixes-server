@@ -3,7 +3,8 @@ create table wardrobe_item
     id             int unsigned auto_increment             not null comment 'id',
     item_name      varchar(64)   default ''                not null comment '衣物名称',
     item_image     varchar(255)  default ''                not null comment '衣物图片',
-    category       tinyint       default 0                 not null comment '分类(1上装 2下装 3外套 4连衣/套装 5鞋 6包 7配饰 8其他)',
+    category       tinyint       default 0                 not null comment '衣物品类(1上装 2下装 3连衣裙 4内衣 5袜子 6鞋履 7配饰 8帽子 9包袋 10首饰 11其他)',
+    item_style     smallint unsigned default 0             not null comment '衣物款式',
     color_name     varchar(32)   default ''                not null comment '颜色名称',
     color_hex      varchar(16)   default ''                not null comment '颜色hex',
     season_tags    varchar(64)   default ''                not null comment '季节标签',
@@ -28,6 +29,7 @@ create table wardrobe_item
     primary key (id),
     key idx_user_status (user_id, status),
     key idx_category (category),
+    key idx_item_style (item_style),
     key idx_last_wear_date (last_wear_date)
 ) comment '衣柜衣物表';
 
@@ -62,7 +64,8 @@ create table wardrobe_outfit_item
     item_id     int unsigned                            not null comment '衣物id',
     item_name   varchar(64)   default ''                not null comment '衣物名称快照',
     item_image  varchar(255)  default ''                not null comment '衣物图片快照',
-    category    tinyint       default 0                 not null comment '衣物分类快照',
+    category    tinyint       default 0                 not null comment '衣物品类快照',
+    item_style  smallint unsigned default 0             not null comment '衣物款式快照',
     sort        tinyint       default 0                 not null comment '排序',
     deleted     tinyint(1)    default 0                 not null comment '是否删除',
     create_time datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
@@ -103,7 +106,8 @@ create table wardrobe_wear_record_item
     item_id     int unsigned                            not null comment '衣物id',
     item_name   varchar(64)   default ''                not null comment '衣物名称快照',
     item_image  varchar(255)  default ''                not null comment '衣物图片快照',
-    category    tinyint       default 0                 not null comment '衣物分类快照',
+    category    tinyint       default 0                 not null comment '衣物品类快照',
+    item_style  smallint unsigned default 0             not null comment '衣物款式快照',
     sort        tinyint       default 0                 not null comment '排序',
     deleted     tinyint(1)    default 0                 not null comment '是否删除',
     create_time datetime      default CURRENT_TIMESTAMP not null comment '创建时间',

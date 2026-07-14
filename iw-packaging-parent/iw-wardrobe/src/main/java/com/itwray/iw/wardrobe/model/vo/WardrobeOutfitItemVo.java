@@ -24,5 +24,7 @@ public class WardrobeOutfitItemVo {
 
     private Integer category;
 
+    private Integer itemStyle;
+
     private Integer sort;
 }
