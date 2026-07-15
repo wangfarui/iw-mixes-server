@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.itwray.iw.auth.model.enums.UserGenderEnum;
 import com.itwray.iw.web.model.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -51,6 +52,11 @@ public class AuthUserEntity extends BaseEntity<Integer> {
      * 头像（url地址）
      */
     private String avatar;
+
+    /**
+     * 性别 (0-保密, 1-男, 2-女)
+     */
+    private UserGenderEnum gender;
 
     /**
      * 账号是否过期

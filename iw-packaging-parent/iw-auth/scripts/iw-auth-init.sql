@@ -38,6 +38,10 @@ values ('superadmin', '$2a$10$M4rF5xsU9IRWfc0E1Scc1eEB8RQYYz5tURQFQzL3bWiuI0R/IO
 alter table auth_user
     add column family_group_id int not null default 0 comment '当前家庭组ID (0-个人模式)' after role_type;
 
+-- 用户表新增字段：性别
+alter table auth_user
+    add column gender tinyint unsigned not null default 0 comment '性别(0保密,1男,2女)' after avatar;
+
 -- 家庭组表
 create table auth_family_group
 (

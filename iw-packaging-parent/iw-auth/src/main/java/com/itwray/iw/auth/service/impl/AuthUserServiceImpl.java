@@ -8,6 +8,7 @@ import com.itwray.iw.auth.model.AuthRedisKeyEnum;
 import com.itwray.iw.auth.model.bo.UserAddBo;
 import com.itwray.iw.auth.model.dto.*;
 import com.itwray.iw.auth.model.entity.AuthUserEntity;
+import com.itwray.iw.auth.model.enums.UserGenderEnum;
 import com.itwray.iw.auth.model.enums.VerificationCodeActionEnum;
 import com.itwray.iw.auth.model.vo.UserSimpleVo;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
@@ -325,11 +326,20 @@ public class AuthUserServiceImpl implements AuthUserService {
     @Override
     @Transactional
     public void editUserInfo(UserInfoEditDto dto) {
-        // 更新用户名
+        UserGenderEnum gender = null;
+        if (dto.getGender() != null) {
+            gender = ConstantEnumUtil.findByType(UserGenderEnum.class, dto.getGender());
+            if (gender == null) {
+                throw new BusinessException("性别仅支持保密、男、女");
+            }
+        }
+
+        // 更新用户信息
         authUserDao.lambdaUpdate()
                 .eq(AuthUserEntity::getId, UserUtils.getUserId())
                 .set(StringUtils.isNotBlank(dto.getName()), AuthUserEntity::getName, dto.getName())
                 .set(StringUtils.isNotBlank(dto.getAvatar()), AuthUserEntity::getAvatar, dto.getAvatar())
+                .set(gender != null, AuthUserEntity::getGender, gender)
                 .set(AuthUserEntity::getUpdateTime, LocalDateTime.now())
                 .update();
     }

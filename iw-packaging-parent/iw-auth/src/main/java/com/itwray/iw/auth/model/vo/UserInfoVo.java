@@ -1,6 +1,7 @@
 package com.itwray.iw.auth.model.vo;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.itwray.iw.auth.model.enums.UserGenderEnum;
 import com.itwray.iw.web.json.serialize.DefaultImageSerializer;
 import com.itwray.iw.web.json.serialize.EmailAddressSerializer;
 import com.itwray.iw.web.json.serialize.PhoneNumberSerializer;
@@ -32,6 +33,9 @@ public class UserInfoVo {
     @Schema(title = "头像（url地址）")
     @JsonSerialize(using = DefaultImageSerializer.class)
     private String avatar = "";
+
+    @Schema(title = "性别(0保密,1男,2女)")
+    private UserGenderEnum gender;
 
     @Schema(title = "电话号码")
     @JsonSerialize(using = PhoneNumberSerializer.class)

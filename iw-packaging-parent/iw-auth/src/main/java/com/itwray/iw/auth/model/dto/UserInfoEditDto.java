@@ -18,4 +18,7 @@ public class UserInfoEditDto {
 
     @Schema(title = "头像（url地址）")
     private String avatar;
+
+    @Schema(title = "性别(0保密,1男,2女)")
+    private Integer gender;
 }

@@ -6,6 +6,7 @@ import com.itwray.iw.auth.mapper.AuthUserMapper;
 import com.itwray.iw.auth.model.AuthRedisKeyEnum;
 import com.itwray.iw.auth.model.bo.UserAddBo;
 import com.itwray.iw.auth.model.entity.AuthUserEntity;
+import com.itwray.iw.auth.model.enums.UserGenderEnum;
 import com.itwray.iw.auth.model.enums.UserLoginWayEnum;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
 import com.itwray.iw.starter.redis.RedisUtil;
@@ -70,6 +71,7 @@ public class AuthUserDao extends BaseDao<AuthUserMapper, AuthUserEntity> {
         // 保存用户
         AuthUserEntity addUser = new AuthUserEntity();
         BeanUtils.copyProperties(bo, addUser);
+        addUser.setGender(UserGenderEnum.UNDISCLOSED);
         // 密码基于 BCrypt 加密存储
         addUser.setPassword(BCrypt.hashpw((addUser.getPassword())));
         this.save(addUser);
