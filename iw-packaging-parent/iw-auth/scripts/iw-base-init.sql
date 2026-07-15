@@ -27,6 +27,32 @@ create table base_application_account
     key idx_user_id (user_id)
 ) comment '应用账号信息表';
 
+create table if not exists base_managed_secret
+(
+    id                  int unsigned auto_increment                 not null comment 'id',
+    name                varchar(64)       default ''                not null comment '密钥名称',
+    service_name        varchar(64)       default ''                not null comment '所属服务',
+    secret_type         varchar(32)       default ''                not null comment '密钥类型',
+    environment         varchar(16)       default ''                not null comment '使用环境',
+    address             varchar(255)      default ''                not null comment '服务地址',
+    field_schema        text                                          not null comment '非敏感字段结构(JSON数组)',
+    secret_ciphertext   longtext                                      not null comment 'AES-GCM加密的字段值(JSON对象)',
+    expire_time         datetime                                      null comment '到期时间',
+    tags                varchar(1024)     default ''                not null comment '标签(JSON数组)',
+    remark              varchar(500)      default ''                not null comment '备注',
+    last_access_time    datetime                                      null comment '最后查看或复制时间',
+    encryption_version  int unsigned      default 1                 not null comment '加密版本',
+    deleted             tinyint(1)        default 0                 not null comment '是否删除(true表示已删除, 默认false表示未删除)',
+    create_time         datetime          default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time         datetime          default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id             int unsigned      default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_user_id (user_id),
+    key idx_expire_time (expire_time),
+    key idx_secret_type (secret_type),
+    key idx_environment (environment)
+) comment '用户密钥管理表';
+
 create table base_website_navigation
 (
     id          int unsigned auto_increment                 not null comment 'id',

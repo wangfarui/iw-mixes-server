@@ -13,11 +13,15 @@ iw:
     password: ${IW_DB_PASSWORD:}
   feign:
     secret: ${IW_INTERNAL_SECRET:dev-secret}
+  auth:
+    managed-secret:
+      aes-key: ${IW_AUTH_MANAGED_SECRET_AES_KEY:managed-secret-dev-key-000000001}
   dao:
     dataPermission:
       enabled: true
       enable-table-names:
         - base_application_account
+        - base_managed_secret
         - base_website_navigation
         - base_ai_task
 

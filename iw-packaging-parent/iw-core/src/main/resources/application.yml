@@ -20,6 +20,8 @@ iw:
   auth:
     application-account:
       aes-key: ${IW_AUTH_APPLICATION_ACCOUNT_AES_KEY:0123456789abcdef0123456789abcdef}
+    managed-secret:
+      aes-key: ${IW_AUTH_MANAGED_SECRET_AES_KEY:managed-secret-dev-key-000000001}
   ding-talk:
     enabled: ${IW_DING_TALK_ENABLED:false}
     access-token: ${IW_DING_TALK_ACCESS_TOKEN:}
@@ -40,6 +42,7 @@ iw:
       enabled: true
       enable-table-names:
         - base_application_account
+        - base_managed_secret
         - base_website_navigation
         - base_ai_task
         - bookkeeping_records
