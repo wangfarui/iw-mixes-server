@@ -28,8 +28,4 @@ public class RegisterInvitePendingBo {
      */
     private String emailAddress;
 
-    /**
-     * 密码
-     */
-    private String password;
 }

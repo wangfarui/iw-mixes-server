@@ -20,7 +20,6 @@ import com.itwray.iw.common.utils.NumberUtils;
 import com.itwray.iw.external.client.InternalApiClient;
 import com.itwray.iw.starter.redis.RedisKeyManager;
 import com.itwray.iw.starter.redis.RedisUtil;
-import com.itwray.iw.starter.redis.lock.DistributedLock;
 import com.itwray.iw.web.exception.AuthorizedException;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.enums.RoleTypeEnum;
@@ -86,27 +85,17 @@ public class AuthUserServiceImpl implements AuthUserService {
      */
     @Override
     public UserInfoVo loginByPassword(LoginPasswordDto dto) {
-        authUserDao.loginBefore(dto.getAccount());
+        String account = StringUtils.trim(dto.getAccount());
+        authUserDao.loginBefore(account);
 
-        // 查询用户是否存在
-        AuthUserEntity authUserEntity = authUserDao.queryOneByUsername(dto.getAccount());
-        if (authUserEntity == null) {
-            if (NumberUtils.isValidPhoneNumber(dto.getAccount())) {
-                authUserEntity = authUserDao.queryOneByPhoneNumber(dto.getAccount());
-            } else if (NumberUtils.isValidEmailAddress(dto.getAccount())) {
-                authUserEntity = authUserDao.queryOneByEmailAddress(dto.getAccount());
+        // 用户名、邮箱、手机号可能分别命中不同历史用户，密码错误时继续尝试下一种标识。
+        for (AuthUserEntity candidate : authUserDao.queryPasswordLoginCandidates(account)) {
+            if (StringUtils.isNotBlank(candidate.getPassword()) && BCrypt.checkpw(dto.getPassword(), candidate.getPassword())) {
+                return authUserDao.loginSuccessAfter(candidate.getId());
             }
         }
 
-        // 用户不存在，抛出账号验证异常信息
-        if (authUserEntity == null) {
-            throw this.accountVerifyException(dto.getAccount(), "账号密码错误");
-        }
-
-        // 校验密码正确性, 通过后表示登录成功
-        this.verifyPassword(dto.getAccount(), dto.getPassword(), authUserEntity.getPassword());
-
-        return authUserDao.loginSuccessAfter(authUserEntity.getId());
+        throw this.accountVerifyException(account, "账号密码错误");
     }
 
     @Override
@@ -152,7 +141,6 @@ public class AuthUserServiceImpl implements AuthUserService {
             UserAddBo userAddBo = new UserAddBo();
             userAddBo.setPhoneNumber(dto.getPhoneNumber());
             userAddBo.setEmailAddress(dto.getEmailAddress());
-            userAddBo.setPassword(dto.getPassword());
             authUserEntity = authUserDao.addNewUser(userAddBo);
         }
 
@@ -287,29 +275,6 @@ public class AuthUserServiceImpl implements AuthUserService {
     }
 
     @Override
-    @Transactional
-    @DistributedLock(lockName = "'user:save:unique:key'") // 在修改保存用户的唯一值的操作上,必须加上分布式锁,以确保不出现重复数据
-    public void editUsername(UserUsernameEditDto dto) {
-        Integer userId = UserUtils.getUserId();
-        AuthUserEntity authUserEntity = authUserDao.queryById(userId);
-        // 用户名没变的情况下,直接忽略请求
-        if (dto.getUsername().equals(authUserEntity.getUsername())) {
-            return;
-        }
-
-        // 校验用户名是否重复
-        authUserDao.checkUserUnique(null, dto.getUsername(), null);
-
-        // 更新用户名
-        authUserDao.lambdaUpdate()
-                .eq(AuthUserEntity::getId, userId)
-                // 校验用户名, 避免并发
-                .eq(AuthUserEntity::getUsername, authUserEntity.getUsername())
-                .set(AuthUserEntity::getUsername, dto.getUsername())
-                .update();
-    }
-
-    @Override
     public String aiAnswer(String content) {
         if (StringUtils.isBlank(content)) {
             return "请发送你的问题哦";
@@ -320,7 +285,7 @@ public class AuthUserServiceImpl implements AuthUserService {
     @Override
     public UserInfoVo getUserInfo() {
         AuthUserEntity authUserEntity = authUserDao.queryById(UserUtils.getUserId());
-        return BeanUtil.copyProperties(authUserEntity, UserInfoVo.class);
+        return authUserDao.buildUserInfoVo(authUserEntity);
     }
 
     @Override
@@ -447,7 +412,7 @@ public class AuthUserServiceImpl implements AuthUserService {
      * @param encryptPassword  加密密码
      */
     private void verifyPassword(String account, String originalPassword, String encryptPassword) {
-        if (!BCrypt.checkpw(originalPassword, encryptPassword)) {
+        if (StringUtils.isBlank(encryptPassword) || !BCrypt.checkpw(originalPassword, encryptPassword)) {
             throw this.accountVerifyException(account, "账号密码错误");
         }
     }

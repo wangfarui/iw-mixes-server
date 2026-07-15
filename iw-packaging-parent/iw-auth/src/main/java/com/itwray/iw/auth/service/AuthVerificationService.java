@@ -20,6 +20,8 @@ public interface AuthVerificationService {
      */
     String getPhoneVerificationCode(String phoneNumber, RedisKeyManager keyManager);
 
+    String getPhoneVerificationCode(String phoneNumber, RedisKeyManager keyManager, Object... keyArgs);
+
     /**
      * 比对验证码是否正确
      *
@@ -30,6 +32,8 @@ public interface AuthVerificationService {
      */
     boolean compareVerificationCode(String verificationCode, String account, RedisKeyManager keyManager);
 
+    boolean compareVerificationCode(String verificationCode, RedisKeyManager keyManager, Object... keyArgs);
+
     /**
      * 获取邮箱的验证码
      * <p>必须得是 Web 请求!!!</p>
@@ -39,4 +43,6 @@ public interface AuthVerificationService {
      * @return 验证码
      */
     String getEmailVerificationCode(String emailAddress, RedisKeyManager keyManager);
+
+    String getEmailVerificationCode(String emailAddress, RedisKeyManager keyManager, Object... keyArgs);
 }

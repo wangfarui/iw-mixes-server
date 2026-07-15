@@ -6,6 +6,7 @@ import com.itwray.iw.auth.model.vo.UserInfoVo;
 import com.itwray.iw.auth.service.AuthRegisterService;
 import com.itwray.iw.auth.service.AuthUserService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Disabled;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -16,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * @since 2024/3/12
  */
 @SpringBootTest
+@Disabled("依赖真实数据库与验证码，仅用于人工集成验证")
 public class AuthUserEntityServiceTest {
 
     @Autowired
@@ -29,8 +31,6 @@ public class AuthUserEntityServiceTest {
         String clientIp = "0.0.0.0";
         String phoneNumber = "13312345678";
         RegisterFormDto dto = new RegisterFormDto();
-        dto.setUsername("wray");
-        dto.setPassword("123456");
         dto.setPhoneNumber(phoneNumber);
         dto.setVerificationCode("111111");
         authRegisterService.registerByForm(dto, clientIp);

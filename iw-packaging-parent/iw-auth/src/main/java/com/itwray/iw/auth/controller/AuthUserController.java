@@ -5,6 +5,7 @@ import com.itwray.iw.auth.model.dto.UserPasswordEditDto;
 import com.itwray.iw.auth.model.dto.UserUsernameEditDto;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
 import com.itwray.iw.auth.service.AuthUserService;
+import com.itwray.iw.auth.service.AuthUserSecurityService;
 import com.itwray.iw.common.GeneralResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,9 +28,12 @@ public class AuthUserController {
 
     private final AuthUserService authUserService;
 
+    private final AuthUserSecurityService authUserSecurityService;
+
     @Autowired
-    public AuthUserController(AuthUserService authUserService) {
+    public AuthUserController(AuthUserService authUserService, AuthUserSecurityService authUserSecurityService) {
         this.authUserService = authUserService;
+        this.authUserSecurityService = authUserSecurityService;
     }
 
     @PostMapping("/editPassword")
@@ -46,8 +50,8 @@ public class AuthUserController {
 
     @PutMapping("/editUsername")
     @Operation(summary = "修改用户名")
-    public void editUsername(@RequestBody @Valid UserUsernameEditDto dto) {
-        authUserService.editUsername(dto);
+    public UserInfoVo editUsername(@RequestBody @Valid UserUsernameEditDto dto) {
+        return authUserSecurityService.editUsername(dto);
     }
 
     @PutMapping("/editUserInfo")

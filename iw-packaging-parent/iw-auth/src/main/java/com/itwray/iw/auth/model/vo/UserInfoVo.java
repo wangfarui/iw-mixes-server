@@ -21,6 +21,12 @@ public class UserInfoVo {
     @Schema(title = "用户id")
     private Integer id;
 
+    @Schema(title = "用户名")
+    private String username;
+
+    @Schema(title = "用户名是否允许修改")
+    private Boolean canEditUsername;
+
     @Schema(title = "姓名")
     private String name;
 
@@ -41,9 +47,18 @@ public class UserInfoVo {
     @JsonSerialize(using = PhoneNumberSerializer.class)
     private String phoneNumber;
 
+    @Schema(title = "是否已绑定手机号")
+    private Boolean phoneBound;
+
     @Schema(title = "邮箱地址")
     @JsonSerialize(using = EmailAddressSerializer.class)
     private String emailAddress;
+
+    @Schema(title = "是否已绑定邮箱")
+    private Boolean emailBound;
+
+    @Schema(title = "是否已设置密码")
+    private Boolean hasPassword;
 
     @Schema(title = "用户角色类型")
     private Integer roleType;

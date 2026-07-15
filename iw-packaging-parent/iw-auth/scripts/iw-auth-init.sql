@@ -2,12 +2,9 @@ create table auth_user
 (
     id                      int unsigned                           not null primary key auto_increment comment '用户id',
     username                varchar(64)                            not null comment '用户名',
-    password                varchar(255)                           not null comment '密码',
+    password                varchar(255)                           null comment '密码',
     name                    varchar(32)                            not null comment '姓名',
     avatar                  varchar(255) default ''                not null comment '头像',
-    account_non_expired     tinyint(1)   default 1                 not null comment '账号过期状态(0已过期, 1未过期)',
-    account_non_locked      tinyint(1)   default 1                 not null comment '账号锁定状态(0已锁定, 1未锁定)',
-    credentials_non_expired tinyint(1)   default 1                 not null comment '用户凭证过期状态(0已过期, 1未过期)',
     enabled                 tinyint(1)   default 1                 not null comment '是否启用(0否, 1是)',
     create_time             datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time             datetime     default CURRENT_TIMESTAMP not null comment '更新时间',
@@ -20,7 +17,7 @@ alter table auth_user
     add index idx_username (username);
 
 alter table auth_user
-    add column email_address varchar(64) not null default '' comment '邮箱地址';
+    add column email_address varchar(64) null default null comment '邮箱地址';
 alter table auth_user
     add index idx_email_address (email_address);
 
@@ -41,6 +38,18 @@ alter table auth_user
 -- 用户表新增字段：性别
 alter table auth_user
     add column gender tinyint unsigned not null default 0 comment '性别(0保密,1男,2女)' after avatar;
+
+-- 仅约束未删除用户的登录标识唯一；逻辑删除数据的生成列为NULL，可以保留重复历史值。
+alter table auth_user
+    add column active_username varchar(64)
+        generated always as (case when deleted = 0 then username else null end) virtual,
+    add column active_phone_number char(11)
+        generated always as (case when deleted = 0 then phone_number else null end) virtual,
+    add column active_email_address varchar(64)
+        generated always as (case when deleted = 0 then email_address else null end) virtual,
+    add unique key uk_auth_user_active_username (active_username),
+    add unique key uk_auth_user_active_phone_number (active_phone_number),
+    add unique key uk_auth_user_active_email_address (active_email_address);
 
 -- 家庭组表
 create table auth_family_group

@@ -78,6 +78,36 @@ public enum AuthRedisKeyEnum implements RedisKeyManager {
     PHONE_VERIFY_IP_KEY("auth:phone:verify:ip:%s", 60 * 60L),
 
     /**
+     * 验证码发送冷却:[验证码Redis Key的SHA-256]
+     */
+    VERIFICATION_SEND_COOLDOWN_KEY("auth:verify:send:cooldown:%s", 60L),
+
+    /**
+     * 验证码错误次数:[验证码Redis Key的SHA-256]
+     */
+    VERIFICATION_FAIL_COUNT_KEY("auth:verify:fail:%s", 5 * 60L),
+
+    /**
+     * 账号敏感操作验证码:[userId]:[operation]:[method]
+     */
+    USER_SECURITY_VERIFY_KEY("auth:user:security:verify:%s:%s:%s", 5 * 60L),
+
+    /**
+     * 账号敏感操作验证通过后的票据:[ticket]
+     */
+    USER_SECURITY_TICKET_KEY("auth:user:security:ticket:%s", 5 * 60L),
+
+    /**
+     * 敏感操作密码验证失败次数:[userId]
+     */
+    USER_SECURITY_PASSWORD_FAIL_KEY("auth:user:security:password:fail:%s", 5 * 60L),
+
+    /**
+     * 新联系方式验证码:[userId]:[contactType]:[联系方式SHA-256]
+     */
+    USER_CONTACT_VERIFY_KEY("auth:user:contact:verify:%s:%s:%s", 5 * 60L),
+
+    /**
      * 登录失败-用户+客户端ip:[account]:[ipAddress]
      */
     LOGIN_ACTION_USER_IP_KEY("auth:login:fail:user:%s:%s", 5 * 60L),

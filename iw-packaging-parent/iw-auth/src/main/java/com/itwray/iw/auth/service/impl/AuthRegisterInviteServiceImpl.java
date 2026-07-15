@@ -98,7 +98,6 @@ public class AuthRegisterInviteServiceImpl implements AuthRegisterInviteService 
         pendingBo.setLoginWay(dto.getLoginWay().getCode());
         pendingBo.setPhoneNumber(dto.getPhoneNumber());
         pendingBo.setEmailAddress(dto.getEmailAddress());
-        pendingBo.setPassword(dto.getPassword());
 
         String ticket = UUID.randomUUID().toString().replace("-", "");
         AuthRedisKeyEnum.USER_REGISTER_INVITE_PENDING_TICKET_KEY.setStringValue(JSONUtil.toJsonStr(pendingBo), ticket);
@@ -124,7 +123,6 @@ public class AuthRegisterInviteServiceImpl implements AuthRegisterInviteService 
         UserAddBo userAddBo = new UserAddBo();
         userAddBo.setPhoneNumber(pendingBo.getPhoneNumber());
         userAddBo.setEmailAddress(pendingBo.getEmailAddress());
-        userAddBo.setPassword(pendingBo.getPassword());
 
         AuthUserEntity authUserEntity = authUserDao.addNewUser(userAddBo);
         RedisUtil.delete(ticketKey);

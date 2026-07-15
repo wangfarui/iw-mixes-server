@@ -67,13 +67,6 @@ public interface AuthUserService {
     void getVerificationCodeByAction(Integer action);
 
     /**
-     * 修改用户的用户名
-     *
-     * @param dto 用户名信息
-     */
-    void editUsername(UserUsernameEditDto dto);
-
-    /**
      * 用户提问 AI回答
      *
      * @param content 提问内容

@@ -1,6 +1,5 @@
 package com.itwray.iw.auth.dao;
 
-import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.itwray.iw.auth.mapper.AuthUserMapper;
 import com.itwray.iw.auth.model.AuthRedisKeyEnum;
@@ -9,8 +8,8 @@ import com.itwray.iw.auth.model.entity.AuthUserEntity;
 import com.itwray.iw.auth.model.enums.UserGenderEnum;
 import com.itwray.iw.auth.model.enums.UserLoginWayEnum;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
+import com.itwray.iw.common.utils.NumberUtils;
 import com.itwray.iw.starter.redis.RedisUtil;
-import com.itwray.iw.starter.redis.lock.DistributedLock;
 import com.itwray.iw.starter.rocketmq.MQProducerHelper;
 import com.itwray.iw.web.constants.WebCommonConstants;
 import com.itwray.iw.web.dao.BaseDao;
@@ -22,11 +21,15 @@ import com.itwray.iw.web.utils.SpringWebHolder;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 import static com.itwray.iw.common.constants.RequestHeaderConstants.TOKEN_HEADER;
@@ -40,6 +43,8 @@ import static com.itwray.iw.common.constants.RequestHeaderConstants.TOKEN_HEADER
 @Component
 public class AuthUserDao extends BaseDao<AuthUserMapper, AuthUserEntity> {
 
+    public static final String SYSTEM_USERNAME_PREFIX = "u_";
+
     /**
      * 新增用户
      *
@@ -47,37 +52,68 @@ public class AuthUserDao extends BaseDao<AuthUserMapper, AuthUserEntity> {
      * @return 用户实体
      */
     @Transactional
-    @DistributedLock(lockName = "'user:save:unique:key'") // 在修改保存用户的唯一值的操作上,必须加上分布式锁,以确保不出现重复数据
     public AuthUserEntity addNewUser(UserAddBo bo) {
-        if (StringUtils.isBlank(bo.getPhoneNumber()) && StringUtils.isBlank(bo.getEmailAddress()) && StringUtils.isBlank(bo.getUsername())) {
-            throw new IwWebException("账号信息不能为空");
+        String phoneNumber = StringUtils.trimToNull(bo.getPhoneNumber());
+        String emailAddress = StringUtils.trimToNull(bo.getEmailAddress());
+        if (emailAddress != null) {
+            emailAddress = emailAddress.toLowerCase(Locale.ROOT);
+        }
+        if (phoneNumber == null && emailAddress == null) {
+            throw new IwWebException("手机号和邮箱不能同时为空");
+        }
+        if (phoneNumber != null && !NumberUtils.isValidPhoneNumber(phoneNumber)) {
+            throw new BusinessException("电话号码格式错误");
+        }
+        if (emailAddress != null && !NumberUtils.isValidEmailAddress(emailAddress)) {
+            throw new BusinessException("邮箱格式错误");
         }
 
         // 校验用户唯一性
-        this.checkUserUnique(bo.getPhoneNumber(), bo.getUsername(), bo.getEmailAddress());
+        this.checkUserUnique(phoneNumber, null, emailAddress);
 
-        // 如果密码为空，则生成随机密码
-        if (StringUtils.isBlank(bo.getPassword())) {
-            bo.setPassword(RandomUtil.randomString(64));
-        }
-        // 填充用户名和姓名
-        if (StringUtils.isBlank(bo.getUsername())) {
-            bo.setUsername(StringUtils.isNotBlank(bo.getPhoneNumber()) ? bo.getPhoneNumber() : bo.getEmailAddress());
-        }
-        if (StringUtils.isBlank(bo.getName())) {
-            bo.setName(bo.getUsername());
-        }
+        // 自增ID生成前使用系统保留的临时用户名，事务提交前会更新为 u_<id>。
+        String temporaryUsername = SYSTEM_USERNAME_PREFIX + "tmp_" + UUID.randomUUID().toString().replace("-", "");
 
         // 保存用户
         AuthUserEntity addUser = new AuthUserEntity();
         BeanUtils.copyProperties(bo, addUser);
+        addUser.setPhoneNumber(phoneNumber);
+        addUser.setEmailAddress(emailAddress);
+        addUser.setUsername(temporaryUsername);
+        addUser.setName("IW用户");
         addUser.setGender(UserGenderEnum.UNDISCLOSED);
-        // 密码基于 BCrypt 加密存储
-        addUser.setPassword(BCrypt.hashpw((addUser.getPassword())));
-        this.save(addUser);
+        addUser.setPassword(StringUtils.isBlank(bo.getPassword()) ? null : BCrypt.hashpw(bo.getPassword()));
+        try {
+            this.save(addUser);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(phoneNumber != null ? "手机号已被其他账号绑定" : "邮箱已被其他账号绑定");
+        }
+
+        String systemUsername = SYSTEM_USERNAME_PREFIX + addUser.getId();
+        String systemName = "用户" + addUser.getId();
+        boolean usernameUpdated;
+        try {
+            usernameUpdated = this.lambdaUpdate()
+                    .eq(AuthUserEntity::getId, addUser.getId())
+                    .eq(AuthUserEntity::getUsername, temporaryUsername)
+                    .set(AuthUserEntity::getUsername, systemUsername)
+                    .set(AuthUserEntity::getName, systemName)
+                    .update();
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("系统用户名冲突，请联系管理员");
+        }
+        if (!usernameUpdated) {
+            throw new IwWebException("系统用户名生成失败");
+        }
+        addUser.setUsername(systemUsername);
+        addUser.setName(systemName);
 
         // 发送注册新用户成功的MQ消息
         bo.setUserId(addUser.getId());
+        bo.setUsername(systemUsername);
+        bo.setName(systemName);
+        bo.setPhoneNumber(phoneNumber);
+        bo.setEmailAddress(emailAddress);
         MQProducerHelper.send(RegisterNewUserTopicEnum.INIT, bo);
 
         // 标记当前用户为新注册的用户
@@ -128,12 +164,24 @@ public class AuthUserDao extends BaseDao<AuthUserMapper, AuthUserEntity> {
         this.setTokenValue(token);
 
         // 构建响应对象
-        UserInfoVo userInfoVo = new UserInfoVo();
-        BeanUtils.copyProperties(authUserEntity, userInfoVo);
+        UserInfoVo userInfoVo = this.buildUserInfoVo(authUserEntity);
         userInfoVo.setTokenName(TOKEN_HEADER);
         userInfoVo.setTokenValue(token);
         userInfoVo.setNewUser(authUserEntity.isNewUser());
 
+        return userInfoVo;
+    }
+
+    /**
+     * 构建包含账号安全状态的用户信息。
+     */
+    public UserInfoVo buildUserInfoVo(AuthUserEntity authUserEntity) {
+        UserInfoVo userInfoVo = new UserInfoVo();
+        BeanUtils.copyProperties(authUserEntity, userInfoVo);
+        userInfoVo.setCanEditUsername(StringUtils.startsWithIgnoreCase(authUserEntity.getUsername(), SYSTEM_USERNAME_PREFIX));
+        userInfoVo.setPhoneBound(StringUtils.isNotBlank(authUserEntity.getPhoneNumber()));
+        userInfoVo.setEmailBound(StringUtils.isNotBlank(authUserEntity.getEmailAddress()));
+        userInfoVo.setHasPassword(StringUtils.isNotBlank(authUserEntity.getPassword()));
         return userInfoVo;
     }
 
@@ -194,6 +242,28 @@ public class AuthUserDao extends BaseDao<AuthUserMapper, AuthUserEntity> {
                 .eq(AuthUserEntity::getEmailAddress, emailAddress)
                 .last(WebCommonConstants.LIMIT_ONE)
                 .one();
+    }
+
+    /**
+     * 按用户名、邮箱、手机号顺序查询密码登录候选用户。
+     */
+    public List<AuthUserEntity> queryPasswordLoginCandidates(String account) {
+        LinkedHashMap<Integer, AuthUserEntity> candidates = new LinkedHashMap<>();
+        AuthUserEntity usernameUser = this.queryOneByUsername(account);
+        if (usernameUser != null) {
+            candidates.put(usernameUser.getId(), usernameUser);
+        }
+
+        AuthUserEntity emailUser = this.queryOneByEmailAddress(account.toLowerCase(Locale.ROOT));
+        if (emailUser != null) {
+            candidates.putIfAbsent(emailUser.getId(), emailUser);
+        }
+
+        AuthUserEntity phoneUser = this.queryOneByPhoneNumber(account);
+        if (phoneUser != null) {
+            candidates.putIfAbsent(phoneUser.getId(), phoneUser);
+        }
+        return List.copyOf(candidates.values());
     }
 
     /**

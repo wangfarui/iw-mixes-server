@@ -108,6 +108,24 @@ public class RedisUtil {
     }
 
     /**
+     * 原子获取并删除String类型的值。
+     */
+    @Nullable
+    public static <T> T getAndDelete(String key, Class<T> typeClass) {
+        if (StringUtils.isBlank(key)) {
+            return null;
+        }
+        Object value = redisTemplate.opsForValue().getAndDelete(key);
+        if (value == null) {
+            return null;
+        }
+        if (!typeClass.isAssignableFrom(value.getClass())) {
+            throw new IwException("Target Class Type Mismatch!");
+        }
+        return (T) value;
+    }
+
+    /**
      * 将值放入缓存
      *
      * @param key   键

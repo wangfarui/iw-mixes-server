@@ -59,21 +59,6 @@ public class AuthUserEntity extends BaseEntity<Integer> {
     private UserGenderEnum gender;
 
     /**
-     * 账号是否过期
-     */
-    private Boolean accountNonExpired;
-
-    /**
-     * 账号是否锁定
-     */
-    private Boolean accountNonLocked;
-
-    /**
-     * 用户凭证是否过期
-     */
-    private Boolean credentialsNonExpired;
-
-    /**
      * 是否启用
      */
     private Boolean enabled;
