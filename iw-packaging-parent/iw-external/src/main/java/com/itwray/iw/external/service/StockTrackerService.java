@@ -18,5 +18,5 @@ public interface StockTrackerService {
 
     GeneralResponse<List<StockTrackerQuoteVo>> queryBatchQuotes(String symbols);
 
-    GeneralResponse<StockTrackerCandleSeriesVo> queryCandles(String symbol, String interval, Integer limit);
+    GeneralResponse<StockTrackerCandleSeriesVo> queryCandles(String symbol, String interval, Integer limit, String endTime);
 }

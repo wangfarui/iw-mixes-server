@@ -119,10 +119,17 @@ public class StockTrackerServiceImpl implements StockTrackerService {
     }
 
     @Override
-    public GeneralResponse<StockTrackerCandleSeriesVo> queryCandles(String symbol, String interval, Integer limit) {
+    public GeneralResponse<StockTrackerCandleSeriesVo> queryCandles(String symbol, String interval, Integer limit,
+                                                                    String endTime) {
         try {
             IntervalSpec intervalSpec = normalizeInterval(interval);
-            return GeneralResponse.success(fetchCandles(symbol, intervalSpec, normalizeLimit(limit, intervalSpec)));
+            int normalizedLimit = normalizeLimit(limit, intervalSpec);
+            LocalDate endDate = normalizeEndDate(endTime, intervalSpec.interval());
+            int fetchLimit = "intraday".equals(intervalSpec.interval())
+                    ? normalizedLimit : Math.min(MAX_KLINE_LIMIT + 1, normalizedLimit + 1);
+            StockTrackerCandleSeriesVo series = fetchCandles(symbol, intervalSpec, fetchLimit, endDate);
+            applyCandlePage(series, normalizedLimit, intervalSpec.interval());
+            return GeneralResponse.success(series);
         } catch (StockTrackerException e) {
             return new GeneralResponse<>(e.getApiCode().getCode(), e.getMessage());
         } catch (Exception e) {
@@ -176,17 +183,18 @@ public class StockTrackerServiceImpl implements StockTrackerService {
         return vo;
     }
 
-    private StockTrackerCandleSeriesVo fetchCandles(String rawSymbol, IntervalSpec intervalSpec, int limit) {
+    private StockTrackerCandleSeriesVo fetchCandles(String rawSymbol, IntervalSpec intervalSpec, int limit,
+                                                    LocalDate endDate) {
         StockSymbol stockSymbol = normalizeSymbol(rawSymbol);
         if ("US".equals(stockSymbol.market())) {
-            return fetchYahooCandles(stockSymbol, intervalSpec, limit, null);
+            return fetchYahooCandles(stockSymbol, intervalSpec, limit, endDate, null);
         }
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("secid", stockSymbol.secid());
         params.put("klt", intervalSpec.klt());
         params.put("fqt", 0);
         params.put("lmt", limit);
-        params.put("end", "20500101");
+        params.put("end", endDate == null ? "20500101" : endDate.format(DateTimeFormatter.BASIC_ISO_DATE));
         params.put("fields1", KLINE_FIELDS_1);
         params.put("fields2", KLINE_FIELDS_2);
 
@@ -203,7 +211,8 @@ public class StockTrackerServiceImpl implements StockTrackerService {
             if (StrUtil.isBlank(intervalSpec.tencentKlineType())) {
                 throw e;
             }
-            return fetchTencentCandles(stockSymbol, intervalSpec, limit, "东方财富K线暂不可用，已自动切换到腾讯行情。");
+            return fetchTencentCandles(stockSymbol, intervalSpec, limit, endDate,
+                    "东方财富K线暂不可用，已自动切换到腾讯行情。");
         }
         JSONArray rows = data.getJSONArray("klines");
         if (rows == null || rows.isEmpty()) {
@@ -323,10 +332,11 @@ public class StockTrackerServiceImpl implements StockTrackerService {
     }
 
     private StockTrackerCandleSeriesVo fetchTencentCandles(StockSymbol stockSymbol, IntervalSpec intervalSpec,
-                                                          int limit, String fallbackWarning) {
+                                                          int limit, LocalDate endDate, String fallbackWarning) {
         String code = toTencentCode(stockSymbol);
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put("param", code + "," + intervalSpec.tencentKlineType() + ",,," + limit);
+        String formattedEnd = endDate == null ? "" : endDate.toString();
+        params.put("param", code + "," + intervalSpec.tencentKlineType() + ",," + formattedEnd + "," + limit);
         try (HttpResponse response = HttpRequest.get(TENCENT_KLINE_URL)
                 .form(params)
                 .timeout(HTTP_TIMEOUT_MS)
@@ -452,10 +462,17 @@ public class StockTrackerServiceImpl implements StockTrackerService {
     }
 
     private StockTrackerCandleSeriesVo fetchYahooCandles(StockSymbol stockSymbol, IntervalSpec intervalSpec,
-                                                         int limit, String fallbackWarning) {
+                                                         int limit, LocalDate endDate, String fallbackWarning) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("interval", toYahooInterval(intervalSpec));
-        params.put("range", toYahooRange(intervalSpec));
+        if ("intraday".equals(intervalSpec.interval())) {
+            params.put("range", "1d");
+        } else {
+            LocalDate resolvedEnd = endDate == null ? LocalDate.now(stockSymbol.zoneId()) : endDate;
+            LocalDate resolvedStart = calculateYahooStartDate(resolvedEnd, intervalSpec.interval(), limit);
+            params.put("period1", resolvedStart.atStartOfDay(stockSymbol.zoneId()).toEpochSecond());
+            params.put("period2", resolvedEnd.plusDays(1).atStartOfDay(stockSymbol.zoneId()).toEpochSecond());
+        }
         try (HttpResponse response = HttpRequest.get(YAHOO_CHART_URL + stockSymbol.yahooSymbol())
                 .form(params)
                 .timeout(HTTP_TIMEOUT_MS)
@@ -823,6 +840,43 @@ public class StockTrackerServiceImpl implements StockTrackerService {
         return Math.max(20, Math.min(MAX_KLINE_LIMIT, limit));
     }
 
+    LocalDate normalizeEndDate(String endTime, String interval) {
+        if (StrUtil.isBlank(endTime) || "intraday".equals(interval)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(endTime.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (Exception e) {
+            throw new StockTrackerException(StockTrackerApiCodeEnum.INVALID_END_TIME);
+        }
+    }
+
+    void applyCandlePage(StockTrackerCandleSeriesVo series, int limit, String interval) {
+        List<StockTrackerCandleSeriesVo.Candle> candles = series.getCandles();
+        boolean pageable = !"intraday".equals(interval);
+        boolean hasMoreBefore = pageable && candles.size() > limit;
+        if (hasMoreBefore) {
+            series.setCandles(new ArrayList<>(candles.subList(candles.size() - limit, candles.size())));
+            candles = series.getCandles();
+        }
+        series.setHasMoreBefore(hasMoreBefore);
+        if (candles.isEmpty()) {
+            return;
+        }
+        StockTrackerCandleSeriesVo.Candle oldest = candles.get(0);
+        StockTrackerCandleSeriesVo.Candle newest = candles.get(candles.size() - 1);
+        series.setOldestTime(oldest.getTradeTime());
+        series.setNewestTime(newest.getTradeTime());
+        if (hasMoreBefore) {
+            try {
+                LocalDate oldestDate = LocalDate.parse(oldest.getTradeTime().substring(0, 10));
+                series.setNextEndTime(oldestDate.minusDays(1).toString());
+            } catch (Exception ignored) {
+                series.setHasMoreBefore(false);
+            }
+        }
+    }
+
     private BigDecimal readDecimal(JSONObject data, String key) {
         return parseDecimal(data.getObj(key));
     }
@@ -944,11 +998,11 @@ public class StockTrackerServiceImpl implements StockTrackerService {
         };
     }
 
-    private String toYahooRange(IntervalSpec intervalSpec) {
-        return switch (intervalSpec.interval()) {
-            case "intraday" -> "1d";
-            case "weekly", "monthly" -> "5y";
-            default -> "1y";
+    LocalDate calculateYahooStartDate(LocalDate endDate, String interval, int limit) {
+        return switch (interval) {
+            case "weekly" -> endDate.minusWeeks(limit + 4L);
+            case "monthly" -> endDate.minusMonths(limit + 2L);
+            default -> endDate.minusDays(limit * 2L + 30L);
         };
     }
 

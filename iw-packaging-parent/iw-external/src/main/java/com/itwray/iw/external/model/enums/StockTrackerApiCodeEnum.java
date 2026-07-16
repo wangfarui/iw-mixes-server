@@ -16,6 +16,8 @@ public enum StockTrackerApiCodeEnum implements ApiCode {
 
     TOO_MANY_SYMBOLS(40033, "单次最多查询20只股票"),
 
+    INVALID_END_TIME(40034, "K线结束时间格式不正确，应为yyyy-MM-dd"),
+
     NO_DATA(40431, "未查询到股票行情"),
 
     SOURCE_FAILED(50331, "行情数据源暂不可用");

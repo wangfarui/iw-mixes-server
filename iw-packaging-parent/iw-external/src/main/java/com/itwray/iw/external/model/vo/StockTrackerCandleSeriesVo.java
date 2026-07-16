@@ -53,6 +53,18 @@ public class StockTrackerCandleSeriesVo {
     @Schema(title = "K线列表")
     private List<Candle> candles = new ArrayList<>();
 
+    @Schema(title = "是否还有更早的K线")
+    private Boolean hasMoreBefore;
+
+    @Schema(title = "查询更早K线时使用的结束时间")
+    private String nextEndTime;
+
+    @Schema(title = "当前结果最早时间")
+    private String oldestTime;
+
+    @Schema(title = "当前结果最新时间")
+    private String newestTime;
+
     @Schema(title = "提示信息")
     private List<String> warnings = new ArrayList<>();
 

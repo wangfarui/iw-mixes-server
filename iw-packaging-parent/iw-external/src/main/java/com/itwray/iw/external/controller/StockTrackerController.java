@@ -54,7 +54,8 @@ public class StockTrackerController {
     @Operation(summary = "查询股票K线")
     public GeneralResponse<StockTrackerCandleSeriesVo> candles(@RequestParam @NotBlank @Size(max = 32) String symbol,
                                                                @RequestParam(defaultValue = "intraday") String interval,
-                                                               @RequestParam(required = false) @Min(1) @Max(800) Integer limit) {
-        return stockTrackerService.queryCandles(symbol, interval, limit);
+                                                               @RequestParam(required = false) @Min(1) @Max(800) Integer limit,
+                                                               @RequestParam(required = false) @Size(max = 10) String endTime) {
+        return stockTrackerService.queryCandles(symbol, interval, limit, endTime);
     }
 }
