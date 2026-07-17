@@ -15,3 +15,11 @@
 - 来源文件：`iw-packaging-parent/iw-auth/scripts/20260715-auth-user-login-identity.sql`
 - 执行内容：清理手机号/邮箱空字符串，允许密码及联系方式为 `NULL`，删除三个未使用的账号状态字段，并增加仅约束 `deleted=0` 数据的用户名、手机号、邮箱生成列唯一索引。
 - 执行说明：停止旧版本 `iw-core` 后执行完整增量脚本，再启动包含新用户实体的版本。
+
+## 2026-07-16 auth_user 账号注销审计字段
+
+- 模块：`iw-auth`
+- 类型：MySQL 增量脚本
+- 来源文件：`iw-packaging-parent/iw-auth/scripts/20260716-auth-user-account-cancellation.sql`
+- 执行内容：为 `auth_user` 增加可空的 `cancelled_time` 字段，用于记录账号注销时间。
+- 执行说明：发布包含账号安全注销流程的新版本前执行完整增量脚本。

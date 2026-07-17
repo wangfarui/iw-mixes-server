@@ -145,4 +145,9 @@ public interface AuthFamilyGroupService extends WebService<FamilyGroupAddDto, Fa
      * @return 共享查询策略
      */
     FamilySharedQueryPolicyVo querySharedQueryPolicy(Integer userId);
+
+    /**
+     * 账号注销前退出家庭组，并通知业务模块撤回该成员的历史共享数据。
+     */
+    void prepareAccountDeletion(Integer userId);
 }

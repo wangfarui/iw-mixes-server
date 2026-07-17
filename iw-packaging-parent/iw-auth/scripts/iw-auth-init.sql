@@ -8,7 +8,8 @@ create table auth_user
     enabled                 tinyint(1)   default 1                 not null comment '是否启用(0否, 1是)',
     create_time             datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time             datetime     default CURRENT_TIMESTAMP not null comment '更新时间',
-    last_login_time         datetime                               null comment '最后登录时间'
+    last_login_time         datetime                               null comment '最后登录时间',
+    cancelled_time          datetime                               null comment '账号注销时间'
 ) comment '用户表';
 
 alter table auth_user

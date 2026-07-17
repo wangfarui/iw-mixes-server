@@ -19,6 +19,7 @@ iw:
       enable-table-names:
         - eat_meal
         - eat_fridge_food
+        - eat_dishes
 
 # 服务器配置
 server:

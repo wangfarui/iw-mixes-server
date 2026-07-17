@@ -55,4 +55,10 @@ public class AuthUserSecurityController {
     public UserInfoVo editPassword(@RequestBody @Valid UserPasswordSecurityEditDto dto) {
         return authUserSecurityService.editPassword(dto);
     }
+
+    @DeleteMapping("/account")
+    @Operation(summary = "安全验证后注销账号")
+    public void deleteAccount(@RequestBody @Valid UserAccountDeletionDto dto) {
+        authUserSecurityService.deleteAccount(dto);
+    }
 }

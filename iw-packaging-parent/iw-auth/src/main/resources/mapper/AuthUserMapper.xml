@@ -5,6 +5,7 @@
     <select id="queryAllUser" resultType="com.itwray.iw.auth.model.entity.AuthUserEntity">
         select *
         from auth_user
-        where 1=1
+        where deleted = 0
+          and enabled = 1
     </select>
 </mapper>

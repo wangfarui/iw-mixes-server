@@ -69,6 +69,11 @@ public class AuthUserEntity extends BaseEntity<Integer> {
     private LocalDateTime lastLoginTime;
 
     /**
+     * 账号注销时间
+     */
+    private LocalDateTime cancelledTime;
+
+    /**
      * 邮箱地址
      */
     private String emailAddress;

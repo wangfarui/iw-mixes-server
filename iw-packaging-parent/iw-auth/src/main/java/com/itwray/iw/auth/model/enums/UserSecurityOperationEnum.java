@@ -18,6 +18,7 @@ public enum UserSecurityOperationEnum implements ConstantEnum {
     EDIT_USERNAME(7, "修改用户名", null, false),
     SET_PASSWORD(8, "设置密码", null, false),
     CHANGE_PASSWORD(9, "修改密码", null, false),
+    DELETE_ACCOUNT(10, "注销账号", null, false),
     ;
 
     private final Integer code;

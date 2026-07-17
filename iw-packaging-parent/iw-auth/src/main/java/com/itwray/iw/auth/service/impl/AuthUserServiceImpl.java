@@ -330,24 +330,6 @@ public class AuthUserServiceImpl implements AuthUserService {
         return RoleTypeEnum.isAdminRole(authUserEntity.getRoleType());
     }
 
-    @Override
-    @Transactional
-    public void deletion() {
-        Integer userId = UserUtils.getUserId();
-        boolean updateResult = authUserDao.lambdaUpdate()
-                .eq(AuthUserEntity::getId, userId)
-                .eq(AuthUserEntity::getDeleted, Boolean.FALSE)
-                .set(AuthUserEntity::getDeleted, Boolean.TRUE)
-                .update();
-        if (!updateResult) {
-            throw new BusinessException("用户不存在，请刷新重试");
-        }
-
-        this.clearUserTokenCache(userId);
-        RedisUtil.delete(AuthRedisKeyEnum.DICT_KEY.getKey(userId));
-        RedisUtil.delete(AuthRedisKeyEnum.USER_DICT_VERSION.getKey(userId));
-    }
-
     /**
      * 获取当前登录用户的id
      */

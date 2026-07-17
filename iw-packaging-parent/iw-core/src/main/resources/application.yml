@@ -59,6 +59,7 @@ iw:
         - points_task_fixed
         - eat_meal
         - eat_fridge_food
+        - eat_dishes
         - wardrobe_item
         - wardrobe_outfit
         - wardrobe_outfit_item

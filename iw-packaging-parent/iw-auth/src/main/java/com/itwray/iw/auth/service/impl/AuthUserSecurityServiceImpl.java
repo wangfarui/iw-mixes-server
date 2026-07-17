@@ -13,6 +13,7 @@ import com.itwray.iw.auth.model.enums.UserSecurityOperationEnum;
 import com.itwray.iw.auth.model.enums.UserSecurityVerificationMethodEnum;
 import com.itwray.iw.auth.model.vo.UserInfoVo;
 import com.itwray.iw.auth.model.vo.UserSecurityTicketVo;
+import com.itwray.iw.auth.service.AuthFamilyGroupService;
 import com.itwray.iw.auth.service.AuthUserSecurityService;
 import com.itwray.iw.auth.service.AuthVerificationService;
 import com.itwray.iw.common.utils.ConstantEnumUtil;
@@ -38,9 +39,13 @@ public class AuthUserSecurityServiceImpl implements AuthUserSecurityService {
 
     private final AuthVerificationService authVerificationService;
 
-    public AuthUserSecurityServiceImpl(AuthUserDao authUserDao, AuthVerificationService authVerificationService) {
+    private final AuthFamilyGroupService authFamilyGroupService;
+
+    public AuthUserSecurityServiceImpl(AuthUserDao authUserDao, AuthVerificationService authVerificationService,
+                                       AuthFamilyGroupService authFamilyGroupService) {
         this.authUserDao = authUserDao;
         this.authVerificationService = authVerificationService;
+        this.authFamilyGroupService = authFamilyGroupService;
     }
 
     @Override
@@ -256,6 +261,34 @@ public class AuthUserSecurityServiceImpl implements AuthUserSecurityService {
         return authUserDao.buildUserInfoVo(user);
     }
 
+    @Override
+    @Transactional
+    public void deleteAccount(UserAccountDeletionDto dto) {
+        UserSecurityTicketBo ticket = getTicket(dto.getSecurityTicket());
+        UserSecurityOperationEnum operation = getOperation(ticket.getOperation());
+        if (operation != UserSecurityOperationEnum.DELETE_ACCOUNT) {
+            throw new BusinessException("安全票据与当前操作不匹配");
+        }
+
+        AuthUserEntity user = getCurrentUser();
+        authFamilyGroupService.prepareAccountDeletion(user.getId());
+        consumeTicket(dto.getSecurityTicket());
+
+        boolean updated = authUserDao.lambdaUpdate()
+                .eq(AuthUserEntity::getId, user.getId())
+                .eq(AuthUserEntity::getDeleted, Boolean.FALSE)
+                .set(AuthUserEntity::getCancelledTime, LocalDateTime.now())
+                .set(AuthUserEntity::getDeleted, Boolean.TRUE)
+                .update();
+        if (!updated) {
+            throw new BusinessException("用户不存在，请刷新重试");
+        }
+
+        revokeAllTokens(user.getId());
+        RedisUtil.delete(AuthRedisKeyEnum.DICT_KEY.getKey(user.getId()));
+        RedisUtil.delete(AuthRedisKeyEnum.USER_DICT_VERSION.getKey(user.getId()));
+    }
+
     private void verifyPassword(AuthUserEntity user, String password) {
         Integer failCount = AuthRedisKeyEnum.USER_SECURITY_PASSWORD_FAIL_KEY.getStringValue(Integer.class, user.getId());
         if (failCount != null && failCount >= 5) {
@@ -312,6 +345,9 @@ public class AuthUserSecurityServiceImpl implements AuthUserSecurityService {
                     "用户名仅允许修改一次");
             case SET_PASSWORD -> requireState(StringUtils.isBlank(user.getPassword()), "密码已设置");
             case CHANGE_PASSWORD -> requireState(StringUtils.isNotBlank(user.getPassword()), "尚未设置密码");
+            case DELETE_ACCOUNT -> {
+                // 账号注销支持当前账号已有的任一身份验证方式。
+            }
         }
     }
 
@@ -416,6 +452,17 @@ public class AuthUserSecurityServiceImpl implements AuthUserSecurityService {
             }
         }
         AuthRedisKeyEnum.USER_TOKEN_SET_KEY.setExpire(userId);
+    }
+
+    private void revokeAllTokens(Integer userId) {
+        String tokenSetKey = AuthRedisKeyEnum.USER_TOKEN_SET_KEY.getKey(userId);
+        Set<String> userTokens = RedisUtil.members(tokenSetKey, String.class);
+        if (userTokens != null) {
+            for (String token : userTokens) {
+                RedisUtil.delete(AuthRedisKeyEnum.USER_TOKEN_KEY.getKey(token));
+            }
+        }
+        RedisUtil.delete(tokenSetKey);
     }
 
     private AuthUserEntity getCurrentUser() {

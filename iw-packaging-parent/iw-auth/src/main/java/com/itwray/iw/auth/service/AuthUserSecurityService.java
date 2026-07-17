@@ -22,4 +22,6 @@ public interface AuthUserSecurityService {
     UserInfoVo editUsername(UserUsernameEditDto dto);
 
     UserInfoVo editPassword(UserPasswordSecurityEditDto dto);
+
+    void deleteAccount(UserAccountDeletionDto dto);
 }

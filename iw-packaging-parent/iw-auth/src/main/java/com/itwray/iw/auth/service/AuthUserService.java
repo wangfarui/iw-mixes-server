@@ -99,8 +99,4 @@ public interface AuthUserService {
      */
     Boolean isAdminUser();
 
-    /**
-     * 注销用户
-     */
-    void deletion();
 }

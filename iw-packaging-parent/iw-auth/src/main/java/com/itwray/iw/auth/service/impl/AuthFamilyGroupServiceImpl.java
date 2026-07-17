@@ -630,6 +630,33 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     }
 
     @Override
+    @Transactional
+    public void prepareAccountDeletion(Integer userId) {
+        AuthFamilyMemberEntity memberEntity = familyMemberDao.lambdaQuery()
+                .eq(AuthFamilyMemberEntity::getUserId, userId)
+                .eq(AuthFamilyMemberEntity::getStatus, FamilyMemberStatusEnum.NORMAL)
+                .one();
+        if (memberEntity == null) {
+            return;
+        }
+        if (FamilyMemberRoleEnum.OWNER.equals(memberEntity.getRole())) {
+            throw new BusinessException("您是家庭组群主，请先转让群主或解散家庭组");
+        }
+
+        familyMemberDao.lambdaUpdate()
+                .eq(AuthFamilyMemberEntity::getId, memberEntity.getId())
+                .eq(AuthFamilyMemberEntity::getStatus, FamilyMemberStatusEnum.NORMAL)
+                .set(AuthFamilyMemberEntity::getStatus, FamilyMemberStatusEnum.QUIT)
+                .update();
+        authUserDao.lambdaUpdate()
+                .eq(AuthUserEntity::getId, userId)
+                .set(AuthUserEntity::getFamilyGroupId, 0)
+                .update();
+
+        this.sendFamilyMemberLeaveMessage(memberEntity.getGroupId(), Collections.singletonList(userId));
+    }
+
+    @Override
     public Integer queryDefaultShared(Integer userId) {
         return this.querySharedSavePolicy(userId).getDefaultShared();
     }
@@ -788,7 +815,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     /**
      * 发送家庭组成员离组消息
      */
-    private void sendFamilyMemberLeaveMessage(Integer groupId, List<Integer> userIdList) {
+    protected void sendFamilyMemberLeaveMessage(Integer groupId, List<Integer> userIdList) {
         if (groupId == null || groupId <= 0 || userIdList == null || userIdList.isEmpty()) {
             return;
         }

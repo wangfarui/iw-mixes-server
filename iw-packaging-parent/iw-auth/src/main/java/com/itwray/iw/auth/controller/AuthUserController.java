@@ -75,9 +75,4 @@ public class AuthUserController {
         return authUserService.isAdminUser();
     }
 
-    @GetMapping("/deletion")
-    @Operation(summary = "注销用户")
-    public void deletion() {
-        authUserService.deletion();
-    }
 }
