@@ -125,3 +125,17 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 - 新增接口时，给出前端可调用的完整 Nginx 入口路径。
 - 新增公开外部接口时，默认使用 `iw-external` 的 `/external-service/api/**` 路径规范。
 - 如果需求提到 `wx项目`、`微信小程序`，联动检查 `../iw-mixes-app-wx`；如果提到 `web项目`、`前端`，联动检查 `../iw-mixes-web-platform`。
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the five canonical engineering-skill labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses the single-context layout. See `docs/agents/domain.md`.
