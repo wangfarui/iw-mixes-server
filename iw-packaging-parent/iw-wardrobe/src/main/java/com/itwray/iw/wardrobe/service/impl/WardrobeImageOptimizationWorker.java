@@ -15,7 +15,10 @@ import com.itwray.iw.wardrobe.service.WardrobeImageFileCleanupService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -39,6 +42,8 @@ public class WardrobeImageOptimizationWorker {
     private final WardrobeAssistantRemoteService remoteService;
     private final FileService fileService;
     private final WardrobeImageFileCleanupService cleanupService;
+    private final TaskExecutor taskExecutor;
+    private final int workerConcurrency;
 
     public WardrobeImageOptimizationWorker(WardrobeImageOptimizationClaimService claimService,
                                            WardrobeImageOptimizationCompletionService completionService,
@@ -46,7 +51,11 @@ public class WardrobeImageOptimizationWorker {
                                            WardrobeItemDao itemDao,
                                            WardrobeAssistantRemoteService remoteService,
                                            FileService fileService,
-                                           WardrobeImageFileCleanupService cleanupService) {
+                                           WardrobeImageFileCleanupService cleanupService,
+                                           @Qualifier("wardrobeImageOptimizationExecutor") TaskExecutor taskExecutor,
+                                           @org.springframework.beans.factory.annotation.Value(
+                                                   "${iw.wardrobe.image-optimization.worker-concurrency:1}")
+                                           int workerConcurrency) {
         this.claimService = claimService;
         this.completionService = completionService;
         this.taskDao = taskDao;
@@ -54,10 +63,22 @@ public class WardrobeImageOptimizationWorker {
         this.remoteService = remoteService;
         this.fileService = fileService;
         this.cleanupService = cleanupService;
+        this.taskExecutor = taskExecutor;
+        this.workerConcurrency = Math.max(1, workerConcurrency);
     }
 
     @Scheduled(fixedDelayString = "${iw.wardrobe.image-optimization.worker-fixed-delay-ms:1000}")
-    public void processNext() {
+    public void scheduleWork() {
+        for (int i = 0; i < workerConcurrency; i += 1) {
+            try {
+                taskExecutor.execute(this::processNext);
+            } catch (TaskRejectedException ignored) {
+                return;
+            }
+        }
+    }
+
+    private void processNext() {
         WardrobeImageOptimizationAttemptEntity claimed = claimService.claimNext();
         if (claimed == null) {
             return;
@@ -76,6 +97,9 @@ public class WardrobeImageOptimizationWorker {
     }
 
     private void execute(WardrobeImageOptimizationAttemptEntity claimed) {
+        if (!claimService.renewClaim(claimed)) {
+            return;
+        }
         if (claimed.getDeadlineTime() != null && !LocalDateTime.now().isBefore(claimed.getDeadlineTime())) {
             completionService.fail(claimed, "图片优化超过15分钟截止时间，请重试");
             return;
@@ -96,6 +120,9 @@ public class WardrobeImageOptimizationWorker {
             response = remoteService.startReferenceGenerateImage(request);
         } else {
             response = remoteService.getReferenceGenerateImageStatus(claimed.getExternalTaskId());
+        }
+        if (!claimService.renewClaim(claimed)) {
+            return;
         }
         this.handleResponse(task, claimed, response);
     }
@@ -128,6 +155,9 @@ public class WardrobeImageOptimizationWorker {
     private void uploadAndComplete(WardrobeImageOptimizationTaskEntity task,
                                    WardrobeImageOptimizationAttemptEntity claimed,
                                    AiImageReferenceGenerateVo response) {
+        if (!claimService.renewClaim(claimed)) {
+            return;
+        }
         byte[] content = this.decodeImage(response.getImageBase64());
         String mimeType = StringUtils.defaultIfBlank(response.getMimeType(), "image/png");
         MultipartFile multipartFile = new GeneratedImageMultipartFile(

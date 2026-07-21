@@ -147,6 +147,7 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         WardrobeImageOptimizationAttemptEntity running = attempt("task-1", 1, "running");
         when(taskDao.findActiveByItem(7, 12)).thenReturn(active);
         when(taskDao.findByTaskId("task-1", 12)).thenReturn(active);
+        when(taskDao.findByTaskIdForUpdate("task-1", 12)).thenReturn(active);
         when(attemptDao.findByTaskAndAttempt("task-1", 1)).thenReturn(running);
         WardrobeImageOptimizationTaskServiceImpl service = service(itemDao, taskDao, attemptDao,
                 new WardrobeImageOptimizationPromptFactory());

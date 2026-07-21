@@ -41,6 +41,10 @@ public class WardrobeImageOptimizationTaskDao extends BaseDao<WardrobeImageOptim
                 .one();
     }
 
+    public WardrobeImageOptimizationTaskEntity findByTaskIdForUpdate(String taskId, Integer userId) {
+        return this.baseMapper.selectByTaskIdForUpdate(taskId, userId);
+    }
+
     public WardrobeImageOptimizationTaskEntity findLatestByItem(Integer itemId, Integer userId) {
         return this.lambdaQuery()
                 .eq(WardrobeImageOptimizationTaskEntity::getItemId, itemId)

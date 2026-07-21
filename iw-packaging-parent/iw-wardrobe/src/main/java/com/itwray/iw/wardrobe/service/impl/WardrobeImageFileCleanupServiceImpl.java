@@ -57,12 +57,18 @@ public class WardrobeImageFileCleanupServiceImpl implements WardrobeImageFileCle
         UserUtils.setUserId(cleanup.getUserId());
         try {
             fileService.delete(cleanup.getFileUrl());
-            cleanup.setStatus(WardrobeImageFileCleanupStatus.SUCCEEDED.getCode());
-            cleanup.setCompleteTime(LocalDateTime.now());
-            cleanup.setClaimToken("");
-            cleanup.setClaimExpireTime(null);
-            cleanup.setLastError("");
-            cleanupDao.updateById(cleanup);
+            cleanupDao.lambdaUpdate()
+                    .eq(WardrobeImageFileCleanupEntity::getId, cleanup.getId())
+                    .eq(WardrobeImageFileCleanupEntity::getClaimToken, cleanup.getClaimToken())
+                    .eq(WardrobeImageFileCleanupEntity::getStatus,
+                            WardrobeImageFileCleanupStatus.RETRYING.getCode())
+                    .set(WardrobeImageFileCleanupEntity::getStatus,
+                            WardrobeImageFileCleanupStatus.SUCCEEDED.getCode())
+                    .set(WardrobeImageFileCleanupEntity::getCompleteTime, LocalDateTime.now())
+                    .set(WardrobeImageFileCleanupEntity::getClaimToken, "")
+                    .set(WardrobeImageFileCleanupEntity::getClaimExpireTime, null)
+                    .set(WardrobeImageFileCleanupEntity::getLastError, "")
+                    .update();
         } catch (Exception e) {
             this.recordFailure(cleanup, e);
         } finally {
@@ -127,20 +133,41 @@ public class WardrobeImageFileCleanupServiceImpl implements WardrobeImageFileCle
 
     private void recordFailure(WardrobeImageFileCleanupEntity cleanup, Exception e) {
         int failures = cleanup.getRetryCount() == null ? 1 : cleanup.getRetryCount() + 1;
-        cleanup.setRetryCount(failures);
-        cleanup.setLastError(StringUtils.left(StringUtils.defaultString(e.getMessage(), e.getClass().getSimpleName()), 500));
-        cleanup.setClaimToken("");
-        cleanup.setClaimExpireTime(null);
+        String lastError = StringUtils.left(StringUtils.defaultString(e.getMessage(), e.getClass().getSimpleName()), 500);
         if (failures > RETRY_DELAYS.size()) {
-            cleanup.setStatus(WardrobeImageFileCleanupStatus.MANUAL_REQUIRED.getCode());
-            cleanup.setManualRequiredTime(LocalDateTime.now());
+            boolean updated = cleanupDao.lambdaUpdate()
+                    .eq(WardrobeImageFileCleanupEntity::getId, cleanup.getId())
+                    .eq(WardrobeImageFileCleanupEntity::getClaimToken, cleanup.getClaimToken())
+                    .eq(WardrobeImageFileCleanupEntity::getStatus,
+                            WardrobeImageFileCleanupStatus.RETRYING.getCode())
+                    .set(WardrobeImageFileCleanupEntity::getRetryCount, failures)
+                    .set(WardrobeImageFileCleanupEntity::getLastError, lastError)
+                    .set(WardrobeImageFileCleanupEntity::getStatus,
+                            WardrobeImageFileCleanupStatus.MANUAL_REQUIRED.getCode())
+                    .set(WardrobeImageFileCleanupEntity::getManualRequiredTime, LocalDateTime.now())
+                    .set(WardrobeImageFileCleanupEntity::getClaimToken, "")
+                    .set(WardrobeImageFileCleanupEntity::getClaimExpireTime, null)
+                    .update();
+            if (!updated) return;
             log.error("Wardrobe image OSS cleanup requires manual action, cleanupId={}, url={}",
                     cleanup.getId(), cleanup.getFileUrl(), e);
         } else {
-            cleanup.setStatus(WardrobeImageFileCleanupStatus.PENDING.getCode());
-            cleanup.setNextRetryTime(LocalDateTime.now().plus(RETRY_DELAYS.get(failures - 1)));
+            boolean updated = cleanupDao.lambdaUpdate()
+                    .eq(WardrobeImageFileCleanupEntity::getId, cleanup.getId())
+                    .eq(WardrobeImageFileCleanupEntity::getClaimToken, cleanup.getClaimToken())
+                    .eq(WardrobeImageFileCleanupEntity::getStatus,
+                            WardrobeImageFileCleanupStatus.RETRYING.getCode())
+                    .set(WardrobeImageFileCleanupEntity::getRetryCount, failures)
+                    .set(WardrobeImageFileCleanupEntity::getLastError, lastError)
+                    .set(WardrobeImageFileCleanupEntity::getStatus,
+                            WardrobeImageFileCleanupStatus.PENDING.getCode())
+                    .set(WardrobeImageFileCleanupEntity::getNextRetryTime,
+                            LocalDateTime.now().plus(RETRY_DELAYS.get(failures - 1)))
+                    .set(WardrobeImageFileCleanupEntity::getClaimToken, "")
+                    .set(WardrobeImageFileCleanupEntity::getClaimExpireTime, null)
+                    .update();
+            if (!updated) return;
             log.warn("Wardrobe image OSS cleanup failed, cleanupId={}, retry={}", cleanup.getId(), failures, e);
         }
-        cleanupDao.updateById(cleanup);
     }
 }

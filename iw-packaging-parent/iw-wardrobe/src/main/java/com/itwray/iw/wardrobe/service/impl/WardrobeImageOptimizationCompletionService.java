@@ -101,7 +101,7 @@ public class WardrobeImageOptimizationCompletionService {
     }
 
     private WardrobeImageOptimizationTaskEntity requireCurrentTask(WardrobeImageOptimizationAttemptEntity claimed) {
-        WardrobeImageOptimizationTaskEntity task = taskDao.findByTaskId(claimed.getTaskId(), claimed.getUserId());
+        WardrobeImageOptimizationTaskEntity task = taskDao.findByTaskIdForUpdate(claimed.getTaskId(), claimed.getUserId());
         if (task == null || !claimed.getAttemptNo().equals(task.getCurrentAttemptNo())
                 || !WardrobeImageOptimizationTaskStatus.RUNNING.getCode().equals(task.getStatus())) {
             throw new BusinessException("图片优化任务已失效");

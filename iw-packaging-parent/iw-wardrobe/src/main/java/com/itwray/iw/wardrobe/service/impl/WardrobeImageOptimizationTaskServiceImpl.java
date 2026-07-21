@@ -159,6 +159,11 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         if (active == null) {
             return;
         }
+        active = taskDao.findByTaskIdForUpdate(active.getTaskId(), UserUtils.getUserId());
+        if (active == null || !WardrobeImageOptimizationTaskStatus.QUEUED.getCode().equals(active.getStatus())
+                && !WardrobeImageOptimizationTaskStatus.RUNNING.getCode().equals(active.getStatus())) {
+            return;
+        }
         LocalDateTime now = LocalDateTime.now();
         active.setStatus(WardrobeImageOptimizationTaskStatus.CANCELLED.getCode());
         active.setErrorMessage("衣物已删除");
