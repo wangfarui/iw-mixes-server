@@ -65,6 +65,9 @@ iw:
         - wardrobe_outfit_item
         - wardrobe_wear_record
         - wardrobe_wear_record_item
+        - wardrobe_image_optimization_task
+        - wardrobe_image_optimization_attempt
+        - wardrobe_image_file_cleanup
       share-scope-enable-table-names:
         - bookkeeping_records
 

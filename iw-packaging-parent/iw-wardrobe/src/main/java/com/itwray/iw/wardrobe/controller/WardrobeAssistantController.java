@@ -7,6 +7,7 @@ import com.itwray.iw.wardrobe.model.vo.WardrobeAiSuggestVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemDraftVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemImageOptimizeTaskVo;
 import com.itwray.iw.wardrobe.service.WardrobeAssistantService;
+import com.itwray.iw.wardrobe.service.WardrobeImageOptimizationTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,9 +25,12 @@ import org.springframework.web.bind.annotation.*;
 public class WardrobeAssistantController {
 
     private final WardrobeAssistantService wardrobeAssistantService;
+    private final WardrobeImageOptimizationTaskService imageOptimizationTaskService;
 
-    public WardrobeAssistantController(WardrobeAssistantService wardrobeAssistantService) {
+    public WardrobeAssistantController(WardrobeAssistantService wardrobeAssistantService,
+                                       WardrobeImageOptimizationTaskService imageOptimizationTaskService) {
         this.wardrobeAssistantService = wardrobeAssistantService;
+        this.imageOptimizationTaskService = imageOptimizationTaskService;
     }
 
     @PostMapping("/suggest")
@@ -44,18 +48,24 @@ public class WardrobeAssistantController {
     @PostMapping("/item-image/optimize/start")
     @Operation(summary = "启动当前衣物图片优化任务")
     public WardrobeItemImageOptimizeTaskVo startOptimizeItemImage(@RequestBody @Valid WardrobeItemImageOptimizeDto dto) {
-        return wardrobeAssistantService.startOptimizeItemImage(dto);
+        return imageOptimizationTaskService.start(dto);
+    }
+
+    @PostMapping("/item-image/optimize/retry")
+    @Operation(summary = "重试失败的衣物图片优化任务")
+    public WardrobeItemImageOptimizeTaskVo retryOptimizeItemImage(@RequestParam("taskId") String taskId) {
+        return imageOptimizationTaskService.retry(taskId);
     }
 
     @GetMapping("/item-image/optimize/status")
     @Operation(summary = "查询当前衣物图片优化任务")
     public WardrobeItemImageOptimizeTaskVo getOptimizeItemImageStatus(@RequestParam("taskId") String taskId) {
-        return wardrobeAssistantService.getOptimizeItemImageStatus(taskId);
+        return imageOptimizationTaskService.get(taskId);
     }
 
     @GetMapping("/item-image/optimize/latest")
     @Operation(summary = "查询衣物最近图片优化任务")
     public WardrobeItemImageOptimizeTaskVo getLatestOptimizeItemImageTask(@RequestParam("itemId") Integer itemId) {
-        return wardrobeAssistantService.getLatestOptimizeItemImageTask(itemId);
+        return imageOptimizationTaskService.getCurrent(itemId);
     }
 }

@@ -13,6 +13,7 @@ import com.itwray.iw.wardrobe.model.vo.WardrobeItemDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeTagSummaryVo;
 import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
+import com.itwray.iw.wardrobe.service.WardrobeImageOptimizationTaskService;
 import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
@@ -42,11 +43,14 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
 
     private final WardrobeItemDao wardrobeItemDao;
     private final WardrobeItemImageService wardrobeItemImageService;
+    private final WardrobeImageOptimizationTaskService optimizationTaskService;
 
     public WardrobeItemServiceImpl(WardrobeItemDao wardrobeItemDao,
-                                   WardrobeItemImageService wardrobeItemImageService) {
+                                   WardrobeItemImageService wardrobeItemImageService,
+                                   WardrobeImageOptimizationTaskService optimizationTaskService) {
         this.wardrobeItemDao = wardrobeItemDao;
         this.wardrobeItemImageService = wardrobeItemImageService;
+        this.optimizationTaskService = optimizationTaskService;
     }
 
     @Override
@@ -82,7 +86,11 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     @Override
     @Transactional
     public void update(WardrobeItemUpdateDto dto) {
-        wardrobeItemDao.queryById(dto.getId());
+        WardrobeItemEntity current = wardrobeItemDao.queryById(dto.getId());
+        if (!StringUtils.equals(StringUtils.defaultString(current.getItemImage()),
+                StringUtils.defaultString(dto.getItemImage()))) {
+            optimizationTaskService.assertSourceImageChangeAllowed(dto.getId(), dto.getItemImage());
+        }
         WardrobeItemEntity entity = BeanUtil.copyProperties(dto, WardrobeItemEntity.class);
         this.fillItemDefaults(entity);
         wardrobeItemDao.updateById(entity);
@@ -92,6 +100,8 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     @Transactional
     public void delete(Integer id) {
         wardrobeItemDao.queryById(id);
+        optimizationTaskService.cancelForItemDeletion(id);
+        wardrobeItemImageService.deleteOptimizedImage(id);
         wardrobeItemDao.removeById(id);
     }
 

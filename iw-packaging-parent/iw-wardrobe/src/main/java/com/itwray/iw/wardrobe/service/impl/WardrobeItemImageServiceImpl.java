@@ -1,28 +1,26 @@
 package com.itwray.iw.wardrobe.service.impl;
 
-import com.itwray.iw.external.model.enums.AiImageGenerateBusinessTypeEnum;
 import com.itwray.iw.web.dao.BaseBusinessFileDao;
 import com.itwray.iw.web.model.dto.FileDto;
 import com.itwray.iw.web.model.enums.BusinessFileTypeEnum;
 import com.itwray.iw.web.model.vo.FileRecordVo;
 import com.itwray.iw.web.model.vo.FileVo;
-import com.itwray.iw.web.service.FileService;
-import com.itwray.iw.wardrobe.dao.AiImageGenerateRecordDao;
+import com.itwray.iw.web.utils.UserUtils;
 import com.itwray.iw.wardrobe.dao.WardrobeItemDao;
 import com.itwray.iw.wardrobe.dao.WardrobeOutfitDao;
 import com.itwray.iw.wardrobe.dao.WardrobeOutfitItemDao;
 import com.itwray.iw.wardrobe.dao.WardrobeWearRecordItemDao;
-import com.itwray.iw.wardrobe.model.entity.AiImageGenerateRecordEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitItemEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeWearRecordItemEntity;
+import com.itwray.iw.wardrobe.service.WardrobeImageFileCleanupService;
+import com.itwray.iw.wardrobe.service.WardrobeImageOptimizationTaskService;
 import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -36,28 +34,24 @@ import java.util.stream.Collectors;
 @Service
 public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
 
-    private static final String TASK_STATUS_SUCCESS = "success";
-    private static final String TASK_STATUS_FAILED = "failed";
-    private static final String IMAGE_DELETED_ERROR_MESSAGE = "优化图片已删除，可重新生成";
-
     private final BaseBusinessFileDao baseBusinessFileDao;
-    private final AiImageGenerateRecordDao aiImageGenerateRecordDao;
-    private final FileService fileService;
+    private final WardrobeImageFileCleanupService cleanupService;
+    private final WardrobeImageOptimizationTaskService optimizationTaskService;
     private final WardrobeItemDao wardrobeItemDao;
     private final WardrobeOutfitDao wardrobeOutfitDao;
     private final WardrobeOutfitItemDao wardrobeOutfitItemDao;
     private final WardrobeWearRecordItemDao wardrobeWearRecordItemDao;
 
     public WardrobeItemImageServiceImpl(BaseBusinessFileDao baseBusinessFileDao,
-                                        AiImageGenerateRecordDao aiImageGenerateRecordDao,
-                                        FileService fileService,
+                                        WardrobeImageFileCleanupService cleanupService,
+                                        WardrobeImageOptimizationTaskService optimizationTaskService,
                                         WardrobeItemDao wardrobeItemDao,
                                         WardrobeOutfitDao wardrobeOutfitDao,
                                         WardrobeOutfitItemDao wardrobeOutfitItemDao,
                                         WardrobeWearRecordItemDao wardrobeWearRecordItemDao) {
         this.baseBusinessFileDao = baseBusinessFileDao;
-        this.aiImageGenerateRecordDao = aiImageGenerateRecordDao;
-        this.fileService = fileService;
+        this.cleanupService = cleanupService;
+        this.optimizationTaskService = optimizationTaskService;
         this.wardrobeItemDao = wardrobeItemDao;
         this.wardrobeOutfitDao = wardrobeOutfitDao;
         this.wardrobeOutfitItemDao = wardrobeOutfitItemDao;
@@ -124,8 +118,11 @@ public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
                 .distinct()
                 .toList();
         this.replaceImageReferences(itemId, replacedUrls, fileRecord.getFileUrl());
-        this.invalidateImageGenerateRecords(itemId, replacedUrls);
-        replacedUrls.forEach(fileService::delete);
+        Integer userId = UserUtils.getUserId();
+        replacedUrls.forEach(url -> {
+            optimizationTaskService.markResultDeleted(itemId, url);
+            cleanupService.enqueue("", itemId, null, url, "optimized_image_replaced", userId);
+        });
     }
 
     @Override
@@ -146,8 +143,11 @@ public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
         String originalImage = wardrobeItemDao.queryById(itemId).getItemImage();
         baseBusinessFileDao.removeBusinessFile(itemId, BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE);
         this.replaceImageReferences(itemId, fileUrls, StringUtils.defaultString(originalImage));
-        this.invalidateImageGenerateRecords(itemId, fileUrls);
-        fileUrls.forEach(fileService::delete);
+        Integer userId = UserUtils.getUserId();
+        fileUrls.forEach(url -> {
+            optimizationTaskService.markResultDeleted(itemId, url);
+            cleanupService.enqueue("", itemId, null, url, "optimized_image_deleted", userId);
+        });
     }
 
     private void replaceImageReferences(Integer itemId, List<String> oldUrls, String replacementUrl) {
@@ -170,20 +170,4 @@ public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
                 .update();
     }
 
-    private void invalidateImageGenerateRecords(Integer itemId, List<String> fileUrls) {
-        if (itemId == null || fileUrls == null || fileUrls.isEmpty()) {
-            return;
-        }
-        aiImageGenerateRecordDao.lambdaUpdate()
-                .eq(AiImageGenerateRecordEntity::getBusinessType,
-                        AiImageGenerateBusinessTypeEnum.WARDROBE_ITEM_IMAGE_OPTIMIZE.name())
-                .eq(AiImageGenerateRecordEntity::getBusinessId, String.valueOf(itemId))
-                .eq(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_SUCCESS)
-                .in(AiImageGenerateRecordEntity::getResultImageUrl, fileUrls)
-                .set(AiImageGenerateRecordEntity::getStatus, TASK_STATUS_FAILED)
-                .set(AiImageGenerateRecordEntity::getResultImageUrl, "")
-                .set(AiImageGenerateRecordEntity::getErrorMessage, IMAGE_DELETED_ERROR_MESSAGE)
-                .set(AiImageGenerateRecordEntity::getUpdateTime, LocalDateTime.now())
-                .update();
-    }
 }

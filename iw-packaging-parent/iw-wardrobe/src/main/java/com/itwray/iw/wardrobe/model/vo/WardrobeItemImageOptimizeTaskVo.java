@@ -3,6 +3,8 @@ package com.itwray.iw.wardrobe.model.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 /**
  * 衣物图片AI优化任务 VO
  *
@@ -30,4 +32,13 @@ public class WardrobeItemImageOptimizeTaskVo {
 
     @Schema(title = "错误信息")
     private String errorMessage;
+
+    @Schema(title = "当前尝试编号")
+    private Integer attemptNo;
+
+    @Schema(title = "是否允许重试")
+    private Boolean retryable;
+
+    @Schema(title = "当前尝试期限")
+    private LocalDateTime deadlineAt;
 }
