@@ -66,6 +66,11 @@ public class BaseAiTaskEntity extends UserEntity<Integer> {
     private String modelName;
 
     /**
+     * 模型提供方
+     */
+    private String modelProvider;
+
+    /**
      * git分支
      */
     private String gitBranch;

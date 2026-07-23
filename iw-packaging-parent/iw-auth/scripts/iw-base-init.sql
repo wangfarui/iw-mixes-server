@@ -88,6 +88,7 @@ create table if not exists base_ai_task
     project_name    varchar(64)       default ''                not null comment '所属项目',
     workspace_path  varchar(255)      default ''                not null comment '工作区路径',
     model_name      varchar(64)       default ''                not null comment '模型名称',
+    model_provider  varchar(64)       default ''                not null comment '模型提供方',
     git_branch      varchar(128)      default ''                not null comment 'git分支',
     transcript_path varchar(512)      default ''                not null comment '记录文件路径',
     resume_command  varchar(255)      default ''                not null comment '恢复命令',

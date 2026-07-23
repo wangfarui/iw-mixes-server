@@ -47,6 +47,9 @@ public class AiTaskDetailVo implements DetailVo {
     @Schema(title = "模型名称")
     private String modelName;
 
+    @Schema(title = "模型提供方")
+    private String modelProvider;
+
     @Schema(title = "git分支")
     private String gitBranch;
 

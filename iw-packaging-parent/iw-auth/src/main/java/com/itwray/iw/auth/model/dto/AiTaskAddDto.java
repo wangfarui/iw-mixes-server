@@ -46,12 +46,17 @@ public class AiTaskAddDto implements AddDto {
     private String projectName;
 
     @Schema(title = "工作区路径")
+    @NotBlank(message = "工作区路径不能为空")
     @Length(max = 255, message = "工作区路径不能超过255字符")
     private String workspacePath;
 
     @Schema(title = "模型名称")
     @Length(max = 64, message = "模型名称不能超过64字符")
     private String modelName;
+
+    @Schema(title = "模型提供方")
+    @Length(max = 64, message = "模型提供方不能超过64字符")
+    private String modelProvider;
 
     @Schema(title = "git分支")
     @Length(max = 128, message = "git分支不能超过128字符")
