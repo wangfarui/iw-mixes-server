@@ -151,9 +151,10 @@ IW_AI_DEFAULT_API_URL
 IW_AI_DEFAULT_API_KEY
 IW_AI_DEFAULT_MODEL
 IW_AI_IMAGE_PROVIDER
-IW_AI_IMAGE_API_URL
+IW_AI_IMAGE_API_BASE_URL
 IW_AI_IMAGE_API_KEY
 IW_AI_IMAGE_MODEL
+IW_AI_IMAGE_SOURCE_BASE_URL
 IW_EXTERNAL_DAILYHOT_*
 BLOG_ACCESS_*
 ALIYUN_ASR_*
@@ -385,36 +386,32 @@ ss -lntp | grep -E '18080|18006|80|443'
 
 如果 `curl` 内网服务不通，优先检查目标服务状态和防火墙；如果 `curl` 正常但域名 504，优先检查 Nginx `proxy_pass`、upstream 地址和超时配置。
 
-### AI 图片生成 502
+### AI 图片生成失败
 
-衣柜“衣物编辑”页的“AI优化”最终由 `iw-external` 调用图片生成供应商。若日志出现：
-
-```text
-AIService#startReferenceGenerateImage 请求失败, status: 502
-```
-
-这表示生产实际进入了 `openai-responses` 旧分支，不是小程序轮询超时。先看 `iw-external` 启动日志确认实际配置：
+衣柜“衣物编辑”页的“AI优化”会由 `iw-external` 的参考图 provider module 同步生成，再由 `iw-core` 落位。先确认 `iw-external` 启动日志中 provider、model 与可信源图基础地址已解析；配置不完整时调用将返回 `CONFIGURATION_ERROR`。
 
 ```bash
-journalctl -u iw-external -n 200 --no-pager | grep 'AIService图片生成配置'
+journalctl -u iw-external -n 200 --no-pager | grep '参考图生成配置'
 ```
 
-推荐生产配置为 Gemini：
+Gemini 配置示例：
 
 ```text
 IW_AI_IMAGE_PROVIDER=gemini
-IW_AI_IMAGE_API_URL=https://generativelanguage.googleapis.com/v1beta
+IW_AI_IMAGE_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 IW_AI_IMAGE_API_KEY=<gemini-api-key>
 IW_AI_IMAGE_MODEL=gemini-3.1-flash-image
+IW_AI_IMAGE_SOURCE_BASE_URL=https://<trusted-image-host>/<trusted-prefix>/
 ```
 
-如改用 OpenAI Image API，使用 `openai` 分支，不要使用 `openai-responses`：
+如改用 OpenAI Image API：
 
 ```text
 IW_AI_IMAGE_PROVIDER=openai
-IW_AI_IMAGE_API_URL=https://api.openai.com/v1
+IW_AI_IMAGE_API_BASE_URL=https://api.openai.com/v1
 IW_AI_IMAGE_API_KEY=Bearer <openai-api-key>
 IW_AI_IMAGE_MODEL=gpt-image-2
+IW_AI_IMAGE_SOURCE_BASE_URL=https://<trusted-image-host>/<trusted-prefix>/
 ```
 
 修改 `/etc/iw-mixes/iw-external.env` 后只需重启 `iw-external`：

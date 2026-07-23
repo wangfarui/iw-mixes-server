@@ -3,13 +3,11 @@ package com.itwray.iw.external.client;
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.core.InternalFeignConfig;
 import com.itwray.iw.external.model.ExternalClientConstants;
-import com.itwray.iw.external.model.dto.AiImageReferenceGenerateDto;
 import com.itwray.iw.external.model.dto.AiStructuredChatDto;
 import com.itwray.iw.external.model.dto.AsrSentenceRecognizeDto;
 import com.itwray.iw.external.model.dto.GetExchangeRateDto;
 import com.itwray.iw.external.model.dto.SendEmailDto;
 import com.itwray.iw.external.model.dto.SmsSendVerificationCodeDto;
-import com.itwray.iw.external.model.vo.AiImageReferenceGenerateVo;
 import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 import com.itwray.iw.external.model.vo.AsrSentenceRecognizeVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,12 +46,6 @@ public interface InternalApiClient {
 
     @PostMapping("/ai/structuredChat")
     AiStructuredChatVo structuredChat(@RequestBody @Valid AiStructuredChatDto dto);
-
-    @PostMapping("/ai/image/referenceGenerate/start")
-    AiImageReferenceGenerateVo startReferenceGenerateImage(@RequestBody @Valid AiImageReferenceGenerateDto dto);
-
-    @GetMapping("/ai/image/referenceGenerate/status")
-    AiImageReferenceGenerateVo getReferenceGenerateImageStatus(@RequestParam("taskId") String taskId);
 
     @PostMapping("/asr/sentenceRecognition")
     AsrSentenceRecognizeVo sentenceRecognition(@RequestBody @Valid AsrSentenceRecognizeDto dto);

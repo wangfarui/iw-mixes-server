@@ -84,6 +84,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         task.setStatus(WardrobeImageOptimizationTaskStatus.QUEUED.getCode());
         task.setCurrentAttemptNo(1);
         task.setResultImageUrl("");
+        task.setErrorCode("");
         task.setErrorMessage("");
         try {
             taskDao.save(task);
@@ -166,12 +167,14 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         }
         LocalDateTime now = LocalDateTime.now();
         active.setStatus(WardrobeImageOptimizationTaskStatus.CANCELLED.getCode());
+        active.setErrorCode("");
         active.setErrorMessage("衣物已删除");
         active.setCompleteTime(now);
         taskDao.updateById(active);
         WardrobeImageOptimizationAttemptEntity attempt = this.currentAttempt(active);
         if (attempt != null) {
             attempt.setStatus(WardrobeImageOptimizationTaskStatus.CANCELLED.getCode());
+            attempt.setErrorCode("");
             attempt.setErrorMessage("衣物已删除");
             attempt.setCompleteTime(now);
             attempt.setClaimToken("");
@@ -195,6 +198,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         int attemptNo = task.getCurrentAttemptNo() == null ? 1 : task.getCurrentAttemptNo() + 1;
         task.setCurrentAttemptNo(attemptNo);
         task.setStatus(WardrobeImageOptimizationTaskStatus.QUEUED.getCode());
+        task.setErrorCode("");
         task.setErrorMessage("");
         task.setResultImageUrl("");
         task.setResultDeletedTime(null);
@@ -206,6 +210,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         attempt.setUserId(task.getUserId());
         attempt.setAttemptNo(attemptNo);
         attempt.setStatus(WardrobeImageOptimizationTaskStatus.QUEUED.getCode());
+        attempt.setErrorCode("");
         attempt.setErrorMessage("");
         attemptDao.save(attempt);
         return this.toVo(task, attempt);

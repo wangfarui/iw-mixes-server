@@ -21,13 +21,7 @@ public class WardrobeImageOptimizationAttemptDao extends BaseDao<WardrobeImageOp
 
     public List<WardrobeImageOptimizationAttemptEntity> findRunnable(LocalDateTime now) {
         return this.lambdaQuery()
-                .and(wrapper -> wrapper
-                        .eq(WardrobeImageOptimizationAttemptEntity::getStatus, "queued")
-                        .or(running -> running
-                                .eq(WardrobeImageOptimizationAttemptEntity::getStatus, "running")
-                                .isNotNull(WardrobeImageOptimizationAttemptEntity::getExternalTaskId)
-                                .ne(WardrobeImageOptimizationAttemptEntity::getExternalTaskId, "")
-                                .le(WardrobeImageOptimizationAttemptEntity::getNextPollTime, now)))
+                .eq(WardrobeImageOptimizationAttemptEntity::getStatus, "queued")
                 .and(wrapper -> wrapper.isNull(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime)
                         .or().le(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime, now))
                 .orderByAsc(WardrobeImageOptimizationAttemptEntity::getId)

@@ -66,15 +66,17 @@ Controller 上的路径仍不包含内部业务服务前缀。例如后端 `@Req
 
 - AI 供应商调用统一收敛在 `iw-packaging-parent/iw-external`，业务模块不要直接请求 OpenAI、DeepSeek 或其他第三方 AI 地址。
 - 业务模块调用 AI 时通过 `iw-feign-client/iw-external-client` 的内部接口传递消息、温度、token 等业务参数；请求 DTO、Controller 入参、前端 payload 不要暴露或透传 `model` 字段。
-- 默认 AI 统一由 `iw-external` 配置 `iw.ai.default.api-url`、`iw.ai.default.api-key`、`iw.ai.default.model` 及对应环境变量 `IW_AI_DEFAULT_*` 控制，默认模型 `gpt-5.5`。不要在业务模块新增 `iw.<domain>.ai.*model` 或写死模型名。
-- 图片生成 AI 统一由 `iw.ai.image.provider`、`iw.ai.image.api-url`、`iw.ai.image.api-key`、`iw.ai.image.model` 及对应环境变量 `IW_AI_IMAGE_*` 控制。当前只有“衣物图片 AI 优化生成”使用图片生成 AI，其它 AI 调用方都使用默认 AI。
+- 默认 AI 统一由 `iw-external` 配置 `iw.ai.default.api-url`、`iw.ai.default.api-key`、`iw.ai.default.model`、`iw.ai.default.reasoning-effort` 及对应环境变量 `IW_AI_DEFAULT_*` 控制，默认模型 `gpt-5.5`、默认推理强度 `medium`。不要在业务模块新增 `iw.<domain>.ai.*model` 或写死模型名。
+- 图片生成 AI 统一由 `iw.ai.image.provider`、`iw.ai.image.api-base-url`、`iw.ai.image.api-key`、`iw.ai.image.model`、`iw.ai.image.source-base-url` 及对应环境变量 `IW_AI_IMAGE_*` 控制。当前只有“衣物图片 AI 优化生成”使用图片生成 AI，其它 AI 调用方都使用默认 AI。
 - 旧配置 `iw.ai.api-url`、`iw.ai.api-key`、`iw.ai.model` / `IW_AI_API_URL`、`IW_AI_API_KEY`、`IW_AI_MODEL` 不再支持；AI 配置必须使用 `iw.ai.default.*` 和 `iw.ai.image.*`。
 - 如某个 AI 能力确实需要独立模型，先确认需求，再在 `iw-external` 内新增明确命名的服务端配置项；不要让 `iw-core`、微信小程序或 Web 管理端通过请求参数选择模型。
 - 默认 AI 的 OpenAI-compatible HTTP 头使用 `Authorization`，需把配置值写成完整格式，例如 `Bearer sk-xxx`。Gemini 图片生成 AI 使用 `x-goog-api-key`，配置值可以是裸 Gemini API Key；如误写成 `Bearer xxx`，服务端会自动去掉前缀。
-- 图片/多模态能力也通过 `iw-external` 的内部 AI 接口提供，业务模块只传提示词、业务上下文和图片 URL；模型兼容性由 `iw-external` 配置负责。图片生成能力使用 external 侧 AI 配置推导供应商接口地址，不在业务模块新增模型参数。
-- 图片生成供应商由 `iw.ai.image.provider` / `IW_AI_IMAGE_PROVIDER` 控制，当前支持 `gemini` 和 `openai`。`gemini` 走 Gemini 原生 `/v1beta/models/{model}:generateContent` 文本+图片生成图片接口，默认图片模型为 `gemini-3.1-flash-image`；`openai` 走 OpenAI Images `/v1/images/edits` 参考图编辑接口，默认图片模型为 `gpt-image-2`；如需旧 OpenAI `/responses + image_generation` 后台任务实现，可显式配置供应商为 `openai-responses`，模型未配置时回退到默认 AI 模型。
-- 图片生成、图片编辑等长耗时 AI 能力不要做前端同步长等待接口。业务端应返回任务 ID，用 Redis 保存短期任务状态并提供轮询接口；如供应商支持后台任务，`iw-external` 也应使用供应商后台/状态查询能力，避免 504 或 Feign/小程序请求超时。
-- 凡是调用 `startReferenceGenerateImage` 的图片生成业务，都必须提供 `businessType`、`businessCustomCategory`、`businessId` 上下文，并在业务调用侧落通用图片生成记录。去重键统一为 `sha256(sourceImageUrl + "|" + (businessType + ":" + businessCustomCategory) + "|" + businessId)`；成功记录直接复用结果，处理中记录返回原任务，失败记录允许用户再次主动触发同 key 重试。供应商返回 429 时当前尝试立即失败，衣物图片优化对用户提示“图片过大，优化失败”，不做自动重试。
+- 参考图生成通过 `iw-external` 内部的包级 deep module 提供；业务模块只传最终提示词和可信衣物源图 URL，不传业务类型、业务 ID、provider 或模型。衣橱任务身份、去重、重试、文件落位与清理由 `iw-wardrobe` 专用任务 module 负责。
+- 图片生成供应商由 `iw.ai.image.provider` / `IW_AI_IMAGE_PROVIDER` 控制，只支持 `openai` 和 `gemini`。`openai` 走 OpenAI Images `/v1/images/edits`，默认模型 `gpt-image-2`；`gemini` 走 `/v1beta/models/{model}:generateContent`，默认模型 `gemini-3.1-flash-image`。旧 `openai-responses` 后台 provider 不再支持。
+- 图片 API 配置必须提供明确的基础地址，不再从聊天、Responses 或 Interactions endpoint 推导图片接口。旧 `iw.ai.image.api-url` / `IW_AI_IMAGE_API_URL` 不再支持，改用 `iw.ai.image.api-base-url` / `IW_AI_IMAGE_API_BASE_URL`。
+- 参考图 provider 调用是 `iw-core` worker 内的同步远程步骤，但微信小程序仍只轮询 MySQL 持久化的衣物图片优化任务。不要为 provider 重新引入 Redis 图片任务、外部任务 ID、状态查询或通用图片生成记录。
+- provider module 不自动重试或降级；OpenAI 与 Gemini 通过配置人工切换。429 归一为 `RATE_LIMITED`，不得再解释为图片过大。
+- 参考图 URL 必须命中 `iw.ai.image.source-base-url` 配置的 HTTPS 基础路径；下载不跟随重定向。输入和输出默认最大 10 MB，只接受 JPEG、PNG、WebP。
 
 ## 发布入口
 

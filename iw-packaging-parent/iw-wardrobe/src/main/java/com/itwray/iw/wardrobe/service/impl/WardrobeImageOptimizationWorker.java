@@ -1,8 +1,8 @@
 package com.itwray.iw.wardrobe.service.impl;
 
-import com.itwray.iw.external.model.dto.AiImageReferenceGenerateDto;
-import com.itwray.iw.external.model.enums.AiImageGenerateBusinessTypeEnum;
-import com.itwray.iw.external.model.vo.AiImageReferenceGenerateVo;
+import com.itwray.iw.external.client.ReferenceImageClient;
+import com.itwray.iw.external.model.dto.ReferenceImageGenerateDto;
+import com.itwray.iw.external.model.vo.ReferenceImageGenerateVo;
 import com.itwray.iw.web.model.vo.FileRecordVo;
 import com.itwray.iw.web.service.FileService;
 import com.itwray.iw.web.utils.UserUtils;
@@ -10,7 +10,6 @@ import com.itwray.iw.wardrobe.dao.WardrobeImageOptimizationTaskDao;
 import com.itwray.iw.wardrobe.dao.WardrobeItemDao;
 import com.itwray.iw.wardrobe.model.entity.WardrobeImageOptimizationAttemptEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeImageOptimizationTaskEntity;
-import com.itwray.iw.wardrobe.service.WardrobeAssistantRemoteService;
 import com.itwray.iw.wardrobe.service.WardrobeImageFileCleanupService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -26,20 +25,16 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.util.Base64;
-import java.util.Set;
 
 @Slf4j
 @Component
 public class WardrobeImageOptimizationWorker {
 
-    private static final Set<String> FAILURE_STATUSES = Set.of("failed", "cancelled", "incomplete", "expired");
-
     private final WardrobeImageOptimizationClaimService claimService;
     private final WardrobeImageOptimizationCompletionService completionService;
     private final WardrobeImageOptimizationTaskDao taskDao;
     private final WardrobeItemDao itemDao;
-    private final WardrobeAssistantRemoteService remoteService;
+    private final ReferenceImageClient referenceImageClient;
     private final FileService fileService;
     private final WardrobeImageFileCleanupService cleanupService;
     private final TaskExecutor taskExecutor;
@@ -49,7 +44,7 @@ public class WardrobeImageOptimizationWorker {
                                            WardrobeImageOptimizationCompletionService completionService,
                                            WardrobeImageOptimizationTaskDao taskDao,
                                            WardrobeItemDao itemDao,
-                                           WardrobeAssistantRemoteService remoteService,
+                                           ReferenceImageClient referenceImageClient,
                                            FileService fileService,
                                            WardrobeImageFileCleanupService cleanupService,
                                            @Qualifier("wardrobeImageOptimizationExecutor") TaskExecutor taskExecutor,
@@ -60,7 +55,7 @@ public class WardrobeImageOptimizationWorker {
         this.completionService = completionService;
         this.taskDao = taskDao;
         this.itemDao = itemDao;
-        this.remoteService = remoteService;
+        this.referenceImageClient = referenceImageClient;
         this.fileService = fileService;
         this.cleanupService = cleanupService;
         this.taskExecutor = taskExecutor;
@@ -90,7 +85,7 @@ public class WardrobeImageOptimizationWorker {
         } catch (Exception e) {
             log.error("Wardrobe image optimization failed, taskId={}, attempt={}",
                     claimed.getTaskId(), claimed.getAttemptNo(), e);
-            completionService.fail(claimed, e.getMessage());
+            completionService.fail(claimed, "INTEGRATION_ERROR", "图片优化服务异常，请重试", "", "");
         } finally {
             UserUtils.restoreContext(snapshot);
         }
@@ -109,18 +104,10 @@ public class WardrobeImageOptimizationWorker {
             completionService.fail(claimed, "图片优化任务不存在");
             return;
         }
-        AiImageReferenceGenerateVo response;
-        if (StringUtils.isBlank(claimed.getExternalTaskId())) {
-            AiImageReferenceGenerateDto request = new AiImageReferenceGenerateDto();
-            request.setPrompt(task.getNormalizedPrompt());
-            request.setImageUrl(task.getSourceImageUrl());
-            request.setBusinessType(AiImageGenerateBusinessTypeEnum.WARDROBE_ITEM_IMAGE_OPTIMIZE.name());
-            request.setBusinessCustomCategory(task.getRuleVersion());
-            request.setBusinessId(String.valueOf(task.getItemId()));
-            response = remoteService.startReferenceGenerateImage(request);
-        } else {
-            response = remoteService.getReferenceGenerateImageStatus(claimed.getExternalTaskId());
-        }
+        ReferenceImageGenerateDto request = new ReferenceImageGenerateDto();
+        request.setPrompt(task.getNormalizedPrompt());
+        request.setSourceImageUrl(task.getSourceImageUrl());
+        ReferenceImageGenerateVo response = referenceImageClient.generate(request);
         if (!claimService.renewClaim(claimed)) {
             return;
         }
@@ -129,46 +116,44 @@ public class WardrobeImageOptimizationWorker {
 
     private void handleResponse(WardrobeImageOptimizationTaskEntity task,
                                 WardrobeImageOptimizationAttemptEntity claimed,
-                                AiImageReferenceGenerateVo response) {
+                                ReferenceImageGenerateVo response) {
         if (response == null) {
-            completionService.fail(claimed, "图片优化服务未返回结果");
+            completionService.fail(claimed, "INTEGRATION_ERROR", "图片优化服务未返回结果", "", "");
             return;
         }
-        String status = StringUtils.lowerCase(StringUtils.trimToEmpty(response.getStatus()));
-        if (FAILURE_STATUSES.contains(status)) {
-            completionService.fail(claimed, response.getErrorMessage());
+        if (!response.succeeded()) {
+            completionService.fail(claimed,
+                    response.getErrorCode() == null ? "INTEGRATION_ERROR" : response.getErrorCode().name(),
+                    response.getMessage(), response.getProvider(), response.getModel());
             return;
         }
-        if (StringUtils.isNotBlank(response.getImageBase64())) {
+        if (response.getImageContent() != null && response.getImageContent().length > 0) {
             this.uploadAndComplete(task, claimed, response);
             return;
         }
-        String externalTaskId = StringUtils.defaultIfBlank(response.getTaskId(), claimed.getExternalTaskId());
-        if (StringUtils.equals(status, "completed") || StringUtils.isBlank(externalTaskId)) {
-            completionService.fail(claimed,
-                    StringUtils.defaultIfBlank(response.getErrorMessage(), "图片优化服务未返回图片"));
-            return;
-        }
-        completionService.defer(claimed, externalTaskId, response.getRevisedPrompt(), "iw-external");
+        completionService.fail(claimed, "INTEGRATION_ERROR", "图片优化服务未返回图片",
+                response.getProvider(), response.getModel());
     }
 
     private void uploadAndComplete(WardrobeImageOptimizationTaskEntity task,
                                    WardrobeImageOptimizationAttemptEntity claimed,
-                                   AiImageReferenceGenerateVo response) {
+                                   ReferenceImageGenerateVo response) {
         if (!claimService.renewClaim(claimed)) {
             return;
         }
-        byte[] content = this.decodeImage(response.getImageBase64());
+        byte[] content = response.getImageContent();
         String mimeType = StringUtils.defaultIfBlank(response.getMimeType(), "image/png");
         MultipartFile multipartFile = new GeneratedImageMultipartFile(
                 "file", "wardrobe-optimized-" + task.getItemId() + this.extension(mimeType), mimeType, content);
         FileRecordVo uploaded = fileService.upload(multipartFile);
         if (uploaded == null || StringUtils.isBlank(uploaded.getFileUrl())) {
-            completionService.fail(claimed, "图片优化结果上传失败");
+            completionService.fail(claimed, "INTEGRATION_ERROR", "图片优化结果上传失败",
+                    response.getProvider(), response.getModel());
             return;
         }
         try {
-            completionService.complete(claimed, uploaded, mimeType, response.getRevisedPrompt(), response.getTaskId());
+            completionService.complete(claimed, uploaded, mimeType, response.getRevisedPrompt(),
+                    response.getProvider(), response.getModel());
         } catch (Exception e) {
             boolean itemDeleted = itemDao.lambdaQuery()
                     .eq(com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity::getId, task.getItemId())
@@ -180,19 +165,6 @@ public class WardrobeImageOptimizationWorker {
                     uploaded.getFileUrl(),
                     reason, claimed.getUserId());
             throw e;
-        }
-    }
-
-    private byte[] decodeImage(String imageBase64) {
-        String value = StringUtils.trimToEmpty(imageBase64);
-        int dataIndex = value.indexOf("base64,");
-        if (dataIndex >= 0) {
-            value = value.substring(dataIndex + "base64,".length());
-        }
-        try {
-            return Base64.getDecoder().decode(value);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("图片优化结果解析失败", e);
         }
     }
 

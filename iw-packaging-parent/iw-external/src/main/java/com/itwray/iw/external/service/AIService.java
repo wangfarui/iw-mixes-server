@@ -3,9 +3,7 @@ package com.itwray.iw.external.service;
 import cn.hutool.http.HttpResponse;
 import com.itwray.iw.external.model.bo.AIMessage;
 import com.itwray.iw.external.model.bo.AiCompletionResult;
-import com.itwray.iw.external.model.dto.AiImageReferenceGenerateDto;
 import com.itwray.iw.external.model.dto.AiStructuredChatDto;
-import com.itwray.iw.external.model.vo.AiImageReferenceGenerateVo;
 import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 import org.springframework.lang.NonNull;
 
@@ -26,10 +24,6 @@ public interface AIService {
     String chat(String content);
 
     AiStructuredChatVo structuredChat(AiStructuredChatDto dto);
-
-    AiImageReferenceGenerateVo startReferenceGenerateImage(AiImageReferenceGenerateDto dto);
-
-    AiImageReferenceGenerateVo getReferenceGenerateImageStatus(String taskId);
 
     /**
      * 同步非流式AI对话

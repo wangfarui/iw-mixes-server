@@ -101,6 +101,9 @@ spring:
           internal-client:
             connectTimeout: ${IW_EXTERNAL_FEIGN_CONNECT_TIMEOUT_MS:5000}
             readTimeout: ${IW_EXTERNAL_FEIGN_READ_TIMEOUT_MS:180000}
+          reference-image-client:
+            connectTimeout: ${IW_REFERENCE_IMAGE_FEIGN_CONNECT_TIMEOUT_MS:5000}
+            readTimeout: ${IW_REFERENCE_IMAGE_FEIGN_READ_TIMEOUT_MS:780000}
   servlet:
     multipart:
       max-file-size: 10MB

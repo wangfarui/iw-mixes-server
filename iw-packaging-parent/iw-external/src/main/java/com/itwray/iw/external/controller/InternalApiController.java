@@ -2,17 +2,21 @@ package com.itwray.iw.external.controller;
 
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.model.ExternalClientConstants;
-import com.itwray.iw.external.model.dto.AiImageReferenceGenerateDto;
+import com.itwray.iw.external.model.dto.ReferenceImageGenerateDto;
 import com.itwray.iw.external.model.dto.AiStructuredChatDto;
 import com.itwray.iw.external.model.dto.AsrSentenceRecognizeDto;
 import com.itwray.iw.external.model.dto.GetExchangeRateDto;
 import com.itwray.iw.external.model.dto.SendEmailDto;
 import com.itwray.iw.external.model.dto.SmsSendVerificationCodeDto;
-import com.itwray.iw.external.model.vo.AiImageReferenceGenerateVo;
+import com.itwray.iw.external.model.enums.ReferenceImageOutcomeType;
+import com.itwray.iw.external.model.vo.ReferenceImageGenerateVo;
 import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 import com.itwray.iw.external.model.vo.AsrSentenceRecognizeVo;
 import com.itwray.iw.external.model.vo.GetExchangeRateVo;
 import com.itwray.iw.external.service.AIService;
+import com.itwray.iw.external.referenceimage.GenerationOutcome;
+import com.itwray.iw.external.referenceimage.ReferenceImageCommand;
+import com.itwray.iw.external.referenceimage.ReferenceImageGenerationService;
 import com.itwray.iw.external.service.AsrService;
 import com.itwray.iw.external.service.EmailService;
 import com.itwray.iw.external.service.InternalApiService;
@@ -44,6 +48,8 @@ public class InternalApiController {
 
     private AIService aiService;
 
+    private ReferenceImageGenerationService referenceImageGenerationService;
+
     private AsrService asrService;
 
     @Autowired
@@ -58,6 +64,11 @@ public class InternalApiController {
     @Autowired
     public void setAiService(AIService aiService) {
         this.aiService = aiService;
+    }
+
+    @Autowired
+    public void setReferenceImageGenerationService(ReferenceImageGenerationService service) {
+        this.referenceImageGenerationService = service;
     }
 
     @Autowired
@@ -100,16 +111,26 @@ public class InternalApiController {
         return GeneralResponse.success(aiService.structuredChat(dto));
     }
 
-    @PostMapping("/ai/image/referenceGenerate/start")
-    @Operation(summary = "启动参考图生成图片任务")
-    public GeneralResponse<AiImageReferenceGenerateVo> startReferenceGenerateImage(@RequestBody @Valid AiImageReferenceGenerateDto dto) {
-        return GeneralResponse.success(aiService.startReferenceGenerateImage(dto));
-    }
-
-    @GetMapping("/ai/image/referenceGenerate/status")
-    @Operation(summary = "查询参考图生成图片任务")
-    public GeneralResponse<AiImageReferenceGenerateVo> getReferenceGenerateImageStatus(@RequestParam("taskId") String taskId) {
-        return GeneralResponse.success(aiService.getReferenceGenerateImageStatus(taskId));
+    @PostMapping("/ai/reference-image/generate")
+    @Operation(summary = "同步生成参考图")
+    public GeneralResponse<ReferenceImageGenerateVo> generateReferenceImage(
+            @RequestBody @Valid ReferenceImageGenerateDto dto) {
+        GenerationOutcome outcome = referenceImageGenerationService.generate(
+                new ReferenceImageCommand(dto.getSourceImageUrl(), dto.getPrompt()));
+        ReferenceImageGenerateVo vo = new ReferenceImageGenerateVo();
+        vo.setProvider(outcome.metadata().provider());
+        vo.setModel(outcome.metadata().model());
+        if (outcome instanceof GenerationOutcome.Success success) {
+            vo.setOutcome(ReferenceImageOutcomeType.SUCCEEDED);
+            vo.setImageContent(success.image().content());
+            vo.setMimeType(success.image().mimeType());
+            vo.setRevisedPrompt(success.image().revisedPrompt());
+        } else if (outcome instanceof GenerationOutcome.Failure failure) {
+            vo.setOutcome(ReferenceImageOutcomeType.FAILED);
+            vo.setErrorCode(failure.errorCode());
+            vo.setMessage(failure.message());
+        }
+        return GeneralResponse.success(vo);
     }
 
     @PostMapping("/asr/sentenceRecognition")

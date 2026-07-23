@@ -1,8 +1,6 @@
 package com.itwray.iw.wardrobe.service;
 
-import com.itwray.iw.external.model.dto.AiImageReferenceGenerateDto;
 import com.itwray.iw.external.model.dto.AiStructuredChatDto;
-import com.itwray.iw.external.model.vo.AiImageReferenceGenerateVo;
 import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 
 /**
@@ -14,8 +12,4 @@ import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 public interface WardrobeAssistantRemoteService {
 
     AiStructuredChatVo structuredChat(AiStructuredChatDto dto);
-
-    AiImageReferenceGenerateVo startReferenceGenerateImage(AiImageReferenceGenerateDto dto);
-
-    AiImageReferenceGenerateVo getReferenceGenerateImageStatus(String taskId);
 }

@@ -25,6 +25,11 @@ public class AIRequestBody {
     private String model;
 
     /**
+     * 推理强度，由服务端默认 AI 配置控制，例如 low、medium、high。
+     */
+    private String reasoning_effort;
+
+    /**
      * 介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚，降低模型重复相同内容的可能性。
      * 默认0
      */

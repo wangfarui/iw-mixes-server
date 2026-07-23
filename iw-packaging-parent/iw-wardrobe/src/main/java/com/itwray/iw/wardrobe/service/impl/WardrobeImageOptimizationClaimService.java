@@ -36,18 +36,19 @@ public class WardrobeImageOptimizationClaimService {
             for (WardrobeImageOptimizationAttemptEntity candidate : attemptDao.findRunnable(now)) {
                 boolean queued = WardrobeImageOptimizationTaskStatus.QUEUED.getCode().equals(candidate.getStatus());
                 String token = IdUtil.fastSimpleUUID();
+                LocalDateTime deadline = now.plusMinutes(15);
                 var update = attemptDao.lambdaUpdate()
                         .eq(WardrobeImageOptimizationAttemptEntity::getId, candidate.getId())
                         .eq(WardrobeImageOptimizationAttemptEntity::getStatus, candidate.getStatus())
                         .and(wrapper -> wrapper.isNull(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime)
                                 .or().le(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime, now))
                         .set(WardrobeImageOptimizationAttemptEntity::getClaimToken, token)
-                        .set(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime, now.plusMinutes(2));
+                        .set(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime, deadline);
                 if (queued) {
                     update.set(WardrobeImageOptimizationAttemptEntity::getStatus,
                                     WardrobeImageOptimizationTaskStatus.RUNNING.getCode())
                             .set(WardrobeImageOptimizationAttemptEntity::getStartTime, now)
-                            .set(WardrobeImageOptimizationAttemptEntity::getDeadlineTime, now.plusMinutes(15));
+                            .set(WardrobeImageOptimizationAttemptEntity::getDeadlineTime, deadline);
                 }
                 if (!update.update()) {
                     continue;
@@ -91,10 +92,10 @@ public class WardrobeImageOptimizationClaimService {
                     }
                     candidate.setStatus(WardrobeImageOptimizationTaskStatus.RUNNING.getCode());
                     candidate.setStartTime(now);
-                    candidate.setDeadlineTime(now.plusMinutes(15));
+                    candidate.setDeadlineTime(deadline);
                 }
                 candidate.setClaimToken(token);
-                candidate.setClaimExpireTime(now.plusMinutes(2));
+                candidate.setClaimExpireTime(deadline);
                 return candidate;
             }
             return null;
@@ -108,15 +109,19 @@ public class WardrobeImageOptimizationClaimService {
             return false;
         }
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime deadline = claimed.getDeadlineTime();
+        if (deadline == null || !now.isBefore(deadline)) {
+            return false;
+        }
         boolean renewed = attemptDao.lambdaUpdate()
                 .eq(WardrobeImageOptimizationAttemptEntity::getId, claimed.getId())
                 .eq(WardrobeImageOptimizationAttemptEntity::getStatus,
                         WardrobeImageOptimizationTaskStatus.RUNNING.getCode())
                 .eq(WardrobeImageOptimizationAttemptEntity::getClaimToken, claimed.getClaimToken())
-                .set(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime, now.plusMinutes(2))
+                .set(WardrobeImageOptimizationAttemptEntity::getClaimExpireTime, deadline)
                 .update();
         if (renewed) {
-            claimed.setClaimExpireTime(now.plusMinutes(2));
+            claimed.setClaimExpireTime(deadline);
         }
         return renewed;
     }

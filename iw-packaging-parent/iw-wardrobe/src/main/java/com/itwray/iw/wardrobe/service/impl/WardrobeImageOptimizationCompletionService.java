@@ -35,7 +35,7 @@ public class WardrobeImageOptimizationCompletionService {
 
     @Transactional
     public void complete(WardrobeImageOptimizationAttemptEntity claimed, FileRecordVo file,
-                         String mimeType, String revisedPrompt, String externalTaskId) {
+                         String mimeType, String revisedPrompt, String provider, String model) {
         WardrobeImageOptimizationTaskEntity task = this.requireCurrentTask(claimed);
         WardrobeImageOptimizationAttemptEntity attempt = this.requireClaim(claimed);
         if (itemDao.queryById(task.getItemId()) == null) {
@@ -44,10 +44,12 @@ public class WardrobeImageOptimizationCompletionService {
         itemImageService.replaceOptimizedImage(task.getItemId(), file);
         LocalDateTime now = LocalDateTime.now();
         attempt.setStatus(WardrobeImageOptimizationTaskStatus.SUCCEEDED.getCode());
-        attempt.setExternalTaskId(StringUtils.defaultIfBlank(externalTaskId, attempt.getExternalTaskId()));
+        attempt.setProvider(StringUtils.defaultString(provider));
+        attempt.setModel(StringUtils.defaultString(model));
         attempt.setResultImageUrl(file.getFileUrl());
         attempt.setResultMimeType(StringUtils.defaultString(mimeType));
         attempt.setRevisedPrompt(StringUtils.defaultString(revisedPrompt));
+        attempt.setErrorCode("");
         attempt.setErrorMessage("");
         attempt.setCompleteTime(now);
         attempt.setClaimToken("");
@@ -57,27 +59,20 @@ public class WardrobeImageOptimizationCompletionService {
         task.setStatus(WardrobeImageOptimizationTaskStatus.SUCCEEDED.getCode());
         task.setResultImageUrl(file.getFileUrl());
         task.setResultDeletedTime(null);
+        task.setErrorCode("");
         task.setErrorMessage("");
         task.setCompleteTime(now);
         taskDao.updateById(task);
     }
 
     @Transactional
-    public void defer(WardrobeImageOptimizationAttemptEntity claimed, String externalTaskId,
-                      String revisedPrompt, String provider) {
-        this.requireCurrentTask(claimed);
-        WardrobeImageOptimizationAttemptEntity attempt = this.requireClaim(claimed);
-        attempt.setExternalTaskId(StringUtils.defaultIfBlank(externalTaskId, attempt.getExternalTaskId()));
-        attempt.setRevisedPrompt(StringUtils.defaultString(revisedPrompt));
-        attempt.setProvider(StringUtils.defaultString(provider));
-        attempt.setNextPollTime(LocalDateTime.now().plusSeconds(5));
-        attempt.setClaimToken("");
-        attempt.setClaimExpireTime(null);
-        attemptDao.updateById(attempt);
+    public void fail(WardrobeImageOptimizationAttemptEntity claimed, String errorMessage) {
+        this.fail(claimed, "", errorMessage, "", "");
     }
 
     @Transactional
-    public void fail(WardrobeImageOptimizationAttemptEntity claimed, String errorMessage) {
+    public void fail(WardrobeImageOptimizationAttemptEntity claimed, String errorCode,
+                     String errorMessage, String provider, String model) {
         WardrobeImageOptimizationTaskEntity task;
         WardrobeImageOptimizationAttemptEntity attempt;
         try {
@@ -89,12 +84,16 @@ public class WardrobeImageOptimizationCompletionService {
         String error = StringUtils.left(StringUtils.defaultIfBlank(errorMessage, "图片优化失败，请重试"), 500);
         LocalDateTime now = LocalDateTime.now();
         attempt.setStatus(WardrobeImageOptimizationTaskStatus.FAILED.getCode());
+        attempt.setProvider(StringUtils.defaultString(provider));
+        attempt.setModel(StringUtils.defaultString(model));
+        attempt.setErrorCode(StringUtils.defaultString(errorCode));
         attempt.setErrorMessage(error);
         attempt.setCompleteTime(now);
         attempt.setClaimToken("");
         attempt.setClaimExpireTime(null);
         attemptDao.updateById(attempt);
         task.setStatus(WardrobeImageOptimizationTaskStatus.FAILED.getCode());
+        task.setErrorCode(StringUtils.defaultString(errorCode));
         task.setErrorMessage(error);
         task.setCompleteTime(now);
         taskDao.updateById(task);

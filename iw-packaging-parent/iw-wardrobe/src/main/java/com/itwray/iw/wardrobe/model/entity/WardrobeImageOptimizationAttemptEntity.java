@@ -27,21 +27,21 @@ public class WardrobeImageOptimizationAttemptEntity extends UserEntity<Integer> 
 
     private LocalDateTime claimExpireTime;
 
-    private LocalDateTime nextPollTime;
-
     private LocalDateTime startTime;
 
     private LocalDateTime deadlineTime;
 
     private String provider;
 
-    private String externalTaskId;
+    private String model;
 
     private String resultImageUrl;
 
     private String resultMimeType;
 
     private String revisedPrompt;
+
+    private String errorCode;
 
     private String errorMessage;
 

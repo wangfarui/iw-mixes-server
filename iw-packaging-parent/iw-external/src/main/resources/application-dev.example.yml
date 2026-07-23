@@ -22,11 +22,13 @@ iw:
       api-url: https://api.deepseek.com/chat/completions
       api-key:
       model: gpt-5.5
+      reasoning-effort: medium
     image:
       provider: gemini
-      api-url: https://generativelanguage.googleapis.com/v1beta
+      api-base-url: https://generativelanguage.googleapis.com/v1beta
       api-key:
       model: gemini-3.1-flash-image
+      source-base-url: https://example-bucket.oss-cn-region.aliyuncs.com/iw-core/
   external:
     amap:
       key:

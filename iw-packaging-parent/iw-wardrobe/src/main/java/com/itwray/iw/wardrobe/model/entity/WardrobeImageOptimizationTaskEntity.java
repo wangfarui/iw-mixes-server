@@ -39,6 +39,8 @@ public class WardrobeImageOptimizationTaskEntity extends UserEntity<Integer> {
 
     private String resultImageUrl;
 
+    private String errorCode;
+
     private String errorMessage;
 
     private LocalDateTime resultDeletedTime;

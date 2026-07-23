@@ -22,11 +22,16 @@ iw:
       api-url: ${IW_AI_DEFAULT_API_URL:https://api.deepseek.com/chat/completions}
       api-key: ${IW_AI_DEFAULT_API_KEY:}
       model: ${IW_AI_DEFAULT_MODEL:gpt-5.5}
+      reasoning-effort: ${IW_AI_DEFAULT_REASONING_EFFORT:medium}
     image:
       provider: ${IW_AI_IMAGE_PROVIDER:gemini}
-      api-url: ${IW_AI_IMAGE_API_URL:${IW_AI_DEFAULT_API_URL:https://api.deepseek.com/chat/completions}}
-      api-key: ${IW_AI_IMAGE_API_KEY:${IW_AI_DEFAULT_API_KEY:}}
+      api-base-url: ${IW_AI_IMAGE_API_BASE_URL:}
+      api-key: ${IW_AI_IMAGE_API_KEY:}
       model: ${IW_AI_IMAGE_MODEL:}
+      source-base-url: ${IW_AI_IMAGE_SOURCE_BASE_URL:}
+      request-timeout-ms: ${IW_AI_IMAGE_REQUEST_TIMEOUT_MS:720000}
+      source-download-timeout-ms: ${IW_AI_IMAGE_SOURCE_DOWNLOAD_TIMEOUT_MS:30000}
+      max-image-bytes: ${IW_AI_IMAGE_MAX_BYTES:10485760}
   remote:
     auth:
       base-url: ${IW_CORE_BASE_URL:http://127.0.0.1:18080}
