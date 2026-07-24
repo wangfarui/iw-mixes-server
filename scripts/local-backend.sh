@@ -16,7 +16,7 @@ scripts/local-backend.sh all
 scripts/local-backend.sh start external
 scripts/local-backend.sh start core
 
-# 查看状态、跟日志、重启、停止服务
+# 查看状态、跟日志、重启、停止服务（也会识别 IDE/Maven/手工启动的服务）
 scripts/local-backend.sh status
 scripts/local-backend.sh logs core
 scripts/local-backend.sh restart all
@@ -108,7 +108,59 @@ log_file() {
   echo "${LOG_DIR}/$(service_name "$1").log"
 }
 
-is_running() {
+service_application() {
+  case "$1" in
+    core) echo "com.itwray.iw.core.IwCoreApplication" ;;
+    external) echo "com.itwray.iw.external.IwExternalApplication" ;;
+    *) return 1 ;;
+  esac
+}
+
+process_command() {
+  ps -p "$1" -o command= 2>/dev/null || true
+}
+
+is_service_process() {
+  local target="$1"
+  local pid="$2"
+  local command application name
+
+  if ! kill -0 "$pid" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  command="$(process_command "$pid")"
+  application="$(service_application "$target")"
+  name="$(service_name "$target")"
+
+  # 端口只能说明有进程在监听；同时校验 Java 命令行，避免 stop/restart 误伤无关服务。
+  [[ "$command" == *java* ]] \
+    && { [[ "$command" == *"$application"* ]] \
+      || [[ "$command" == *"${name}-"* ]] \
+      || [[ "$command" == *"/${name}.jar"* ]]; }
+}
+
+listening_pids() {
+  local port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+  fi
+}
+
+command_line_pids() {
+  local target="$1"
+  local application name
+  application="$(service_application "$target")"
+  name="$(service_name "$target")"
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "$application" 2>/dev/null || true
+    pgrep -f "${name}-" 2>/dev/null || true
+  fi
+}
+
+managed_pid() {
   local target="$1"
   local pid_path
   pid_path="$(pid_file "$target")"
@@ -118,28 +170,63 @@ is_running() {
 
   local pid
   pid="$(cat "$pid_path")"
-  if [ -z "$pid" ] || ! kill -0 "$pid" >/dev/null 2>&1; then
+  if [ -z "$pid" ] || ! is_service_process "$target" "$pid"; then
     rm -f "$pid_path"
     return 1
   fi
 
-  return 0
+  echo "$pid"
+}
+
+service_pids() {
+  local target="$1"
+  local pid
+  local -a pids=()
+
+  if pid="$(managed_pid "$target")"; then
+    pids+=("$pid")
+  fi
+
+  while IFS= read -r pid; do
+    if [ -n "$pid" ] && is_service_process "$target" "$pid"; then
+      pids+=("$pid")
+    fi
+  done < <(listening_pids "$(service_port "$target")")
+
+  # 除默认端口外，IDE/Maven 可能使用了自定义端口；命令行扫描作为补充。
+  while IFS= read -r pid; do
+    if [ -n "$pid" ] && is_service_process "$target" "$pid"; then
+      pids+=("$pid")
+    fi
+  done < <(command_line_pids "$target")
+
+  if [ "${#pids[@]}" -gt 0 ]; then
+    printf '%s\n' "${pids[@]}" | awk '!seen[$0]++'
+  fi
+}
+
+is_running() {
+  [ -n "$(service_pids "$1")" ]
 }
 
 current_pid() {
-  local target="$1"
-  if is_running "$target"; then
-    cat "$(pid_file "$target")"
-  fi
+  service_pids "$1" | head -n 1
 }
 
 port_in_use() {
   local port="$1"
-  if command -v lsof >/dev/null 2>&1; then
-    lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
-  else
-    return 1
-  fi
+  [ -n "$(listening_pids "$port")" ]
+}
+
+port_owners() {
+  local port="$1"
+  local pid command
+
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    command="$(process_command "$pid")"
+    echo "PID ${pid}${command:+, ${command}}"
+  done < <(listening_pids "$port")
 }
 
 tail_log_on_failure() {
@@ -226,12 +313,14 @@ start_service() {
   ensure_log_dir
 
   if is_running "$target"; then
-    echo "${name} already running, PID $(current_pid "$target")."
+    echo "${name} already running, PID(s) $(service_pids "$target" | paste -sd, -)."
     return
   fi
 
   if port_in_use "$port"; then
-    echo "Port ${port} is already in use. Stop the existing process or set $(service_port_env_name "$target")."
+    echo "Port ${port} is already in use by a process that is not ${name}."
+    port_owners "$port"
+    echo "Stop that process or set $(service_port_env_name "$target")."
     exit 1
   fi
 
@@ -268,21 +357,27 @@ start_service() {
 stop_service() {
   local target="$1"
   local name pid_path pid
+  local -a pids=()
   name="$(service_name "$target")"
   pid_path="$(pid_file "$target")"
 
-  if ! is_running "$target"; then
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && pids+=("$pid")
+  done < <(service_pids "$target")
+
+  if [ "${#pids[@]}" -eq 0 ]; then
     echo "${name} is not running."
     return
   fi
 
-  pid="$(cat "$pid_path")"
-  echo "Stopping ${name}, PID ${pid} ..."
-  kill "$pid" >/dev/null 2>&1 || true
+  for pid in "${pids[@]}"; do
+    echo "Stopping ${name}, PID ${pid} ..."
+    kill "$pid" >/dev/null 2>&1 || true
+  done
 
   local i
   for i in $(seq 1 30); do
-    if ! kill -0 "$pid" >/dev/null 2>&1; then
+    if ! is_running "$target"; then
       rm -f "$pid_path"
       echo "${name} stopped."
       return
@@ -290,22 +385,44 @@ stop_service() {
     sleep 1
   done
 
-  echo "${name} did not stop in time, killing PID ${pid}."
-  kill -9 "$pid" >/dev/null 2>&1 || true
+  echo "${name} did not stop in time, force killing remaining process(es)."
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && kill -9 "$pid" >/dev/null 2>&1 || true
+  done < <(service_pids "$target")
   rm -f "$pid_path"
 }
 
 status_service() {
   local target="$1"
-  local name port pid
+  local name port pid pid_path source listening
+  local -a pids=()
   name="$(service_name "$target")"
   port="$(service_port "$target")"
+  pid_path="$(pid_file "$target")"
 
-  if is_running "$target"; then
-    pid="$(current_pid "$target")"
-    echo "${name}: running, PID ${pid}, port ${port}, log $(log_file "$target")"
-  else
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && pids+=("$pid")
+  done < <(service_pids "$target")
+
+  if [ "${#pids[@]}" -eq 0 ]; then
     echo "${name}: stopped, port ${port}, log $(log_file "$target")"
+    return
+  fi
+
+  for pid in "${pids[@]}"; do
+    source="detected"
+    if [ -f "$pid_path" ] && [ "$(cat "$pid_path")" = "$pid" ]; then
+      source="script-managed"
+    fi
+    listening="no"
+    if listening_pids "$port" | awk -v expected="$pid" '$0 == expected { found=1 } END { exit !found }'; then
+      listening="yes"
+    fi
+    echo "${name}: running, PID ${pid}, port ${port} (listening: ${listening}), source: ${source}"
+  done
+
+  if [ ! -f "$pid_path" ]; then
+    echo "${name}: no script log is associated; process was discovered from its command line or listening port."
   fi
 }
 

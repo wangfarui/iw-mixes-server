@@ -59,7 +59,7 @@ scripts/local-backend.sh restart all
 scripts/local-backend.sh stop all
 ```
 
-脚本会使用 JDK 17 执行 Maven package，然后以 `dev` profile 后台运行 Jar。默认日志和 PID 位于 `logs/local/`；如需跳过构建，可设置 `IW_LOCAL_SKIP_BUILD=1`。本地数据库、Redis、AI Key、阿里云 Key 等仍通过环境变量或不提交的 `application-dev.yml` 提供。
+脚本会使用 JDK 17 执行 Maven package，然后以 `dev` profile 后台运行 Jar。默认日志和 PID 位于 `logs/local/`；如需跳过构建，可设置 `IW_LOCAL_SKIP_BUILD=1`。`status`、`stop` 和 `restart` 会同时扫描监听端口及 Java 命令行，因此也能识别通过 IDE、Maven 或手工命令启动的 `iw-core` / `iw-external`；脚本只会操作命令行能确认属于目标服务的 Java 进程。本地数据库、Redis、AI Key、阿里云 Key 等仍通过环境变量或不提交的 `application-dev.yml` 提供。
 
 本地兼容入口不代理 WebSocket。需要验证 `/external-service/wb/**` 时，使用 [deploy/nginx/iw-mixes-server.local.conf](deploy/nginx/iw-mixes-server.local.conf)，并让 `iw-core` 改回 `18080` 运行，由 Nginx 监听 `18000`。
 
