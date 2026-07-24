@@ -11,9 +11,11 @@ import com.itwray.iw.auth.model.entity.BaseAiTaskEntity;
 import com.itwray.iw.auth.model.vo.AiTaskDetailVo;
 import com.itwray.iw.auth.model.vo.AiTaskPageVo;
 import com.itwray.iw.auth.service.BaseAiTaskService;
+import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
 import com.itwray.iw.web.service.impl.WebServiceImpl;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +40,11 @@ public class BaseAiTaskServiceImpl extends WebServiceImpl<BaseAiTaskDao, BaseAiT
     public Integer add(AiTaskAddDto dto) {
         BaseAiTaskEntity entity = BeanUtil.copyProperties(dto, BaseAiTaskEntity.class);
         entity.setLastActiveAt(LocalDateTime.now());
-        getBaseDao().save(entity);
+        try {
+            getBaseDao().save(entity);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("该会话任务已存在，请编辑原记录");
+        }
         return entity.getId();
     }
 
