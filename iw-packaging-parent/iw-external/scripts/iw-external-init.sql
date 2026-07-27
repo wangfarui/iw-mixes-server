@@ -57,3 +57,16 @@ create table external_tool_ai_records
     key idx_status_create_time (status, create_time),
     key idx_client_ip_hash_create_time (client_ip_hash, create_time)
 ) comment '外部工具AI调用记录表';
+
+create table external_tool_usage_daily
+(
+    id          bigint unsigned                       not null auto_increment comment 'id',
+    stat_date   date                                  not null comment '统计日期',
+    tool_key    varchar(64)                           not null comment '稳定工具标识',
+    usage_count bigint unsigned                       not null default 0 comment '当日使用次数',
+    create_time datetime default CURRENT_TIMESTAMP    not null comment '创建时间',
+    update_time datetime default CURRENT_TIMESTAMP    not null on update CURRENT_TIMESTAMP comment '更新时间',
+    primary key (id),
+    unique key uk_stat_date_tool_key (stat_date, tool_key),
+    key idx_tool_key_stat_date (tool_key, stat_date)
+) comment '外部工具按日使用统计表';
