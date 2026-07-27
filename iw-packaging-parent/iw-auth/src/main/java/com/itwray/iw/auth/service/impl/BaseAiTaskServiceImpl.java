@@ -6,11 +6,13 @@ import com.itwray.iw.auth.dao.BaseAiTaskDao;
 import com.itwray.iw.auth.mapper.BaseAiTaskMapper;
 import com.itwray.iw.auth.model.dto.AiTaskAddDto;
 import com.itwray.iw.auth.model.dto.AiTaskPageDto;
+import com.itwray.iw.auth.model.dto.AiTaskTopUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskUpdateDto;
 import com.itwray.iw.auth.model.entity.BaseAiTaskEntity;
 import com.itwray.iw.auth.model.vo.AiTaskDetailVo;
 import com.itwray.iw.auth.model.vo.AiTaskPageVo;
 import com.itwray.iw.auth.service.BaseAiTaskService;
+import com.itwray.iw.common.constants.BoolEnum;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
 import com.itwray.iw.web.service.impl.WebServiceImpl;
@@ -65,6 +67,14 @@ public class BaseAiTaskServiceImpl extends WebServiceImpl<BaseAiTaskDao, BaseAiT
     }
 
     @Override
+    @Transactional
+    public void updateTop(AiTaskTopUpdateDto dto) {
+        getBaseDao().queryById(dto.getId());
+        LocalDateTime topTime = BoolEnum.TRUE.getCode().equals(dto.getIsTop()) ? LocalDateTime.now() : null;
+        getBaseDao().updateTop(dto.getId(), dto.getIsTop(), topTime);
+    }
+
+    @Override
     public AiTaskDetailVo detail(Integer id) {
         BaseAiTaskEntity entity = getBaseDao().queryById(id);
         return BeanUtil.copyProperties(entity, AiTaskDetailVo.class);
@@ -78,6 +88,8 @@ public class BaseAiTaskServiceImpl extends WebServiceImpl<BaseAiTaskDao, BaseAiT
                 .like(StringUtils.isNotBlank(dto.getProjectName()), BaseAiTaskEntity::getProjectName, dto.getProjectName())
                 .eq(StringUtils.isNotBlank(dto.getSessionKey()), BaseAiTaskEntity::getSessionKey, dto.getSessionKey())
                 .like(StringUtils.isNotBlank(dto.getWorkspaceKeyword()), BaseAiTaskEntity::getWorkspacePath, dto.getWorkspaceKeyword())
+                .orderByDesc(BaseAiTaskEntity::getIsTop)
+                .orderByDesc(BaseAiTaskEntity::getTopTime)
                 .orderByDesc(BaseAiTaskEntity::getLastActiveAt)
                 .orderByDesc(BaseAiTaskEntity::getId);
         if (StringUtils.isNotBlank(dto.getKeyword())) {

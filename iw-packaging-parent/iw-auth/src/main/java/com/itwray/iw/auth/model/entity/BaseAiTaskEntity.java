@@ -51,6 +51,16 @@ public class BaseAiTaskEntity extends UserEntity<Integer> {
     private AiTaskStatusEnum taskStatus;
 
     /**
+     * 是否置顶(0否 1是)
+     */
+    private Integer isTop;
+
+    /**
+     * 置顶时间
+     */
+    private LocalDateTime topTime;
+
+    /**
      * 所属项目
      */
     private String projectName;

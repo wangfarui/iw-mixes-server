@@ -2,6 +2,7 @@ package com.itwray.iw.auth.controller;
 
 import com.itwray.iw.auth.model.dto.AiTaskAddDto;
 import com.itwray.iw.auth.model.dto.AiTaskPageDto;
+import com.itwray.iw.auth.model.dto.AiTaskTopUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskUpdateDto;
 import com.itwray.iw.auth.model.vo.AiTaskDetailVo;
 import com.itwray.iw.auth.model.vo.AiTaskPageVo;
@@ -14,6 +15,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,5 +41,11 @@ public class BaseAiTaskController extends WebController<BaseAiTaskService, AiTas
     @Operation(summary = "分页查询AI任务")
     public PageVo<AiTaskPageVo> page(@RequestBody @Valid AiTaskPageDto dto) {
         return getWebService().page(dto);
+    }
+
+    @PutMapping("/top")
+    @Operation(summary = "更新AI任务置顶状态")
+    public void updateTop(@RequestBody @Valid AiTaskTopUpdateDto dto) {
+        getWebService().updateTop(dto);
     }
 }

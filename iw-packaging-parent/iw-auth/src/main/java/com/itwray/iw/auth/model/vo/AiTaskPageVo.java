@@ -38,6 +38,13 @@ public class AiTaskPageVo implements PageRecordVo {
     @Schema(title = "任务状态")
     private AiTaskStatusEnum taskStatus;
 
+    @Schema(title = "是否置顶(0否 1是)")
+    private Integer isTop;
+
+    @Schema(title = "置顶时间")
+    @JsonFormat(pattern = DateUtils.DATETIME_FORMAT)
+    private LocalDateTime topTime;
+
     @Schema(title = "所属项目")
     private String projectName;
 

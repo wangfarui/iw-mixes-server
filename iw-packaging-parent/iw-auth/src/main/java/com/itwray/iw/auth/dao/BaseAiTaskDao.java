@@ -5,6 +5,8 @@ import com.itwray.iw.auth.model.entity.BaseAiTaskEntity;
 import com.itwray.iw.web.dao.BaseDao;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 /**
  * AI任务表DAO
  *
@@ -13,4 +15,13 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class BaseAiTaskDao extends BaseDao<BaseAiTaskMapper, BaseAiTaskEntity> {
+
+    public void updateTop(Integer id, Integer isTop, LocalDateTime topTime) {
+        lambdaUpdate()
+                .eq(BaseAiTaskEntity::getId, id)
+                .set(BaseAiTaskEntity::getIsTop, isTop)
+                .set(BaseAiTaskEntity::getTopTime, topTime)
+                .set(BaseAiTaskEntity::getUpdateTime, LocalDateTime.now())
+                .update();
+    }
 }

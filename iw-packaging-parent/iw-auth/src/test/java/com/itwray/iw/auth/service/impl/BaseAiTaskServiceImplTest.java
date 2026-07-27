@@ -2,6 +2,7 @@ package com.itwray.iw.auth.service.impl;
 
 import com.itwray.iw.auth.dao.BaseAiTaskDao;
 import com.itwray.iw.auth.model.dto.AiTaskAddDto;
+import com.itwray.iw.auth.model.dto.AiTaskTopUpdateDto;
 import com.itwray.iw.auth.model.entity.BaseAiTaskEntity;
 import com.itwray.iw.auth.model.enums.AiTaskStatusEnum;
 import com.itwray.iw.auth.model.enums.AiToolTypeEnum;
@@ -12,8 +13,14 @@ import org.springframework.dao.DuplicateKeyException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class BaseAiTaskServiceImplTest {
 
@@ -37,5 +44,35 @@ class BaseAiTaskServiceImplTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> service.add(dto));
 
         assertEquals("该会话任务已存在，请编辑原记录", exception.getMessage());
+    }
+
+    @Test
+    void topTaskRecordsTopTime() {
+        BaseAiTaskDao taskDao = mock(BaseAiTaskDao.class);
+        when(taskDao.queryById(anyInt())).thenReturn(new BaseAiTaskEntity());
+        BaseAiTaskServiceImpl service = new BaseAiTaskServiceImpl(taskDao);
+
+        AiTaskTopUpdateDto dto = new AiTaskTopUpdateDto();
+        dto.setId(42);
+        dto.setIsTop(1);
+
+        service.updateTop(dto);
+
+        verify(taskDao).updateTop(eq(42), eq(1), notNull());
+    }
+
+    @Test
+    void untopTaskClearsTopTime() {
+        BaseAiTaskDao taskDao = mock(BaseAiTaskDao.class);
+        when(taskDao.queryById(anyInt())).thenReturn(new BaseAiTaskEntity());
+        BaseAiTaskServiceImpl service = new BaseAiTaskServiceImpl(taskDao);
+
+        AiTaskTopUpdateDto dto = new AiTaskTopUpdateDto();
+        dto.setId(42);
+        dto.setIsTop(0);
+
+        service.updateTop(dto);
+
+        verify(taskDao).updateTop(eq(42), eq(0), isNull());
     }
 }
