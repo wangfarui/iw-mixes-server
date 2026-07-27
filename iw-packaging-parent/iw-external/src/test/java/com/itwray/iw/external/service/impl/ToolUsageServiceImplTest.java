@@ -13,6 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ToolUsageServiceImplTest {
@@ -45,6 +46,17 @@ class ToolUsageServiceImplTest {
         ToolUsageServiceImpl service = new ToolUsageServiceImpl(mock(ExternalToolUsageDailyMapper.class), Clock.systemUTC());
 
         assertThrows(BusinessException.class, () -> service.record("not-a-tool"));
+    }
+
+    @Test
+    void recordUsesShanghaiNaturalDateAndStableToolKey() {
+        ExternalToolUsageDailyMapper mapper = mock(ExternalToolUsageDailyMapper.class);
+        Clock clock = Clock.fixed(Instant.parse("2026-07-26T16:30:00Z"), ZoneId.of("Asia/Shanghai"));
+        ToolUsageServiceImpl service = new ToolUsageServiceImpl(mapper, clock);
+
+        service.record("formatter");
+
+        verify(mapper).incrementUsage(java.time.LocalDate.of(2026, 7, 27), "formatter");
     }
 
     private ExternalToolUsageDailyMapper.ToolUsageStatisticsRow row(String toolKey,

@@ -3,10 +3,9 @@ package com.itwray.iw.external.controller;
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.model.dto.ToolUsageRecordDto;
 import com.itwray.iw.external.model.vo.ToolUsageSummaryVo;
+import com.itwray.iw.external.service.ToolUsageRateGuard;
 import com.itwray.iw.external.service.ToolUsageService;
-import com.itwray.iw.external.service.impl.ToolUsageRateLimiter;
 import com.itwray.iw.web.annotation.SkipWrapper;
-import com.itwray.iw.web.utils.IpUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,17 +29,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class ToolUsageController {
 
     private final ToolUsageService toolUsageService;
-    private final ToolUsageRateLimiter rateLimiter;
+    private final ToolUsageRateGuard rateGuard;
 
-    public ToolUsageController(ToolUsageService toolUsageService, ToolUsageRateLimiter rateLimiter) {
+    public ToolUsageController(ToolUsageService toolUsageService, ToolUsageRateGuard rateGuard) {
         this.toolUsageService = toolUsageService;
-        this.rateLimiter = rateLimiter;
+        this.rateGuard = rateGuard;
     }
 
     @PostMapping("/record")
     @Operation(summary = "记录工具使用")
     public GeneralResponse<Void> record(@RequestBody @Valid ToolUsageRecordDto dto, HttpServletRequest request) {
-        if (!rateLimiter.tryAcquire(IpUtils.getClientIp(request))) {
+        if (!rateGuard.tryAcquire(request)) {
             return new GeneralResponse<>(429, "请求过于频繁，请稍后再试");
         }
         toolUsageService.record(dto.getToolKey());
