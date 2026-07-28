@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Clock;
@@ -60,7 +61,7 @@ public class RemoteShareController {
 
     @GetMapping("/sessions/{roomId}")
     public ResponseEntity<GeneralResponse<RemoteShareSessionService.SessionState>> state(@PathVariable String roomId,
-                                                                                           @NotBlank @Size(max = 128) String capability) {
+                                                                                           @RequestHeader("X-Remote-Share-Capability") @NotBlank @Size(max = 128) String capability) {
         return respond(() -> sessions.state(roomId, capability));
     }
 
@@ -91,7 +92,7 @@ public class RemoteShareController {
 
     @GetMapping("/sessions/{roomId}/texts")
     public ResponseEntity<GeneralResponse<List<RemoteShareTextStore.PendingText>>> claimTexts(@PathVariable String roomId,
-                                                                                                 @NotBlank @Size(max = 128) String capability) {
+                                                                                                 @RequestHeader("X-Remote-Share-Capability") @NotBlank @Size(max = 128) String capability) {
         return respond(() -> {
             RemoteShareSessionService.SessionState state = sessions.state(roomId, capability);
             return texts.claimFor(roomId, state.slot(), Instant.now(clock));
@@ -105,7 +106,7 @@ public class RemoteShareController {
 
     @PutMapping("/sessions/{roomId}/binaries/{itemId}/chunks/{index}")
     public ResponseEntity<GeneralResponse<Void>> uploadBinaryChunk(@PathVariable String roomId, @PathVariable String itemId,
-                                                                    @PathVariable int index, @NotBlank String capability,
+                                                                    @PathVariable int index, @RequestHeader("X-Remote-Share-Capability") @NotBlank String capability,
                                                                     HttpServletRequest request) {
         return respondVoid(() -> {
             try {
@@ -124,16 +125,23 @@ public class RemoteShareController {
 
     @GetMapping("/sessions/{roomId}/binaries")
     public ResponseEntity<GeneralResponse<List<RemoteShareBinaryStore.PendingBinary>>> pendingBinaries(@PathVariable String roomId,
-                                                                                                           @NotBlank String capability) {
+                                                                                                           @RequestHeader("X-Remote-Share-Capability") @NotBlank String capability) {
         return respond(() -> binaries.pendingFor(roomId, capability));
     }
 
     @GetMapping("/sessions/{roomId}/binaries/{itemId}/chunks/{index}")
     public ResponseEntity<StreamingResponseBody> downloadBinaryChunk(@PathVariable String roomId, @PathVariable String itemId,
-                                                                      @PathVariable int index, @NotBlank String capability) {
+                                                                      @PathVariable int index, @RequestHeader("X-Remote-Share-Capability") @NotBlank String capability,
+                                                                      HttpServletRequest request) {
         try {
+            java.nio.file.Path chunk = binaries.receiverChunk(roomId, capability, itemId, index);
+            if ("1".equals(request.getHeader("X-Remote-Share-Accel"))) {
+                return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                        .header("X-Accel-Redirect", "/_internal/remote-share/" + itemId + "/" + chunk.getFileName())
+                        .body(output -> { });
+            }
             return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
-                    .body(output -> Files.copy(binaries.receiverChunk(roomId, capability, itemId, index), output));
+                    .body(output -> Files.copy(chunk, output));
         } catch (RuntimeException exception) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
@@ -166,7 +174,11 @@ public class RemoteShareController {
     private <T> ResponseEntity<GeneralResponse<T>> error(RuntimeException exception) {
         if (exception instanceof RemoteShareSessionService.SessionFullException
                 || exception instanceof RemoteShareSessionService.SessionAlreadyExistsException
-                || exception instanceof RemoteShareTextStore.TextQuotaExceededException) {
+                || exception instanceof RemoteShareTextStore.TextQuotaExceededException
+                || exception instanceof RemoteShareBinaryStore.ItemLimitExceededException
+                || exception instanceof RemoteShareBinaryStore.RoomLimitExceededException
+                || exception instanceof RemoteShareBinaryStore.TotalLimitExceededException
+                || exception instanceof RemoteShareBinaryStore.UploadBusyException) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new GeneralResponse<>(409, messageFor(exception)));
         }
         if (exception instanceof RemoteShareSessionService.ForbiddenException) {
@@ -178,6 +190,10 @@ public class RemoteShareController {
         if (exception instanceof RemoteShareSessionService.SessionNotFoundException) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new GeneralResponse<>(404, "会话不存在"));
         }
+        if (exception instanceof RemoteShareBinaryStore.DiskLowException
+                || exception instanceof RemoteShareBinaryStore.StorageUnavailableException) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new GeneralResponse<>(503, "临时存储暂不可用，请稍后重试"));
+        }
         return ResponseEntity.badRequest().body(new GeneralResponse<>(400, "请求参数无效"));
     }
 
@@ -188,6 +204,10 @@ public class RemoteShareController {
         if (exception instanceof RemoteShareTextStore.TextQuotaExceededException) {
             return "临时文本额度不足";
         }
+        if (exception instanceof RemoteShareBinaryStore.ItemLimitExceededException) return "单项文件不能超过 10 MB";
+        if (exception instanceof RemoteShareBinaryStore.RoomLimitExceededException) return "当前会话的临时存储额度不足";
+        if (exception instanceof RemoteShareBinaryStore.TotalLimitExceededException) return "临时存储空间不足";
+        if (exception instanceof RemoteShareBinaryStore.UploadBusyException) return "当前有上传任务正在进行";
         return "会话已存在";
     }
 

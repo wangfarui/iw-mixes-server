@@ -13,7 +13,7 @@ MySQL, Redis and Nginx stay on the public server. Nacos, RocketMQ broker and the
 2. Create directories:
 
    ```bash
-   mkdir -p /opt/iw-mixes-server /etc/iw-mixes /var/log/iw-mixes
+   mkdir -p /opt/iw-mixes-server /etc/iw-mixes /var/log/iw-mixes /opt/iw-mixes-server/iw-external/data/remote-share
    ```
 
 3. Copy systemd units:

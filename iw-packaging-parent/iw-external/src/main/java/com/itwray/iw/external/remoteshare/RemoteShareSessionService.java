@@ -1,6 +1,7 @@
 package com.itwray.iw.external.remoteshare;
 
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -77,6 +78,12 @@ public class RemoteShareSessionService {
         Session session = activeSession(roomId);
         slotFor(session, capability);
         sessions.remove(roomId);
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    public synchronized void cleanupExpired() {
+        Instant now = clock.instant();
+        sessions.entrySet().removeIf(entry -> !entry.getValue().expiresAt.isAfter(now));
     }
 
     private Session activeSession(String roomId) {

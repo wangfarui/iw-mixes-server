@@ -13,6 +13,7 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.server.HandshakeInterceptor;
+import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 
 import java.util.Map;
 
@@ -22,9 +23,12 @@ import java.util.Map;
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final RemoteShareSessionService remoteShareSessionService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
-    public WebSocketConfig(RemoteShareSessionService remoteShareSessionService) {
+    public WebSocketConfig(RemoteShareSessionService remoteShareSessionService,
+                           com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.remoteShareSessionService = remoteShareSessionService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -44,7 +48,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
                     }
                 })
                 .setAllowedOrigins("*"); // 允许跨域
-        registry.addHandler(remoteShareWebSocketHandler(remoteShareSessionService), "/wb/remote-share")
+        registry.addHandler(remoteShareWebSocketHandler(remoteShareSessionService, objectMapper), "/wb/remote-share")
                 .setAllowedOriginPatterns("https://*.itwray.com", "http://localhost:*", "http://127.0.0.1:*");
     }
 
@@ -54,7 +58,15 @@ public class WebSocketConfig implements WebSocketConfigurer {
     }
 
     @Bean
-    public RemoteShareWebSocketHandler remoteShareWebSocketHandler(RemoteShareSessionService sessionService) {
-        return new RemoteShareWebSocketHandler(sessionService);
+    public RemoteShareWebSocketHandler remoteShareWebSocketHandler(RemoteShareSessionService sessionService,
+                                                                     com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+        return new RemoteShareWebSocketHandler(sessionService, objectMapper);
+    }
+
+    @Bean
+    public ServletServerContainerFactoryBean webSocketContainer() {
+        ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
+        container.setMaxTextMessageBufferSize(128 * 1024);
+        return container;
     }
 }

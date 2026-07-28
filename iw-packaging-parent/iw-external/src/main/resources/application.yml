@@ -41,6 +41,9 @@ iw:
     dataPermission:
       enabled: false
   external:
+    remote-share:
+      # Kept under iw-external's stable working directory so Nginx can serve authorized chunks internally.
+      storage-directory: data/remote-share
     amap:
       key: ${IW_EXTERNAL_AMAP_KEY:}
     exchange-rate:

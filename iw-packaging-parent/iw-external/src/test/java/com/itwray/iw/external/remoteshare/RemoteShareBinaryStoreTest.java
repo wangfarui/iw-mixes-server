@@ -6,9 +6,11 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.nio.file.Files;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RemoteShareBinaryStoreTest {
@@ -29,8 +31,9 @@ class RemoteShareBinaryStoreTest {
         store.complete("binary-room", sender.capability(), "item-1");
 
         assertEquals(List.of("item-1"), store.pendingFor("binary-room", receiver.capability()).stream().map(RemoteShareBinaryStore.PendingBinary::itemId).toList());
-        assertThrows(RemoteShareBinaryStore.NotReadyException.class, () -> store.pendingFor("binary-room", sender.capability()));
-        assertEquals(List.of(1, 2, 3, 4, 5, 6), store.claim("binary-room", receiver.capability(), "item-1").stream().map(Byte::intValue).toList());
+        assertEquals(List.of(), store.pendingFor("binary-room", sender.capability()));
+        assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(store.receiverChunk("binary-room", receiver.capability(), "item-1", 0)));
+        store.receipt("binary-room", receiver.capability(), "item-1");
         assertEquals(0, store.pendingFor("binary-room", receiver.capability()).size());
     }
 
@@ -41,6 +44,6 @@ class RemoteShareBinaryStoreTest {
         RemoteShareBinaryStore store = new RemoteShareBinaryStore(temporaryDirectory, sessions, 10, 30, 100);
 
         assertThrows(RemoteShareBinaryStore.ItemLimitExceededException.class,
-                () -> store.begin("limit-room", sender.capability(), "too-large", 11, 1, "manifest"));
+                () -> store.begin("limit-room", sender.capability(), "too-large", 39, 1, "manifest"));
     }
 }
