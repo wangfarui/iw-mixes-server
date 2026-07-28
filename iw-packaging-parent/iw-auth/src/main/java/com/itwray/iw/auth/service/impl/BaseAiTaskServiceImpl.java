@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itwray.iw.auth.dao.BaseAiTaskDao;
 import com.itwray.iw.auth.mapper.BaseAiTaskMapper;
 import com.itwray.iw.auth.model.dto.AiTaskAddDto;
+import com.itwray.iw.auth.model.dto.AiTaskActiveUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskPageDto;
 import com.itwray.iw.auth.model.dto.AiTaskTopUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskUpdateDto;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 /**
  * AI任务服务实现类
@@ -53,9 +55,11 @@ public class BaseAiTaskServiceImpl extends WebServiceImpl<BaseAiTaskDao, BaseAiT
     @Override
     @Transactional
     public void update(AiTaskUpdateDto dto) {
-        getBaseDao().queryById(dto.getId());
+        BaseAiTaskEntity originalEntity = getBaseDao().queryById(dto.getId());
         BaseAiTaskEntity entity = BeanUtil.copyProperties(dto, BaseAiTaskEntity.class);
-        entity.setLastActiveAt(LocalDateTime.now());
+        if (!Objects.equals(originalEntity.getTaskStatus(), dto.getTaskStatus())) {
+            entity.setLastActiveAt(LocalDateTime.now());
+        }
         getBaseDao().updateById(entity);
     }
 
@@ -72,6 +76,13 @@ public class BaseAiTaskServiceImpl extends WebServiceImpl<BaseAiTaskDao, BaseAiT
         getBaseDao().queryById(dto.getId());
         LocalDateTime topTime = BoolEnum.TRUE.getCode().equals(dto.getIsTop()) ? LocalDateTime.now() : null;
         getBaseDao().updateTop(dto.getId(), dto.getIsTop(), topTime);
+    }
+
+    @Override
+    @Transactional
+    public void updateActive(AiTaskActiveUpdateDto dto) {
+        getBaseDao().queryById(dto.getId());
+        getBaseDao().updateActive(dto.getId(), LocalDateTime.now());
     }
 
     @Override

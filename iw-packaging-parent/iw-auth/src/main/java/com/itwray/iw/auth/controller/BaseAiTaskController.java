@@ -1,6 +1,7 @@
 package com.itwray.iw.auth.controller;
 
 import com.itwray.iw.auth.model.dto.AiTaskAddDto;
+import com.itwray.iw.auth.model.dto.AiTaskActiveUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskPageDto;
 import com.itwray.iw.auth.model.dto.AiTaskTopUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskUpdateDto;
@@ -47,5 +48,11 @@ public class BaseAiTaskController extends WebController<BaseAiTaskService, AiTas
     @Operation(summary = "更新AI任务置顶状态")
     public void updateTop(@RequestBody @Valid AiTaskTopUpdateDto dto) {
         getWebService().updateTop(dto);
+    }
+
+    @PutMapping("/active")
+    @Operation(summary = "更新AI任务活跃时间")
+    public void updateActive(@RequestBody @Valid AiTaskActiveUpdateDto dto) {
+        getWebService().updateActive(dto);
     }
 }

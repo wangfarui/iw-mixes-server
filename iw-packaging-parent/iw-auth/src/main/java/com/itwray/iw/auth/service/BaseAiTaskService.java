@@ -1,6 +1,7 @@
 package com.itwray.iw.auth.service;
 
 import com.itwray.iw.auth.model.dto.AiTaskAddDto;
+import com.itwray.iw.auth.model.dto.AiTaskActiveUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskPageDto;
 import com.itwray.iw.auth.model.dto.AiTaskTopUpdateDto;
 import com.itwray.iw.auth.model.dto.AiTaskUpdateDto;
@@ -20,4 +21,6 @@ public interface BaseAiTaskService extends WebService<AiTaskAddDto, AiTaskUpdate
     PageVo<AiTaskPageVo> page(AiTaskPageDto dto);
 
     void updateTop(AiTaskTopUpdateDto dto);
+
+    void updateActive(AiTaskActiveUpdateDto dto);
 }

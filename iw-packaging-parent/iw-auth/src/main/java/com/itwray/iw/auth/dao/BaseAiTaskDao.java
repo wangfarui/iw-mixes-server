@@ -24,4 +24,12 @@ public class BaseAiTaskDao extends BaseDao<BaseAiTaskMapper, BaseAiTaskEntity> {
                 .set(BaseAiTaskEntity::getUpdateTime, LocalDateTime.now())
                 .update();
     }
+
+    public void updateActive(Integer id, LocalDateTime activeTime) {
+        lambdaUpdate()
+                .eq(BaseAiTaskEntity::getId, id)
+                .set(BaseAiTaskEntity::getLastActiveAt, activeTime)
+                .set(BaseAiTaskEntity::getUpdateTime, activeTime)
+                .update();
+    }
 }
