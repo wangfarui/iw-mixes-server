@@ -59,6 +59,17 @@ class ToolUsageServiceImplTest {
         verify(mapper).incrementUsage(java.time.LocalDate.of(2026, 7, 27), "formatter");
     }
 
+    @Test
+    void recordAcceptsRemoteShareToolKey() {
+        ExternalToolUsageDailyMapper mapper = mock(ExternalToolUsageDailyMapper.class);
+        Clock clock = Clock.fixed(Instant.parse("2026-07-26T16:30:00Z"), ZoneId.of("Asia/Shanghai"));
+        ToolUsageServiceImpl service = new ToolUsageServiceImpl(mapper, clock);
+
+        service.record("remote-share");
+
+        verify(mapper).incrementUsage(java.time.LocalDate.of(2026, 7, 27), "remote-share");
+    }
+
     private ExternalToolUsageDailyMapper.ToolUsageStatisticsRow row(String toolKey,
                                                                      Long totalUsageCount,
                                                                      Long periodUsageCount,

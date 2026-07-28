@@ -27,7 +27,8 @@ public enum ToolUsageToolKeyEnum {
     COLOR_PICKER("color-picker"),
     TEXT_PLAYGROUND("text-playground"),
     IP_LOOKUP("ip-lookup"),
-    NETWORK_DIAGNOSTICS("network-diagnostics");
+    NETWORK_DIAGNOSTICS("network-diagnostics"),
+    REMOTE_SHARE("remote-share");
 
     private final String toolKey;
 

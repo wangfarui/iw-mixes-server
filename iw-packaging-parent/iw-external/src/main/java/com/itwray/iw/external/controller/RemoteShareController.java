@@ -8,6 +8,7 @@ import com.itwray.iw.web.annotation.SkipWrapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,13 +51,19 @@ public class RemoteShareController {
 
     @PostMapping("/sessions")
     public ResponseEntity<GeneralResponse<RemoteShareSessionService.JoinedDevice>> create(@RequestBody @Valid CreateSessionRequest request) {
-        return respond(() -> sessions.create(request.roomId(), request.accessToken()));
+        return respond(() -> sessions.create(request.roomId(), request.accessToken(), request.sessionSecret()));
     }
 
     @PostMapping("/sessions/{roomId}/join")
     public ResponseEntity<GeneralResponse<RemoteShareSessionService.JoinedDevice>> join(@PathVariable String roomId,
                                                                                           @RequestBody @Valid JoinSessionRequest request) {
-        return respond(() -> sessions.join(roomId, request.accessToken()));
+        return respond(() -> concealFullSession(() -> sessions.join(roomId, request.accessToken())));
+    }
+
+    @PostMapping("/sessions/join-by-code")
+    public ResponseEntity<GeneralResponse<RemoteShareSessionService.CodeJoinedDevice>> joinByCode(
+            @RequestBody @Valid JoinByCodeRequest request) {
+        return respond(() -> concealFullSession(() -> sessions.joinByCode(request.joinCode())));
     }
 
     @GetMapping("/sessions/{roomId}")
@@ -170,6 +177,14 @@ public class RemoteShareController {
         }
     }
 
+    private <T> T concealFullSession(ThrowingSupplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (RemoteShareSessionService.SessionFullException exception) {
+            throw new RemoteShareSessionService.SessionNotFoundException();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private <T> ResponseEntity<GeneralResponse<T>> error(RuntimeException exception) {
         if (exception instanceof RemoteShareSessionService.SessionFullException
@@ -217,8 +232,10 @@ public class RemoteShareController {
     private interface ThrowingRunnable { void run(); }
 
     public record CreateSessionRequest(@NotBlank @Size(max = 128) String roomId,
-                                       @NotBlank @Size(max = 256) String accessToken) { }
+                                       @NotBlank @Size(max = 256) String accessToken,
+                                       @NotBlank @Size(max = 128) String sessionSecret) { }
     public record JoinSessionRequest(@NotBlank @Size(max = 256) String accessToken) { }
+    public record JoinByCodeRequest(@NotBlank @Pattern(regexp = "\\d{4}") String joinCode) { }
     public record CapabilityRequest(@NotBlank @Size(max = 128) String capability) { }
     public record EncryptedTextRequest(@NotBlank @Size(max = 128) String capability,
                                        @NotBlank @Size(max = 350000) String ciphertext) { }

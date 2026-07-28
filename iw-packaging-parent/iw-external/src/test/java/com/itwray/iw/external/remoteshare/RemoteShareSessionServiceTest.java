@@ -54,6 +54,20 @@ class RemoteShareSessionServiceTest {
                 () -> service.join("room-3", "access-token"));
     }
 
+    @Test
+    void joinsByFourDigitCodeAndReturnsTheTemporarySessionSecret() {
+        RemoteShareSessionService service = new RemoteShareSessionService(Clock.systemUTC(), 30 * 60);
+        RemoteShareSessionService.JoinedDevice creator = service.create("room-4", "access-token", "browser-session-secret");
+
+        RemoteShareSessionService.CodeJoinedDevice receiver = service.joinByCode(creator.joinCode());
+
+        assertEquals(RemoteShareSessionService.DeviceSlot.B, receiver.slot());
+        assertEquals("browser-session-secret", receiver.sessionSecret());
+        assertNotEquals(creator.capability(), receiver.capability());
+        assertThrows(RemoteShareSessionService.SessionFullException.class,
+                () -> service.joinByCode(creator.joinCode()));
+    }
+
     private static final class MutableClock extends Clock {
         private Instant instant;
 

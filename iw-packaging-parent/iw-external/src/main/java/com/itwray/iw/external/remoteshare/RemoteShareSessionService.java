@@ -23,6 +23,7 @@ public class RemoteShareSessionService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<String, String> roomByJoinCode = new ConcurrentHashMap<>();
     private final Clock clock;
     private final long ttlSeconds;
 
@@ -36,15 +37,23 @@ public class RemoteShareSessionService {
     }
 
     public synchronized JoinedDevice create(String roomId, String accessToken) {
+        return create(roomId, accessToken, null);
+    }
+
+    public synchronized JoinedDevice create(String roomId, String accessToken, String sessionSecret) {
         validateRoomAndToken(roomId, accessToken);
+        if (sessionSecret != null && sessionSecret.isBlank()) throw new IllegalArgumentException("Invalid remote-share session secret");
         discardIfExpired(roomId);
         if (sessions.containsKey(roomId)) {
             throw new SessionAlreadyExistsException();
         }
         String capability = newCapability();
         Instant expiresAt = clock.instant().plusSeconds(ttlSeconds);
-        sessions.put(roomId, new Session(hash(accessToken), hash(capability), null, expiresAt));
-        return new JoinedDevice(DeviceSlot.A, capability, expiresAt);
+        String joinCode = sessionSecret == null ? null : newJoinCode();
+        Session session = new Session(hash(accessToken), hash(capability), null, expiresAt, joinCode, sessionSecret);
+        sessions.put(roomId, session);
+        if (joinCode != null) roomByJoinCode.put(joinCode, roomId);
+        return new JoinedDevice(DeviceSlot.A, capability, expiresAt, joinCode);
     }
 
     public synchronized JoinedDevice join(String roomId, String accessToken) {
@@ -52,12 +61,17 @@ public class RemoteShareSessionService {
         if (!session.accessTokenHash.equals(hash(accessToken))) {
             throw new ForbiddenException();
         }
-        if (session.secondCapabilityHash != null) {
-            throw new SessionFullException();
-        }
-        String capability = newCapability();
-        session.secondCapabilityHash = hash(capability);
-        return new JoinedDevice(DeviceSlot.B, capability, session.expiresAt);
+        return join(session);
+    }
+
+    public synchronized CodeJoinedDevice joinByCode(String joinCode) {
+        if (joinCode == null || !joinCode.matches("\\d{4}")) throw new SessionNotFoundException();
+        String roomId = roomByJoinCode.get(joinCode);
+        if (roomId == null) throw new SessionNotFoundException();
+        Session session = activeSession(roomId);
+        if (!joinCode.equals(session.joinCode) || session.sessionSecret == null) throw new SessionNotFoundException();
+        JoinedDevice device = join(session);
+        return new CodeJoinedDevice(device.slot(), device.capability(), device.expiresAt(), session.sessionSecret, joinCode);
     }
 
     public synchronized SessionState state(String roomId, String capability) {
@@ -77,13 +91,14 @@ public class RemoteShareSessionService {
     public synchronized void close(String roomId, String capability) {
         Session session = activeSession(roomId);
         slotFor(session, capability);
-        sessions.remove(roomId);
+        removeSession(roomId, session);
     }
 
     @Scheduled(fixedDelay = 60_000)
     public synchronized void cleanupExpired() {
         Instant now = clock.instant();
-        sessions.entrySet().removeIf(entry -> !entry.getValue().expiresAt.isAfter(now));
+        sessions.entrySet().stream().filter(entry -> !entry.getValue().expiresAt.isAfter(now))
+                .toList().forEach(entry -> removeSession(entry.getKey(), entry.getValue()));
     }
 
     private Session activeSession(String roomId) {
@@ -95,7 +110,7 @@ public class RemoteShareSessionService {
             throw new SessionNotFoundException();
         }
         if (!session.expiresAt.isAfter(clock.instant())) {
-            sessions.remove(roomId);
+            removeSession(roomId, session);
             throw new SessionExpiredException();
         }
         return session;
@@ -104,7 +119,7 @@ public class RemoteShareSessionService {
     private void discardIfExpired(String roomId) {
         Session current = sessions.get(roomId);
         if (current != null && !current.expiresAt.isAfter(clock.instant())) {
-            sessions.remove(roomId);
+            removeSession(roomId, current);
         }
     }
 
@@ -131,6 +146,27 @@ public class RemoteShareSessionService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    private JoinedDevice join(Session session) {
+        if (session.secondCapabilityHash != null) throw new SessionFullException();
+        String capability = newCapability();
+        session.secondCapabilityHash = hash(capability);
+        return new JoinedDevice(DeviceSlot.B, capability, session.expiresAt, session.joinCode);
+    }
+
+    private String newJoinCode() {
+        for (int attempts = 0; attempts < 100; attempts++) {
+            String code = String.format("%04d", RANDOM.nextInt(10_000));
+            if (!roomByJoinCode.containsKey(code)) return code;
+        }
+        throw new IllegalStateException("Unable to allocate remote-share join code");
+    }
+
+    private void removeSession(String roomId, Session session) {
+        if (sessions.remove(roomId, session) && session.joinCode != null) {
+            roomByJoinCode.remove(session.joinCode, roomId);
+        }
+    }
+
     private String hash(String value) {
         if (value == null || value.isBlank()) {
             throw new ForbiddenException();
@@ -145,7 +181,10 @@ public class RemoteShareSessionService {
 
     public enum DeviceSlot { A, B }
 
-    public record JoinedDevice(DeviceSlot slot, String capability, Instant expiresAt) { }
+    public record JoinedDevice(DeviceSlot slot, String capability, Instant expiresAt, String joinCode) { }
+
+    public record CodeJoinedDevice(DeviceSlot slot, String capability, Instant expiresAt,
+                                   String sessionSecret, String joinCode) { }
 
     public record SessionState(DeviceSlot slot, boolean paired, Instant expiresAt) { }
 
@@ -154,12 +193,17 @@ public class RemoteShareSessionService {
         private final String firstCapabilityHash;
         private String secondCapabilityHash;
         private final Instant expiresAt;
+        private final String joinCode;
+        private final String sessionSecret;
 
-        private Session(String accessTokenHash, String firstCapabilityHash, String secondCapabilityHash, Instant expiresAt) {
+        private Session(String accessTokenHash, String firstCapabilityHash, String secondCapabilityHash, Instant expiresAt,
+                        String joinCode, String sessionSecret) {
             this.accessTokenHash = accessTokenHash;
             this.firstCapabilityHash = firstCapabilityHash;
             this.secondCapabilityHash = secondCapabilityHash;
             this.expiresAt = expiresAt;
+            this.joinCode = joinCode;
+            this.sessionSecret = sessionSecret;
         }
     }
 
