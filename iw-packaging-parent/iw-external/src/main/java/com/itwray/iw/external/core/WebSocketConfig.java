@@ -1,6 +1,8 @@
 package com.itwray.iw.external.core;
 
 import com.itwray.iw.external.handler.DeepSeekWebSocketHandler;
+import com.itwray.iw.external.handler.RemoteShareWebSocketHandler;
+import com.itwray.iw.external.remoteshare.RemoteShareSessionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +21,12 @@ import java.util.Map;
 @Slf4j
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    private final RemoteShareSessionService remoteShareSessionService;
+
+    public WebSocketConfig(RemoteShareSessionService remoteShareSessionService) {
+        this.remoteShareSessionService = remoteShareSessionService;
+    }
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(deepSeekWebSocketHandler(), "/wb/chat-ws")
@@ -36,10 +44,17 @@ public class WebSocketConfig implements WebSocketConfigurer {
                     }
                 })
                 .setAllowedOrigins("*"); // 允许跨域
+        registry.addHandler(remoteShareWebSocketHandler(remoteShareSessionService), "/wb/remote-share")
+                .setAllowedOriginPatterns("https://*.itwray.com", "http://localhost:*", "http://127.0.0.1:*");
     }
 
     @Bean
     public DeepSeekWebSocketHandler deepSeekWebSocketHandler() {
         return new DeepSeekWebSocketHandler();
+    }
+
+    @Bean
+    public RemoteShareWebSocketHandler remoteShareWebSocketHandler(RemoteShareSessionService sessionService) {
+        return new RemoteShareWebSocketHandler(sessionService);
     }
 }
