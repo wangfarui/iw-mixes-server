@@ -3,6 +3,7 @@ package com.itwray.iw.external.remoteshare;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.PostConstruct;
 
 import java.io.IOException;
@@ -32,6 +33,7 @@ public class RemoteShareBinaryStore {
     private final Map<String, Item> items = new ConcurrentHashMap<>();
     private final AtomicLong reservedBytes = new AtomicLong();
 
+    @Autowired
     public RemoteShareBinaryStore(RemoteShareSessionService sessions,
                                   @Value("${iw.external.remote-share.storage-directory:data/remote-share}") String storageDirectory) {
         this(Path.of(storageDirectory), sessions,
