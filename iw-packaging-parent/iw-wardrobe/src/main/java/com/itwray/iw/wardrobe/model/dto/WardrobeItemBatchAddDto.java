@@ -17,6 +17,9 @@ import java.util.List;
 @Schema(name = "衣物批量新增DTO")
 public class WardrobeItemBatchAddDto {
 
+    @Schema(title = "批量衣物的所属人用户ID，未传时默认为当前用户")
+    private Integer ownerUserId;
+
     @Valid
     @NotEmpty(message = "衣物列表不能为空")
     @Schema(title = "衣物列表")

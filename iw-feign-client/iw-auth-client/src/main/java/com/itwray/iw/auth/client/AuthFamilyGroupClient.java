@@ -2,6 +2,7 @@ package com.itwray.iw.auth.client;
 
 import com.itwray.iw.auth.model.vo.FamilySharedQueryPolicyVo;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeAccessPolicyVo;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,4 +32,8 @@ public interface AuthFamilyGroupClient {
     @GetMapping("/sharedQueryPolicy")
     @Operation(summary = "查询用户当前共享查询策略")
     FamilySharedQueryPolicyVo querySharedQueryPolicy(@RequestParam("userId") Integer userId);
+
+    @GetMapping("/wardrobeAccessPolicy")
+    @Operation(summary = "查询用户当前衣物家庭访问策略")
+    FamilyWardrobeAccessPolicyVo queryWardrobeAccessPolicy(@RequestParam("userId") Integer userId);
 }

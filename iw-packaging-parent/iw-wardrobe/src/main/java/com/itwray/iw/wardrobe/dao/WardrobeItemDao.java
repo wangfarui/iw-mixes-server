@@ -13,4 +13,15 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class WardrobeItemDao extends BaseDao<WardrobeItemMapper, WardrobeItemEntity> {
+
+    public WardrobeItemEntity queryByIdInOwnerIds(Integer id, java.util.List<Integer> ownerUserIds) {
+        WardrobeItemEntity item = this.lambdaQuery()
+                .eq(WardrobeItemEntity::getId, id)
+                .in(WardrobeItemEntity::getUserId, ownerUserIds)
+                .one();
+        if (item == null) {
+            throw new com.itwray.iw.web.exception.BusinessException("衣物不存在或无权查看");
+        }
+        return item;
+    }
 }

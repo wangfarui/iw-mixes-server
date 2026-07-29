@@ -65,4 +65,10 @@ public class WardrobeItemEntity extends UserEntity<Integer> {
     private LocalDate lastWearDate;
 
     private String remark;
+
+    /** 创建衣物资料的用户，和所属人分开保存。 */
+    private Integer createUserId;
+
+    /** 最近维护衣物资料的用户。 */
+    private Integer updateUserId;
 }

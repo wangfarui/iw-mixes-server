@@ -4,6 +4,7 @@ import com.itwray.iw.auth.model.dto.*;
 import com.itwray.iw.auth.model.vo.FamilyGroupDetailVo;
 import com.itwray.iw.auth.model.vo.FamilyInviteVo;
 import com.itwray.iw.auth.model.vo.FamilyMemberVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeAccessPolicyVo;
 import com.itwray.iw.auth.model.vo.FamilySharedQueryPolicyVo;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
 import com.itwray.iw.web.service.WebService;
@@ -145,6 +146,11 @@ public interface AuthFamilyGroupService extends WebService<FamilyGroupAddDto, Fa
      * @return 共享查询策略
      */
     FamilySharedQueryPolicyVo querySharedQueryPolicy(Integer userId);
+
+    /**
+     * 查询衣物所属、可见范围和管理权限所需的家庭上下文。
+     */
+    FamilyWardrobeAccessPolicyVo queryWardrobeAccessPolicy(Integer userId);
 
     /**
      * 账号注销前退出家庭组，并通知业务模块撤回该成员的历史共享数据。

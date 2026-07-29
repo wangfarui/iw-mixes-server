@@ -18,6 +18,12 @@ import java.time.LocalDate;
 @Schema(name = "衣物分页VO")
 public class WardrobeItemPageVo {
 
+    @Schema(title = "所属人用户ID")
+    private Integer ownerUserId;
+
+    @Schema(title = "是否可编辑、删除和优化图片")
+    private Boolean canManage;
+
     private Integer id;
 
     private String itemName;

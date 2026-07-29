@@ -39,4 +39,7 @@ public class WardrobeMarkWornDto {
 
     @Schema(title = "备注")
     private String remark;
+
+    @Schema(title = "确认后仅记录仍可用的衣物")
+    private Boolean allowPartial;
 }

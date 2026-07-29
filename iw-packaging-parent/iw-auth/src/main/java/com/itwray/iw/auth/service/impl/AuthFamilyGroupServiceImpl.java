@@ -20,6 +20,7 @@ import com.itwray.iw.auth.model.vo.FamilyInviteVo;
 import com.itwray.iw.auth.model.vo.FamilyMemberVo;
 import com.itwray.iw.auth.model.vo.FamilySharedQueryPolicyVo;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeAccessPolicyVo;
 import com.itwray.iw.auth.service.AuthFamilyGroupService;
 import com.itwray.iw.auth.utils.FamilyGroupUtils;
 import com.itwray.iw.common.constants.BoolEnum;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -712,6 +714,32 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
                 ? BoolEnum.TRUE.getCode()
                 : BoolEnum.FALSE.getCode());
         this.resolveQueryOnlyMyself(memberEntity);
+        return vo;
+    }
+
+    @Override
+    public FamilyWardrobeAccessPolicyVo queryWardrobeAccessPolicy(Integer userId) {
+        FamilyWardrobeAccessPolicyVo vo = new FamilyWardrobeAccessPolicyVo();
+        Integer currentGroupId = this.queryCurrentGroupId(userId);
+        vo.setCurrentGroupId(currentGroupId);
+        if (currentGroupId == null || currentGroupId <= 0) {
+            vo.setMemberUserIds(List.of(userId));
+            return vo;
+        }
+        AuthFamilyMemberEntity currentMember = queryNormalMember(currentGroupId, userId);
+        if (currentMember == null) {
+            vo.setMemberUserIds(List.of());
+            return vo;
+        }
+        vo.setCurrentUserRole(currentMember.getRole().getCode());
+        vo.setMemberUserIds(familyMemberDao.lambdaQuery()
+                .eq(AuthFamilyMemberEntity::getGroupId, currentGroupId)
+                .eq(AuthFamilyMemberEntity::getStatus, FamilyMemberStatusEnum.NORMAL)
+                .list()
+                .stream()
+                .map(AuthFamilyMemberEntity::getUserId)
+                .filter(Objects::nonNull)
+                .toList());
         return vo;
     }
 

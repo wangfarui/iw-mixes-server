@@ -2,6 +2,7 @@ package com.itwray.iw.auth.controller;
 
 import com.itwray.iw.auth.model.vo.FamilySharedQueryPolicyVo;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeAccessPolicyVo;
 import com.itwray.iw.auth.service.AuthFamilyGroupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -53,5 +54,11 @@ public class InternalFamilyGroupController {
     @Operation(summary = "查询用户当前共享查询策略")
     public FamilySharedQueryPolicyVo sharedQueryPolicy(@RequestParam("userId") Integer userId) {
         return authFamilyGroupService.querySharedQueryPolicy(userId);
+    }
+
+    @GetMapping("/wardrobeAccessPolicy")
+    @Operation(summary = "查询用户当前衣物家庭访问策略")
+    public FamilyWardrobeAccessPolicyVo wardrobeAccessPolicy(@RequestParam("userId") Integer userId) {
+        return authFamilyGroupService.queryWardrobeAccessPolicy(userId);
     }
 }

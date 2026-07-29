@@ -21,6 +21,9 @@ import java.time.LocalDate;
 @Schema(name = "衣物新增DTO")
 public class WardrobeItemAddDto implements AddDto {
 
+    @Schema(title = "所属人用户ID，未传时默认为当前用户")
+    private Integer ownerUserId;
+
     @NotBlank(message = "衣物名称不能为空")
     @Size(max = 64, message = "衣物名称不能超过64个字符")
     @Schema(title = "衣物名称")

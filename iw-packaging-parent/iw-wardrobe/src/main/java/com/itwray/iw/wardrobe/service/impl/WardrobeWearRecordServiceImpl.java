@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -71,9 +72,13 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     @Override
     @Transactional
     public Integer add(WardrobeWearRecordAddDto dto) {
+        return this.add(dto, Boolean.FALSE);
+    }
+
+    private Integer add(WardrobeWearRecordAddDto dto, Boolean allowPartial) {
         LocalDate wearDate = Objects.requireNonNullElse(dto.getWearDate(), LocalDate.now());
         Integer recordType = Objects.requireNonNullElse(dto.getRecordType(), RECORD_TYPE_WORN);
-        List<WardrobeOutfitItemVo> itemList = this.resolveRecordItems(dto.getOutfitId(), dto.getItemIds());
+        List<WardrobeOutfitItemVo> itemList = this.resolveRecordItems(dto.getOutfitId(), dto.getItemIds(), allowPartial);
         if (itemList.isEmpty()) {
             throw new BusinessException("请至少选择一件衣物");
         }
@@ -99,7 +104,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     @Transactional
     public void update(WardrobeWearRecordUpdateDto dto) {
         wearRecordDao.queryById(dto.getId());
-        List<WardrobeOutfitItemVo> itemList = this.resolveRecordItems(dto.getOutfitId(), dto.getItemIds());
+        List<WardrobeOutfitItemVo> itemList = this.resolveRecordItems(dto.getOutfitId(), dto.getItemIds(), Boolean.FALSE);
         if (itemList.isEmpty()) {
             throw new BusinessException("请至少选择一件衣物");
         }
@@ -202,7 +207,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         addDto.setMoodText(dto.getMoodText());
         addDto.setRemark(dto.getRemark());
         addDto.setRecordType(RECORD_TYPE_WORN);
-        return this.add(addDto);
+        return this.add(addDto, dto.getAllowPartial());
     }
 
     @Override
@@ -218,16 +223,39 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         this.increaseWearCount(entity.getOutfitId(), itemList, entity.getWearDate());
     }
 
-    private List<WardrobeOutfitItemVo> resolveRecordItems(Integer outfitId, List<Integer> itemIds) {
+    private List<WardrobeOutfitItemVo> resolveRecordItems(Integer outfitId, List<Integer> itemIds, Boolean allowPartial) {
         if (outfitId != null && outfitId > 0) {
             wardrobeOutfitDao.queryById(outfitId);
-            return outfitItemDao.lambdaQuery()
+            List<WardrobeOutfitItemVo> snapshotItems = outfitItemDao.lambdaQuery()
                     .eq(WardrobeOutfitItemEntity::getOutfitId, outfitId)
                     .orderByAsc(WardrobeOutfitItemEntity::getSort)
                     .list()
                     .stream()
                     .map(this::toOutfitItemVo)
                     .toList();
+            Set<Integer> availableItemIds = wardrobeItemService.queryActiveItemsByIds(snapshotItems.stream()
+                            .map(WardrobeOutfitItemVo::getItemId)
+                            .filter(Objects::nonNull)
+                            .toList())
+                    .stream()
+                    .map(WardrobeItemEntity::getId)
+                    .collect(Collectors.toSet());
+            List<WardrobeOutfitItemVo> unavailableItems = snapshotItems.stream()
+                    .filter(item -> !availableItemIds.contains(item.getItemId()))
+                    .toList();
+            if (!unavailableItems.isEmpty() && !Boolean.TRUE.equals(allowPartial)) {
+                throw new BusinessException("搭配中衣物已被删除或转交：" + unavailableItems.stream()
+                        .map(WardrobeOutfitItemVo::getItemName)
+                        .filter(StringUtils::isNotBlank)
+                        .collect(Collectors.joining("、")) + "。确认后可仅记录仍可用的衣物");
+            }
+            List<WardrobeOutfitItemVo> availableItems = snapshotItems.stream()
+                    .filter(item -> availableItemIds.contains(item.getItemId()))
+                    .toList();
+            if (availableItems.isEmpty()) {
+                throw new BusinessException("搭配中的衣物均已被删除或转交，不能记录穿着");
+            }
+            return availableItems;
         }
         List<WardrobeItemEntity> itemList = wardrobeItemService.queryActiveItemsByIds(itemIds);
         if (itemIds != null && itemList.size() != itemIds.stream().filter(Objects::nonNull).distinct().count()) {

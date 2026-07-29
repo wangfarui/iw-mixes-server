@@ -16,6 +16,12 @@ import lombok.EqualsAndHashCode;
 @Schema(name = "衣物分页DTO")
 public class WardrobeItemPageDto extends PageDto {
 
+    @Schema(title = "仅查询自己的衣物；儿童始终强制仅自己")
+    private Boolean queryOnlyMyself;
+
+    @Schema(title = "所属人用户ID筛选")
+    private Integer ownerUserId;
+
     @Schema(title = "衣物名称")
     private String itemName;
 
