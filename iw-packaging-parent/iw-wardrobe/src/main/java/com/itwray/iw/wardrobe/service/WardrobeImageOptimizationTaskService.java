@@ -13,9 +13,13 @@ public interface WardrobeImageOptimizationTaskService {
 
     WardrobeItemImageOptimizeTaskVo getCurrent(Integer itemId);
 
-    void assertSourceImageChangeAllowed(Integer itemId, String nextSourceImageUrl);
+    void assertSourceImageChangeAllowed(Integer itemId, Integer ownerUserId, String nextSourceImageUrl);
 
-    void cancelForItemDeletion(Integer itemId);
+    void assertOwnerChangeAllowed(Integer itemId, Integer ownerUserId);
 
-    void markResultDeleted(Integer itemId, String resultImageUrl);
+    void transferOwnership(Integer itemId, Integer previousOwnerUserId, Integer nextOwnerUserId);
+
+    void cancelForItemDeletion(Integer itemId, Integer ownerUserId);
+
+    void markResultDeleted(Integer itemId, Integer ownerUserId, String resultImageUrl);
 }

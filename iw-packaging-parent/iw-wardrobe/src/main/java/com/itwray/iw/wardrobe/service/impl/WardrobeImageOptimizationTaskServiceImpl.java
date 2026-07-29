@@ -11,6 +11,7 @@ import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
 import com.itwray.iw.wardrobe.model.enums.WardrobeImageOptimizationTaskStatus;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemImageOptimizeTaskVo;
 import com.itwray.iw.wardrobe.service.WardrobeImageOptimizationTaskService;
+import com.itwray.iw.wardrobe.service.WardrobeItemAccessService;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.utils.UserUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -19,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 
 @Service
 public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOptimizationTaskService {
@@ -27,15 +30,18 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
     private final WardrobeImageOptimizationTaskDao taskDao;
     private final WardrobeImageOptimizationAttemptDao attemptDao;
     private final WardrobeImageOptimizationPromptFactory promptFactory;
+    private final WardrobeItemAccessService accessService;
 
     public WardrobeImageOptimizationTaskServiceImpl(WardrobeItemDao itemDao,
                                                      WardrobeImageOptimizationTaskDao taskDao,
                                                      WardrobeImageOptimizationAttemptDao attemptDao,
-                                                     WardrobeImageOptimizationPromptFactory promptFactory) {
+                                                     WardrobeImageOptimizationPromptFactory promptFactory,
+                                                     WardrobeItemAccessService accessService) {
         this.itemDao = itemDao;
         this.taskDao = taskDao;
         this.attemptDao = attemptDao;
         this.promptFactory = promptFactory;
+        this.accessService = accessService;
     }
 
     @Override
@@ -44,14 +50,13 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         if (dto == null || dto.getItemId() == null) {
             throw new BusinessException("衣物ID不能为空");
         }
-        WardrobeItemEntity item = itemDao.queryById(dto.getItemId());
-        if (item == null) {
-            throw new BusinessException("衣物不存在或已删除");
-        }
+        WardrobeItemEntity item = itemDao.queryByIdInOwnerIds(dto.getItemId(), accessService.resolveFamilyOwnerIds());
+        accessService.requireManage(item);
         if (StringUtils.isBlank(item.getItemImage())) {
             throw new BusinessException("请先上传衣物图片");
         }
-        Integer userId = UserUtils.getUserId();
+        Integer userId = item.getUserId();
+        Integer operatorUserId = UserUtils.getUserId();
         WardrobeImageOptimizationPromptFactory.Input input = promptFactory.create(item, dto.getPrompt());
         WardrobeImageOptimizationTaskEntity active = taskDao.findActiveByItem(item.getId(), userId);
         if (active != null) {
@@ -75,6 +80,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         task.setTaskId(IdUtil.fastSimpleUUID());
         task.setUserId(userId);
         task.setItemId(item.getId());
+        task.setRequesterUserId(operatorUserId);
         task.setFingerprint(input.fingerprint());
         task.setSourceImageUrl(input.sourceImageUrl());
         task.setUserPrompt(input.userPrompt());
@@ -102,6 +108,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         WardrobeImageOptimizationAttemptEntity attempt = new WardrobeImageOptimizationAttemptEntity();
         attempt.setTaskId(task.getTaskId());
         attempt.setUserId(userId);
+        attempt.setOperatorUserId(operatorUserId);
         attempt.setAttemptNo(1);
         attempt.setStatus(WardrobeImageOptimizationTaskStatus.QUEUED.getCode());
         attemptDao.save(attempt);
@@ -115,10 +122,8 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         if (!WardrobeImageOptimizationTaskStatus.FAILED.getCode().equals(task.getStatus())) {
             throw new BusinessException("只有失败的图片优化任务可以重试");
         }
-        WardrobeItemEntity item = itemDao.queryById(task.getItemId());
-        if (item == null) {
-            throw new BusinessException("衣物不存在或已删除");
-        }
+        WardrobeItemEntity item = itemDao.queryByIdInOwnerIds(task.getItemId(), accessService.resolveFamilyOwnerIds());
+        accessService.requireManage(item);
         if (!StringUtils.equals(StringUtils.trimToEmpty(item.getItemImage()), task.getSourceImageUrl())) {
             throw new BusinessException("衣物源图已变化，不能重试原任务");
         }
@@ -137,16 +142,18 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
 
     @Override
     public WardrobeItemImageOptimizeTaskVo getCurrent(Integer itemId) {
-        if (itemId == null || itemDao.queryById(itemId) == null) {
+        if (itemId == null) {
             throw new BusinessException("衣物不存在或已删除");
         }
-        WardrobeImageOptimizationTaskEntity task = taskDao.findLatestByItem(itemId, UserUtils.getUserId());
+        WardrobeItemEntity item = itemDao.queryByIdInOwnerIds(itemId, accessService.resolveFamilyOwnerIds());
+        accessService.requireManage(item);
+        WardrobeImageOptimizationTaskEntity task = taskDao.findLatestByItem(itemId, item.getUserId());
         return task == null ? null : this.toVo(task, this.currentAttempt(task));
     }
 
     @Override
-    public void assertSourceImageChangeAllowed(Integer itemId, String nextSourceImageUrl) {
-        WardrobeImageOptimizationTaskEntity active = taskDao.findActiveByItem(itemId, UserUtils.getUserId());
+    public void assertSourceImageChangeAllowed(Integer itemId, Integer ownerUserId, String nextSourceImageUrl) {
+        WardrobeImageOptimizationTaskEntity active = taskDao.findActiveByItem(itemId, ownerUserId);
         if (active != null && !StringUtils.equals(active.getSourceImageUrl(),
                 StringUtils.trimToEmpty(nextSourceImageUrl))) {
             throw new BusinessException("图片优化处理中，暂不能修改衣物源图");
@@ -154,13 +161,47 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
     }
 
     @Override
+    public void assertOwnerChangeAllowed(Integer itemId, Integer ownerUserId) {
+        if (taskDao.findActiveByItem(itemId, ownerUserId) != null) {
+            throw new BusinessException("图片优化处理中，暂不能变更所属人");
+        }
+    }
+
+    @Override
     @Transactional
-    public void cancelForItemDeletion(Integer itemId) {
-        WardrobeImageOptimizationTaskEntity active = taskDao.findActiveByItem(itemId, UserUtils.getUserId());
+    public void transferOwnership(Integer itemId, Integer previousOwnerUserId, Integer nextOwnerUserId) {
+        if (Objects.equals(previousOwnerUserId, nextOwnerUserId)) {
+            return;
+        }
+        List<String> taskIds = taskDao.lambdaQuery()
+                .eq(WardrobeImageOptimizationTaskEntity::getItemId, itemId)
+                .eq(WardrobeImageOptimizationTaskEntity::getUserId, previousOwnerUserId)
+                .list()
+                .stream()
+                .map(WardrobeImageOptimizationTaskEntity::getTaskId)
+                .toList();
+        taskDao.lambdaUpdate()
+                .eq(WardrobeImageOptimizationTaskEntity::getItemId, itemId)
+                .eq(WardrobeImageOptimizationTaskEntity::getUserId, previousOwnerUserId)
+                .set(WardrobeImageOptimizationTaskEntity::getUserId, nextOwnerUserId)
+                .update();
+        if (!taskIds.isEmpty()) {
+            attemptDao.lambdaUpdate()
+                    .in(WardrobeImageOptimizationAttemptEntity::getTaskId, taskIds)
+                    .eq(WardrobeImageOptimizationAttemptEntity::getUserId, previousOwnerUserId)
+                    .set(WardrobeImageOptimizationAttemptEntity::getUserId, nextOwnerUserId)
+                    .update();
+        }
+    }
+
+    @Override
+    @Transactional
+    public void cancelForItemDeletion(Integer itemId, Integer ownerUserId) {
+        WardrobeImageOptimizationTaskEntity active = taskDao.findActiveByItem(itemId, ownerUserId);
         if (active == null) {
             return;
         }
-        active = taskDao.findByTaskIdForUpdate(active.getTaskId(), UserUtils.getUserId());
+        active = taskDao.findByTaskIdForUpdate(active.getTaskId(), ownerUserId);
         if (active == null || !WardrobeImageOptimizationTaskStatus.QUEUED.getCode().equals(active.getStatus())
                 && !WardrobeImageOptimizationTaskStatus.RUNNING.getCode().equals(active.getStatus())) {
             return;
@@ -170,7 +211,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         active.setErrorCode("");
         active.setErrorMessage("衣物已删除");
         active.setCompleteTime(now);
-        taskDao.updateById(active);
+        taskDao.updateByTaskIdAndOwner(active, ownerUserId);
         WardrobeImageOptimizationAttemptEntity attempt = this.currentAttempt(active);
         if (attempt != null) {
             attempt.setStatus(WardrobeImageOptimizationTaskStatus.CANCELLED.getCode());
@@ -178,20 +219,20 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
             attempt.setErrorMessage("衣物已删除");
             attempt.setCompleteTime(now);
             attempt.setClaimToken("");
-            attemptDao.updateById(attempt);
+            attemptDao.updateByTaskAndOwner(attempt, ownerUserId);
         }
     }
 
     @Override
     @Transactional
-    public void markResultDeleted(Integer itemId, String resultImageUrl) {
+    public void markResultDeleted(Integer itemId, Integer ownerUserId, String resultImageUrl) {
         WardrobeImageOptimizationTaskEntity task = taskDao.findSucceededByResult(
-                itemId, UserUtils.getUserId(), resultImageUrl);
+                itemId, ownerUserId, resultImageUrl);
         if (task == null) {
             return;
         }
         task.setResultDeletedTime(LocalDateTime.now());
-        taskDao.updateById(task);
+        taskDao.updateByTaskIdAndOwner(task, ownerUserId);
     }
 
     private WardrobeItemImageOptimizeTaskVo enqueueNextAttempt(WardrobeImageOptimizationTaskEntity task) {
@@ -203,11 +244,12 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         task.setResultImageUrl("");
         task.setResultDeletedTime(null);
         task.setCompleteTime(null);
-        taskDao.updateById(task);
+        taskDao.updateByTaskIdAndOwner(task, task.getUserId());
 
         WardrobeImageOptimizationAttemptEntity attempt = new WardrobeImageOptimizationAttemptEntity();
         attempt.setTaskId(task.getTaskId());
         attempt.setUserId(task.getUserId());
+        attempt.setOperatorUserId(UserUtils.getUserId());
         attempt.setAttemptNo(attemptNo);
         attempt.setStatus(WardrobeImageOptimizationTaskStatus.QUEUED.getCode());
         attempt.setErrorCode("");
@@ -220,15 +262,18 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         if (StringUtils.isBlank(taskId)) {
             throw new BusinessException("任务ID不能为空");
         }
-        WardrobeImageOptimizationTaskEntity task = taskDao.findByTaskId(taskId, UserUtils.getUserId());
+        WardrobeImageOptimizationTaskEntity task = taskDao.findByTaskIdInOwners(
+                taskId, accessService.resolveFamilyOwnerIds());
         if (task == null) {
             throw new BusinessException("图片优化任务不存在");
         }
+        WardrobeItemEntity item = itemDao.queryByIdInOwnerIds(task.getItemId(), accessService.resolveFamilyOwnerIds());
+        accessService.requireManage(item);
         return task;
     }
 
     private WardrobeImageOptimizationAttemptEntity currentAttempt(WardrobeImageOptimizationTaskEntity task) {
-        return attemptDao.findByTaskAndAttempt(task.getTaskId(), task.getCurrentAttemptNo());
+        return attemptDao.findByTaskAndAttempt(task.getTaskId(), task.getCurrentAttemptNo(), task.getUserId());
     }
 
     private BusinessException activeTaskConflict(WardrobeImageOptimizationTaskEntity active) {
@@ -242,6 +287,7 @@ public class WardrobeImageOptimizationTaskServiceImpl implements WardrobeImageOp
         vo.setTaskId(task.getTaskId());
         vo.setItemId(task.getItemId());
         vo.setUserId(task.getUserId());
+        vo.setRequesterUserId(task.getRequesterUserId());
         vo.setStatus(task.getStatus());
         vo.setItemImage(task.getResultDeletedTime() == null
                 ? StringUtils.defaultString(task.getResultImageUrl()) : "");

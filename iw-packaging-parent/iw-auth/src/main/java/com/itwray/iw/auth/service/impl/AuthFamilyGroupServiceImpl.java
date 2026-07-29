@@ -21,6 +21,7 @@ import com.itwray.iw.auth.model.vo.FamilyMemberVo;
 import com.itwray.iw.auth.model.vo.FamilySharedQueryPolicyVo;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
 import com.itwray.iw.auth.model.vo.FamilyWardrobeAccessPolicyVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeMemberVo;
 import com.itwray.iw.auth.service.AuthFamilyGroupService;
 import com.itwray.iw.auth.utils.FamilyGroupUtils;
 import com.itwray.iw.common.constants.BoolEnum;
@@ -31,6 +32,7 @@ import com.itwray.iw.web.model.enums.mq.FamilyGroupTopicEnum;
 import com.itwray.iw.web.service.impl.WebServiceImpl;
 import com.itwray.iw.web.utils.UserUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -724,22 +726,50 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
         vo.setCurrentGroupId(currentGroupId);
         if (currentGroupId == null || currentGroupId <= 0) {
             vo.setMemberUserIds(List.of(userId));
+            AuthUserEntity user = authUserDao.getById(userId);
+            FamilyWardrobeMemberVo member = new FamilyWardrobeMemberVo();
+            member.setUserId(userId);
+            if (user != null) {
+                member.setName(StringUtils.defaultIfBlank(user.getName(), user.getUsername()));
+                member.setAvatar(user.getAvatar());
+            }
+            vo.setMembers(List.of(member));
             return vo;
         }
         AuthFamilyMemberEntity currentMember = queryNormalMember(currentGroupId, userId);
         if (currentMember == null) {
-            vo.setMemberUserIds(List.of());
+            vo.setMemberUserIds(List.of(userId));
+            vo.setMembers(List.of());
             return vo;
         }
-        vo.setCurrentUserRole(currentMember.getRole().getCode());
-        vo.setMemberUserIds(familyMemberDao.lambdaQuery()
+        vo.setChild(FamilyMemberRoleEnum.CHILD.equals(currentMember.getRole()));
+        vo.setCanManageFamilyWardrobe(FamilyMemberRoleEnum.OWNER.equals(currentMember.getRole())
+                || FamilyMemberRoleEnum.PARENT.equals(currentMember.getRole()));
+        vo.setQueryOnlyMyself(BoolEnum.TRUE.getCode().equals(this.resolveQueryOnlyMyself(currentMember)));
+        List<Integer> memberUserIds = familyMemberDao.lambdaQuery()
                 .eq(AuthFamilyMemberEntity::getGroupId, currentGroupId)
                 .eq(AuthFamilyMemberEntity::getStatus, FamilyMemberStatusEnum.NORMAL)
                 .list()
                 .stream()
                 .map(AuthFamilyMemberEntity::getUserId)
                 .filter(Objects::nonNull)
-                .toList());
+                .toList();
+        vo.setMemberUserIds(memberUserIds);
+        Map<Integer, AuthUserEntity> userMap = authUserDao.lambdaQuery()
+                .in(AuthUserEntity::getId, memberUserIds)
+                .list()
+                .stream()
+                .collect(Collectors.toMap(AuthUserEntity::getId, user -> user));
+        vo.setMembers(memberUserIds.stream().map(memberUserId -> {
+            AuthUserEntity user = userMap.get(memberUserId);
+            FamilyWardrobeMemberVo member = new FamilyWardrobeMemberVo();
+            member.setUserId(memberUserId);
+            if (user != null) {
+                member.setName(StringUtils.defaultIfBlank(user.getName(), user.getUsername()));
+                member.setAvatar(user.getAvatar());
+            }
+            return member;
+        }).toList());
         return vo;
     }
 

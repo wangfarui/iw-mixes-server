@@ -59,10 +59,37 @@ class WardrobeItemAccessServiceImplTest {
         assertEquals(13, service.resolveOwnerForSave(13));
     }
 
+    @Test
+    void familyContextFailureFallsBackToPersonalWardrobe() {
+        UserUtils.setUserId(12);
+        AuthFamilyGroupClient familyClient = mock(AuthFamilyGroupClient.class);
+        when(familyClient.queryWardrobeAccessPolicy(12)).thenThrow(new IllegalStateException("auth unavailable"));
+        WardrobeItemAccessService service = new WardrobeItemAccessServiceImpl(familyClient);
+
+        assertEquals(List.of(12), service.resolveVisibleOwnerIds(false));
+        assertThrows(BusinessException.class, () -> service.resolveOwnerForSave(13));
+    }
+
+    @Test
+    void savedPersonalQueryPreferenceNarrowsListsWithoutRemovingFamilyAuthority() {
+        UserUtils.setUserId(12);
+        AuthFamilyGroupClient familyClient = mock(AuthFamilyGroupClient.class);
+        FamilyWardrobeAccessPolicyVo policy = policy(2, List.of(12, 13));
+        policy.setQueryOnlyMyself(true);
+        when(familyClient.queryWardrobeAccessPolicy(12)).thenReturn(policy);
+        WardrobeItemAccessService service = new WardrobeItemAccessServiceImpl(familyClient);
+
+        assertEquals(List.of(12), service.resolveVisibleOwnerIds(false));
+        assertEquals(List.of(12, 13), service.resolveFamilyOwnerIds());
+        service.requireView(item(13));
+        service.requireManage(item(13));
+    }
+
     private static FamilyWardrobeAccessPolicyVo policy(Integer role, List<Integer> memberUserIds) {
         FamilyWardrobeAccessPolicyVo policy = new FamilyWardrobeAccessPolicyVo();
         policy.setCurrentGroupId(8);
-        policy.setCurrentUserRole(role);
+        policy.setChild(role != null && role == 4);
+        policy.setCanManageFamilyWardrobe(role != null && (role == 1 || role == 2));
         policy.setMemberUserIds(memberUserIds);
         return policy;
     }

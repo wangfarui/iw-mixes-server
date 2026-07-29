@@ -27,4 +27,7 @@ public class WardrobeOutfitItemVo {
     private Integer itemStyle;
 
     private Integer sort;
+
+    /** available、deleted、transferred。 */
+    private String availability;
 }

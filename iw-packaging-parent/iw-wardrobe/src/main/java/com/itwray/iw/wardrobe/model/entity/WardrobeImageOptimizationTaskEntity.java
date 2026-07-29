@@ -21,6 +21,9 @@ public class WardrobeImageOptimizationTaskEntity extends UserEntity<Integer> {
 
     private Integer itemId;
 
+    /** 实际发起任务的登录用户，不随衣物所属人转移而变化。 */
+    private Integer requesterUserId;
+
     private String fingerprint;
 
     private String sourceImageUrl;

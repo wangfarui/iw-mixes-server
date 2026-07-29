@@ -17,8 +17,10 @@ import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitItemEntity;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitPageVo;
+import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitSuggestionVo;
 import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
+import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
 import com.itwray.iw.web.exception.BusinessException;
@@ -35,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -62,17 +65,20 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     private final WardrobeItemDao wardrobeItemDao;
     private final WardrobeWearRecordService wearRecordService;
     private final WardrobeItemImageService wardrobeItemImageService;
+    private final WardrobeItemService wardrobeItemService;
 
     public WardrobeOutfitServiceImpl(WardrobeOutfitDao wardrobeOutfitDao,
                                      WardrobeOutfitItemDao outfitItemDao,
                                      WardrobeItemDao wardrobeItemDao,
                                      @Lazy WardrobeWearRecordService wearRecordService,
-                                     WardrobeItemImageService wardrobeItemImageService) {
+                                     WardrobeItemImageService wardrobeItemImageService,
+                                     WardrobeItemService wardrobeItemService) {
         this.wardrobeOutfitDao = wardrobeOutfitDao;
         this.outfitItemDao = outfitItemDao;
         this.wardrobeItemDao = wardrobeItemDao;
         this.wearRecordService = wearRecordService;
         this.wardrobeItemImageService = wardrobeItemImageService;
+        this.wardrobeItemService = wardrobeItemService;
     }
 
     @Override
@@ -140,7 +146,9 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     @Override
     public WardrobeOutfitDetailVo detail(Integer id) {
         WardrobeOutfitDetailVo detailVo = BeanUtil.copyProperties(wardrobeOutfitDao.queryById(id), WardrobeOutfitDetailVo.class);
-        detailVo.setItemList(this.queryOutfitItemVos(id));
+        List<WardrobeOutfitItemVo> itemList = this.queryOutfitItemVos(id);
+        this.fillItemAvailability(itemList);
+        detailVo.setItemList(itemList);
         return detailVo;
     }
 
@@ -173,7 +181,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     }
 
     @Override
-    public Integer markWorn(WardrobeMarkWornDto dto) {
+    public WardrobeMarkWornVo markWorn(WardrobeMarkWornDto dto) {
         return wearRecordService.markWorn(dto);
     }
 
@@ -263,7 +271,22 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
                 .stream()
                 .collect(Collectors.groupingBy(WardrobeOutfitItemEntity::getOutfitId,
                         Collectors.mapping(this::toOutfitItemVo, Collectors.toList())));
+        List<WardrobeOutfitItemVo> allItems = itemMap.values().stream().flatMap(List::stream).toList();
+        this.fillItemAvailability(allItems);
         outfitList.forEach(outfit -> outfit.setItemList(itemMap.getOrDefault(outfit.getId(), List.of())));
+    }
+
+    private void fillItemAvailability(List<WardrobeOutfitItemVo> itemList) {
+        if (itemList == null || itemList.isEmpty()) {
+            return;
+        }
+        List<Integer> itemIds = itemList.stream().map(WardrobeOutfitItemVo::getItemId)
+                .filter(Objects::nonNull).distinct().toList();
+        Set<Integer> availableItemIds = wardrobeItemService.queryActiveItemsByIds(itemIds).stream()
+                .map(WardrobeItemEntity::getId).collect(Collectors.toSet());
+        Map<Integer, Integer> activeOwnerIds = wardrobeItemService.queryHistoricalActiveOwnerIds(itemIds);
+        itemList.forEach(item -> item.setAvailability(availableItemIds.contains(item.getItemId())
+                ? "available" : activeOwnerIds.containsKey(item.getItemId()) ? "transferred" : "deleted"));
     }
 
     private List<WardrobeOutfitItemVo> queryOutfitItemVos(Integer outfitId) {

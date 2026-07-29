@@ -12,6 +12,7 @@ import com.itwray.iw.wardrobe.model.enums.WardrobeItemStatusEnum;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeTagSummaryVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeMemberVo;
 import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import com.itwray.iw.wardrobe.service.WardrobeImageOptimizationTaskService;
 import com.itwray.iw.wardrobe.service.WardrobeItemAccessService;
@@ -99,35 +100,47 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     @Override
     @Transactional
     public void update(WardrobeItemUpdateDto dto) {
-        WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(dto.getId(), accessService.resolveVisibleOwnerIds(false));
+        WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(dto.getId(), accessService.resolveFamilyOwnerIds());
         accessService.requireManage(current);
+        Integer nextOwnerUserId = accessService.resolveOwnerForSave(dto.getOwnerUserId());
+        if (!Objects.equals(current.getUserId(), nextOwnerUserId)) {
+            optimizationTaskService.assertOwnerChangeAllowed(dto.getId(), current.getUserId());
+        }
         if (!StringUtils.equals(StringUtils.defaultString(current.getItemImage()),
                 StringUtils.defaultString(dto.getItemImage()))) {
-            optimizationTaskService.assertSourceImageChangeAllowed(dto.getId(), dto.getItemImage());
+            optimizationTaskService.assertSourceImageChangeAllowed(dto.getId(), current.getUserId(), dto.getItemImage());
         }
         WardrobeItemEntity entity = BeanUtil.copyProperties(dto, WardrobeItemEntity.class);
-        entity.setUserId(accessService.resolveOwnerForSave(dto.getOwnerUserId()));
+        entity.setUserId(nextOwnerUserId);
         entity.setUpdateUserId(UserUtils.getUserId());
         this.fillItemDefaults(entity);
-        wardrobeItemDao.updateById(entity);
+        if (!wardrobeItemDao.updateByIdAndOwner(entity, current.getUserId())) {
+            throw new BusinessException("衣物所属人已变化，请刷新后重试");
+        }
+        if (!Objects.equals(current.getUserId(), nextOwnerUserId)) {
+            wardrobeItemImageService.transferOwnership(dto.getId(), current.getUserId(), nextOwnerUserId);
+            optimizationTaskService.transferOwnership(dto.getId(), current.getUserId(), nextOwnerUserId);
+        }
     }
 
     @Override
     @Transactional
     public void delete(Integer id) {
-        WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveVisibleOwnerIds(false));
+        WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveFamilyOwnerIds());
         accessService.requireManage(current);
-        optimizationTaskService.cancelForItemDeletion(id);
-        wardrobeItemImageService.deleteOptimizedImage(id);
-        wardrobeItemDao.removeById(id);
+        optimizationTaskService.cancelForItemDeletion(id, current.getUserId());
+        wardrobeItemImageService.deleteOptimizedImage(id, current.getUserId());
+        if (!wardrobeItemDao.removeByIdAndOwner(id, current.getUserId())) {
+            throw new BusinessException("衣物所属人已变化，请刷新后重试");
+        }
     }
 
     @Override
     @Transactional
     public void deleteOptimizedImage(Integer id) {
-        WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveVisibleOwnerIds(false));
+        WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveFamilyOwnerIds());
         accessService.requireManage(current);
-        wardrobeItemImageService.deleteOptimizedImage(id);
+        wardrobeItemImageService.deleteOptimizedImage(id, current.getUserId());
     }
 
     @Override
@@ -185,21 +198,26 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
 
     @Override
     public WardrobeItemDetailVo detail(Integer id) {
-        WardrobeItemEntity item = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveVisibleOwnerIds(false));
-        accessService.requireView(item, false);
+        WardrobeItemEntity item = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveFamilyOwnerIds());
+        accessService.requireView(item);
         WardrobeItemDetailVo detailVo = BeanUtil.copyProperties(item, WardrobeItemDetailVo.class);
         detailVo.setOwnerUserId(item.getUserId());
-        detailVo.setCanManage(accessService.canManage(item));
         detailVo.setOriginalImage(detailVo.getItemImage());
         this.fillItemImages(List.of(detailVo));
+        this.fillCapabilities(List.of(detailVo));
         return detailVo;
     }
 
     @Override
-    public WardrobeTagSummaryVo tagSummary() {
+    public WardrobeTagSummaryVo tagSummary(Boolean queryOnlyMyself, Integer ownerUserId) {
+        List<Integer> visibleOwnerIds = accessService.resolveVisibleOwnerIds(Boolean.TRUE.equals(queryOnlyMyself));
+        if (ownerUserId != null && !visibleOwnerIds.contains(ownerUserId)) {
+            throw new BusinessException("不能查看该成员的衣物标签");
+        }
         List<WardrobeItemEntity> itemList = wardrobeItemDao.lambdaQuery()
                 .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
-                .in(WardrobeItemEntity::getUserId, accessService.resolveVisibleOwnerIds(false))
+                .in(WardrobeItemEntity::getUserId, visibleOwnerIds)
+                .eq(ownerUserId != null, WardrobeItemEntity::getUserId, ownerUserId)
                 .list();
         WardrobeTagSummaryVo vo = new WardrobeTagSummaryVo();
         vo.setBrands(this.collectValues(itemList, WardrobeItemEntity::getBrand));
@@ -222,6 +240,23 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
                 .list();
         wardrobeItemImageService.applyCoverImages(itemList);
         return itemList;
+    }
+
+    @Override
+    public Map<Integer, Integer> queryHistoricalActiveOwnerIds(List<Integer> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        // 只用于当前用户已有快照中的 ID 判定，不向调用方暴露衣物详情。
+        return wardrobeItemDao.lambdaQuery()
+                .in(WardrobeItemEntity::getId, itemIds)
+                .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
+                .isNotNull(WardrobeItemEntity::getUserId)
+                .select(WardrobeItemEntity::getId, WardrobeItemEntity::getUserId)
+                .list()
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(WardrobeItemEntity::getId,
+                        WardrobeItemEntity::getUserId, (left, right) -> left));
     }
 
     @Override
@@ -273,7 +308,8 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
             return;
         }
         Map<Integer, String> optimizedImageMap = wardrobeItemImageService.getOptimizedImageUrlMap(
-                itemList.stream().map(WardrobeItemPageVo::getId).filter(Objects::nonNull).toList()
+                itemList.stream().map(WardrobeItemPageVo::getId).filter(Objects::nonNull).toList(),
+                itemList.stream().map(WardrobeItemPageVo::getOwnerUserId).filter(Objects::nonNull).distinct().toList()
         );
         itemList.forEach(item -> {
             String optimizedImage = StringUtils.defaultString(optimizedImageMap.get(item.getId()));
@@ -286,11 +322,21 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         if (itemList == null || itemList.isEmpty()) {
             return;
         }
+        Integer currentUserId = UserUtils.getUserId();
+        Map<Integer, FamilyWardrobeMemberVo> memberMap = accessService.resolveVisibleMembers();
+        Set<Integer> manageableOwnerIds = accessService.resolveManageableOwnerIds();
         itemList.forEach(item -> {
-            WardrobeItemEntity entity = new WardrobeItemEntity();
-            entity.setId(item.getId());
-            entity.setUserId(item.getOwnerUserId());
-            item.setCanManage(accessService.canManage(entity));
+            boolean canManage = manageableOwnerIds.contains(item.getOwnerUserId());
+            boolean canMarkWorn = Objects.equals(currentUserId, item.getOwnerUserId());
+            item.setCanEdit(canManage);
+            item.setCanDelete(canManage);
+            item.setCanOptimize(canManage);
+            item.setCanMarkWorn(canMarkWorn);
+            FamilyWardrobeMemberVo member = memberMap.get(item.getOwnerUserId());
+            if (member != null) {
+                item.setOwnerName(member.getName());
+                item.setOwnerAvatar(member.getAvatar());
+            }
         });
     }
 

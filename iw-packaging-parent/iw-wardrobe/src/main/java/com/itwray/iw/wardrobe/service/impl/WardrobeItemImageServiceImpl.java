@@ -6,15 +6,7 @@ import com.itwray.iw.web.model.enums.BusinessFileTypeEnum;
 import com.itwray.iw.web.model.vo.FileRecordVo;
 import com.itwray.iw.web.model.vo.FileVo;
 import com.itwray.iw.web.utils.UserUtils;
-import com.itwray.iw.wardrobe.dao.WardrobeItemDao;
-import com.itwray.iw.wardrobe.dao.WardrobeOutfitDao;
-import com.itwray.iw.wardrobe.dao.WardrobeOutfitItemDao;
-import com.itwray.iw.wardrobe.dao.WardrobeWearRecordItemDao;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
-import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitEntity;
-import com.itwray.iw.wardrobe.model.entity.WardrobeOutfitItemEntity;
-import com.itwray.iw.wardrobe.model.entity.WardrobeWearRecordItemEntity;
-import com.itwray.iw.wardrobe.service.WardrobeImageFileCleanupService;
 import com.itwray.iw.wardrobe.service.WardrobeImageOptimizationTaskService;
 import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import org.apache.commons.lang3.StringUtils;
@@ -35,38 +27,22 @@ import java.util.stream.Collectors;
 public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
 
     private final BaseBusinessFileDao baseBusinessFileDao;
-    private final WardrobeImageFileCleanupService cleanupService;
     private final WardrobeImageOptimizationTaskService optimizationTaskService;
-    private final WardrobeItemDao wardrobeItemDao;
-    private final WardrobeOutfitDao wardrobeOutfitDao;
-    private final WardrobeOutfitItemDao wardrobeOutfitItemDao;
-    private final WardrobeWearRecordItemDao wardrobeWearRecordItemDao;
 
     public WardrobeItemImageServiceImpl(BaseBusinessFileDao baseBusinessFileDao,
-                                        WardrobeImageFileCleanupService cleanupService,
-                                        WardrobeImageOptimizationTaskService optimizationTaskService,
-                                        WardrobeItemDao wardrobeItemDao,
-                                        WardrobeOutfitDao wardrobeOutfitDao,
-                                        WardrobeOutfitItemDao wardrobeOutfitItemDao,
-                                        WardrobeWearRecordItemDao wardrobeWearRecordItemDao) {
+                                        WardrobeImageOptimizationTaskService optimizationTaskService) {
         this.baseBusinessFileDao = baseBusinessFileDao;
-        this.cleanupService = cleanupService;
         this.optimizationTaskService = optimizationTaskService;
-        this.wardrobeItemDao = wardrobeItemDao;
-        this.wardrobeOutfitDao = wardrobeOutfitDao;
-        this.wardrobeOutfitItemDao = wardrobeOutfitItemDao;
-        this.wardrobeWearRecordItemDao = wardrobeWearRecordItemDao;
     }
 
     @Override
-    public Map<Integer, String> getOptimizedImageUrlMap(Collection<Integer> itemIds) {
-        if (itemIds == null || itemIds.isEmpty()) {
+    public Map<Integer, String> getOptimizedImageUrlMap(Collection<Integer> itemIds,
+                                                        Collection<Integer> ownerUserIds) {
+        if (itemIds == null || itemIds.isEmpty() || ownerUserIds == null || ownerUserIds.isEmpty()) {
             return Collections.emptyMap();
         }
         return baseBusinessFileDao.getLatestBusinessFileMap(
-                        itemIds,
-                        BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE
-                )
+                        itemIds, BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE, ownerUserIds)
                 .entrySet()
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getFileUrl()));
@@ -78,8 +54,8 @@ public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
             return;
         }
         Map<Integer, String> optimizedImageMap = this.getOptimizedImageUrlMap(
-                itemList.stream().map(WardrobeItemEntity::getId).filter(Objects::nonNull).toList()
-        );
+                itemList.stream().map(WardrobeItemEntity::getId).filter(Objects::nonNull).toList(),
+                itemList.stream().map(WardrobeItemEntity::getUserId).filter(Objects::nonNull).distinct().toList());
         itemList.forEach(item -> {
             String optimizedImage = optimizedImageMap.get(item.getId());
             if (StringUtils.isNotBlank(optimizedImage)) {
@@ -117,20 +93,29 @@ public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
                 .filter(url -> !StringUtils.equals(url, fileRecord.getFileUrl()))
                 .distinct()
                 .toList();
-        this.replaceImageReferences(itemId, replacedUrls, fileRecord.getFileUrl());
-        Integer userId = UserUtils.getUserId();
-        replacedUrls.forEach(url -> {
-            optimizationTaskService.markResultDeleted(itemId, url);
-            cleanupService.enqueue("", itemId, null, url, "optimized_image_replaced", userId);
-        });
+        Integer ownerUserId = currentFiles.isEmpty() ? null : UserUtils.getUserId();
+        if (ownerUserId != null) {
+            replacedUrls.forEach(url -> optimizationTaskService.markResultDeleted(itemId, ownerUserId, url));
+        }
+    }
+
+    @Override
+    public void transferOwnership(Integer itemId, Integer previousOwnerUserId, Integer nextOwnerUserId) {
+        if (Objects.equals(previousOwnerUserId, nextOwnerUserId)) {
+            return;
+        }
+        baseBusinessFileDao.transferBusinessFileOwner(itemId,
+                BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE,
+                previousOwnerUserId, nextOwnerUserId);
     }
 
     @Override
     @Transactional
-    public void deleteOptimizedImage(Integer itemId) {
+    public void deleteOptimizedImage(Integer itemId, Integer ownerUserId) {
         List<FileVo> currentFiles = baseBusinessFileDao.getBusinessFile(
                 itemId,
-                BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE
+                BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE,
+                ownerUserId
         );
         if (currentFiles.isEmpty()) {
             return;
@@ -140,34 +125,10 @@ public class WardrobeItemImageServiceImpl implements WardrobeItemImageService {
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .toList();
-        String originalImage = wardrobeItemDao.queryById(itemId).getItemImage();
-        baseBusinessFileDao.removeBusinessFile(itemId, BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE);
-        this.replaceImageReferences(itemId, fileUrls, StringUtils.defaultString(originalImage));
-        Integer userId = UserUtils.getUserId();
-        fileUrls.forEach(url -> {
-            optimizationTaskService.markResultDeleted(itemId, url);
-            cleanupService.enqueue("", itemId, null, url, "optimized_image_deleted", userId);
-        });
-    }
-
-    private void replaceImageReferences(Integer itemId, List<String> oldUrls, String replacementUrl) {
-        if (itemId == null || oldUrls == null || oldUrls.isEmpty()) {
-            return;
-        }
-        wardrobeOutfitItemDao.lambdaUpdate()
-                .eq(WardrobeOutfitItemEntity::getItemId, itemId)
-                .in(WardrobeOutfitItemEntity::getItemImage, oldUrls)
-                .set(WardrobeOutfitItemEntity::getItemImage, StringUtils.defaultString(replacementUrl))
-                .update();
-        wardrobeWearRecordItemDao.lambdaUpdate()
-                .eq(WardrobeWearRecordItemEntity::getItemId, itemId)
-                .in(WardrobeWearRecordItemEntity::getItemImage, oldUrls)
-                .set(WardrobeWearRecordItemEntity::getItemImage, StringUtils.defaultString(replacementUrl))
-                .update();
-        wardrobeOutfitDao.lambdaUpdate()
-                .in(WardrobeOutfitEntity::getCoverImage, oldUrls)
-                .set(WardrobeOutfitEntity::getCoverImage, StringUtils.defaultString(replacementUrl))
-                .update();
+        baseBusinessFileDao.removeBusinessFile(itemId, BusinessFileTypeEnum.WARDROBE_ITEM_OPTIMIZED_IMAGE,
+                ownerUserId);
+        // 历史搭配和穿着记录保存图片快照，因此关联移除后保留底层文件，不改写也不清理快照 URL。
+        fileUrls.forEach(url -> optimizationTaskService.markResultDeleted(itemId, ownerUserId, url));
     }
 
 }

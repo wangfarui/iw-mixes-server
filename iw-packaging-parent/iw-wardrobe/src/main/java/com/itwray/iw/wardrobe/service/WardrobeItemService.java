@@ -12,6 +12,7 @@ import com.itwray.iw.web.model.vo.PageVo;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 衣物服务
@@ -35,9 +36,11 @@ public interface WardrobeItemService {
 
     WardrobeItemDetailVo detail(Integer id);
 
-    WardrobeTagSummaryVo tagSummary();
+    WardrobeTagSummaryVo tagSummary(Boolean queryOnlyMyself, Integer ownerUserId);
 
     List<WardrobeItemEntity> queryActiveItemsByIds(List<Integer> itemIds);
+
+    Map<Integer, Integer> queryHistoricalActiveOwnerIds(List<Integer> itemIds);
 
     void increaseWearCount(List<Integer> itemIds, LocalDate wearDate);
 }

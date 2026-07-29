@@ -6,6 +6,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitPageDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitUpdateDto;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitPageVo;
+import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import com.itwray.iw.web.model.vo.PageVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,7 +71,7 @@ public class WardrobeOutfitController {
 
     @PostMapping("/markWorn")
     @Operation(summary = "标记搭配已穿")
-    public Integer markWorn(@RequestBody WardrobeMarkWornDto dto) {
+    public WardrobeMarkWornVo markWorn(@RequestBody WardrobeMarkWornDto dto) {
         return wardrobeOutfitService.markWorn(dto);
     }
 }

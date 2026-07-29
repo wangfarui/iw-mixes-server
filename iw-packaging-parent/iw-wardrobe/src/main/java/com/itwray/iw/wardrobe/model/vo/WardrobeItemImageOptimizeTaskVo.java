@@ -24,6 +24,8 @@ public class WardrobeItemImageOptimizeTaskVo {
     @Schema(title = "用户ID")
     private Integer userId;
 
+    private Integer requesterUserId;
+
     @Schema(title = "任务状态")
     private String status;
 

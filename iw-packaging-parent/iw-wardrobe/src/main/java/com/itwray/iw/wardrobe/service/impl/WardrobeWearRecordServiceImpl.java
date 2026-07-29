@@ -17,6 +17,7 @@ import com.itwray.iw.wardrobe.model.entity.WardrobeWearRecordEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeWearRecordItemEntity;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeWearRecordVo;
+import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
@@ -197,7 +198,16 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     }
 
     @Override
-    public Integer markWorn(WardrobeMarkWornDto dto) {
+    @Transactional
+    public WardrobeMarkWornVo markWorn(WardrobeMarkWornDto dto) {
+        List<WardrobeOutfitItemVo> unavailableItems = dto.getOutfitId() == null || dto.getOutfitId() <= 0
+                ? List.of() : this.queryUnavailableOutfitItems(dto.getOutfitId());
+        WardrobeMarkWornVo result = new WardrobeMarkWornVo();
+        result.setUnavailableItems(unavailableItems);
+        if (!unavailableItems.isEmpty() && !Boolean.TRUE.equals(dto.getAllowPartial())) {
+            result.setConfirmationRequired(true);
+            return result;
+        }
         WardrobeWearRecordAddDto addDto = new WardrobeWearRecordAddDto();
         addDto.setWearDate(Objects.requireNonNullElse(dto.getWearDate(), LocalDate.now()));
         addDto.setOutfitId(dto.getOutfitId());
@@ -207,7 +217,9 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         addDto.setMoodText(dto.getMoodText());
         addDto.setRemark(dto.getRemark());
         addDto.setRecordType(RECORD_TYPE_WORN);
-        return this.add(addDto, dto.getAllowPartial());
+        result.setRecordId(this.add(addDto, dto.getAllowPartial()));
+        result.setConfirmationRequired(false);
+        return result;
     }
 
     @Override
@@ -226,20 +238,11 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     private List<WardrobeOutfitItemVo> resolveRecordItems(Integer outfitId, List<Integer> itemIds, Boolean allowPartial) {
         if (outfitId != null && outfitId > 0) {
             wardrobeOutfitDao.queryById(outfitId);
-            List<WardrobeOutfitItemVo> snapshotItems = outfitItemDao.lambdaQuery()
-                    .eq(WardrobeOutfitItemEntity::getOutfitId, outfitId)
-                    .orderByAsc(WardrobeOutfitItemEntity::getSort)
-                    .list()
+            List<WardrobeOutfitItemVo> snapshotItems = outfitItemDao.queryByOutfitId(outfitId)
                     .stream()
                     .map(this::toOutfitItemVo)
                     .toList();
-            Set<Integer> availableItemIds = wardrobeItemService.queryActiveItemsByIds(snapshotItems.stream()
-                            .map(WardrobeOutfitItemVo::getItemId)
-                            .filter(Objects::nonNull)
-                            .toList())
-                    .stream()
-                    .map(WardrobeItemEntity::getId)
-                    .collect(Collectors.toSet());
+            Set<Integer> availableItemIds = this.availableItemIds(snapshotItems);
             List<WardrobeOutfitItemVo> unavailableItems = snapshotItems.stream()
                     .filter(item -> !availableItemIds.contains(item.getItemId()))
                     .toList();
@@ -262,6 +265,32 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
             throw new BusinessException("存在不可用的衣物，请刷新后重试");
         }
         return itemList.stream().map(this::toOutfitItemVo).toList();
+    }
+
+    private List<WardrobeOutfitItemVo> queryUnavailableOutfitItems(Integer outfitId) {
+        wardrobeOutfitDao.queryById(outfitId);
+        List<WardrobeOutfitItemVo> snapshotItems = outfitItemDao.queryByOutfitId(outfitId)
+                .stream()
+                .map(this::toOutfitItemVo)
+                .toList();
+        Set<Integer> availableItemIds = this.availableItemIds(snapshotItems);
+        Map<Integer, Integer> activeOwnerIds = wardrobeItemService.queryHistoricalActiveOwnerIds(snapshotItems.stream()
+                .map(WardrobeOutfitItemVo::getItemId).filter(Objects::nonNull).toList());
+        return snapshotItems.stream()
+                .filter(item -> !availableItemIds.contains(item.getItemId()))
+                .peek(item -> item.setAvailability(activeOwnerIds.containsKey(item.getItemId())
+                        ? "transferred" : "deleted"))
+                .toList();
+    }
+
+    private Set<Integer> availableItemIds(List<WardrobeOutfitItemVo> snapshotItems) {
+        return wardrobeItemService.queryActiveItemsByIds(snapshotItems.stream()
+                        .map(WardrobeOutfitItemVo::getItemId)
+                        .filter(Objects::nonNull)
+                        .toList())
+                .stream()
+                .map(WardrobeItemEntity::getId)
+                .collect(Collectors.toSet());
     }
 
     private String resolveOutfitName(Integer outfitId) {

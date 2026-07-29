@@ -41,6 +41,21 @@ public class WardrobeImageOptimizationTaskDao extends BaseDao<WardrobeImageOptim
                 .one();
     }
 
+    public WardrobeImageOptimizationTaskEntity findByTaskIdInOwners(String taskId, List<Integer> ownerUserIds) {
+        return this.lambdaQuery()
+                .eq(WardrobeImageOptimizationTaskEntity::getTaskId, taskId)
+                .in(WardrobeImageOptimizationTaskEntity::getUserId, ownerUserIds)
+                .last("limit 1")
+                .one();
+    }
+
+    public boolean updateByTaskIdAndOwner(WardrobeImageOptimizationTaskEntity task, Integer ownerUserId) {
+        return this.lambdaUpdate()
+                .eq(WardrobeImageOptimizationTaskEntity::getTaskId, task.getTaskId())
+                .eq(WardrobeImageOptimizationTaskEntity::getUserId, ownerUserId)
+                .update(task);
+    }
+
     public WardrobeImageOptimizationTaskEntity findByTaskIdForUpdate(String taskId, Integer userId) {
         return this.baseMapper.selectByTaskIdForUpdate(taskId, userId);
     }

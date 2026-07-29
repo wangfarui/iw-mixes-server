@@ -8,6 +8,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeOutfitUpdateDto;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitDetailVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitSuggestionVo;
+import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 import com.itwray.iw.web.model.vo.PageVo;
 
 import java.time.LocalDate;
@@ -35,7 +36,7 @@ public interface WardrobeOutfitService {
 
     List<WardrobeOutfitSuggestionVo> suggest(WardrobeOutfitSuggestDto dto);
 
-    Integer markWorn(WardrobeMarkWornDto dto);
+    WardrobeMarkWornVo markWorn(WardrobeMarkWornDto dto);
 
     void increaseWearCount(Integer outfitId, LocalDate wearDate);
 }

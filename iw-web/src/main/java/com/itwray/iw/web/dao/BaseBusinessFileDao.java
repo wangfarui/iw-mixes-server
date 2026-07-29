@@ -31,10 +31,13 @@ public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBus
      * @param fileList             新保存的文件列表
      */
     public void saveBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum, List<FileDto> fileList) {
-        // 首先删除历史关联信息
-        this.removeBusinessFile(businessId, businessFileTypeEnum);
-        // 新增关联信息
-        this.addBusinessFile(businessId, businessFileTypeEnum, fileList);
+        this.saveBusinessFile(businessId, businessFileTypeEnum, fileList, null);
+    }
+
+    public void saveBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum,
+                                 List<FileDto> fileList, Integer ownerUserId) {
+        this.removeBusinessFile(businessId, businessFileTypeEnum, ownerUserId);
+        this.addBusinessFile(businessId, businessFileTypeEnum, fileList, ownerUserId);
     }
 
     /**
@@ -45,13 +48,18 @@ public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBus
      * @param fileList             新保存的文件列表
      */
     public void addBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum, List<FileDto> fileList) {
+        this.addBusinessFile(businessId, businessFileTypeEnum, fileList, null);
+    }
+
+    private void addBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum,
+                                 List<FileDto> fileList, Integer ownerUserId) {
         if (CollUtil.isEmpty(fileList)) {
             return;
         }
-        // 新增关联信息
         List<BaseBusinessFileEntity> entityList = fileList.stream()
                 .map(t -> {
                     BaseBusinessFileEntity entity = new BaseBusinessFileEntity();
+                    entity.setUserId(ownerUserId);
                     entity.setBusinessId(businessId);
                     entity.setBusinessType(businessFileTypeEnum);
                     entity.setFileName(t.getFileName());
@@ -68,10 +76,26 @@ public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBus
      * @param businessFileTypeEnum 业务文件类型
      */
     public void removeBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum) {
+        this.removeBusinessFile(businessId, businessFileTypeEnum, (Integer) null);
+    }
+
+    public void removeBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum,
+                                   Integer ownerUserId) {
         this.lambdaUpdate()
                 .eq(BaseBusinessFileEntity::getBusinessId, businessId)
                 .eq(BaseBusinessFileEntity::getBusinessType, businessFileTypeEnum)
+                .eq(ownerUserId != null, BaseBusinessFileEntity::getUserId, ownerUserId)
                 .remove();
+    }
+
+    public void transferBusinessFileOwner(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum,
+                                          Integer previousOwnerUserId, Integer nextOwnerUserId) {
+        this.lambdaUpdate()
+                .eq(BaseBusinessFileEntity::getBusinessId, businessId)
+                .eq(BaseBusinessFileEntity::getBusinessType, businessFileTypeEnum)
+                .eq(BaseBusinessFileEntity::getUserId, previousOwnerUserId)
+                .set(BaseBusinessFileEntity::getUserId, nextOwnerUserId)
+                .update();
     }
 
     /**
@@ -97,17 +121,21 @@ public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBus
      * @return 业务文件关联信息
      */
     public List<FileVo> getBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum) {
+        return this.getBusinessFile(businessId, businessFileTypeEnum, null);
+    }
+
+    public List<FileVo> getBusinessFile(Integer businessId, BusinessFileTypeEnum businessFileTypeEnum,
+                                        Integer ownerUserId) {
         List<BaseBusinessFileEntity> entityList = this.lambdaQuery()
                 .eq(BaseBusinessFileEntity::getBusinessType, businessFileTypeEnum)
                 .eq(BaseBusinessFileEntity::getBusinessId, businessId)
+                .eq(ownerUserId != null, BaseBusinessFileEntity::getUserId, ownerUserId)
                 .select(BaseBusinessFileEntity::getFileName, BaseBusinessFileEntity::getFileUrl)
                 .list();
         if (CollUtil.isEmpty(entityList)) {
             return Collections.emptyList();
         }
-        return entityList.stream()
-                .map(t -> new FileVo(t.getFileName(), t.getFileUrl()))
-                .toList();
+        return entityList.stream().map(t -> new FileVo(t.getFileName(), t.getFileUrl())).toList();
     }
 
     /**
@@ -115,12 +143,29 @@ public class BaseBusinessFileDao extends BaseDao<BaseBusinessFileMapper, BaseBus
      */
     public Map<Integer, FileVo> getLatestBusinessFileMap(Collection<Integer> businessIds,
                                                          BusinessFileTypeEnum businessFileTypeEnum) {
+        return this.getLatestBusinessFileMapInternal(businessIds, businessFileTypeEnum, null);
+    }
+
+
+    public Map<Integer, FileVo> getLatestBusinessFileMap(Collection<Integer> businessIds,
+                                                         BusinessFileTypeEnum businessFileTypeEnum,
+                                                         Collection<Integer> ownerUserIds) {
+        if (CollUtil.isEmpty(businessIds) || CollUtil.isEmpty(ownerUserIds)) {
+            return Collections.emptyMap();
+        }
+        return this.getLatestBusinessFileMapInternal(businessIds, businessFileTypeEnum, ownerUserIds);
+    }
+
+    private Map<Integer, FileVo> getLatestBusinessFileMapInternal(Collection<Integer> businessIds,
+                                                                   BusinessFileTypeEnum businessFileTypeEnum,
+                                                                   Collection<Integer> ownerUserIds) {
         if (CollUtil.isEmpty(businessIds)) {
             return Collections.emptyMap();
         }
         List<BaseBusinessFileEntity> entityList = this.lambdaQuery()
                 .eq(BaseBusinessFileEntity::getBusinessType, businessFileTypeEnum)
                 .in(BaseBusinessFileEntity::getBusinessId, businessIds)
+                .in(CollUtil.isNotEmpty(ownerUserIds), BaseBusinessFileEntity::getUserId, ownerUserIds)
                 .orderByDesc(BaseBusinessFileEntity::getId)
                 .select(BaseBusinessFileEntity::getId,
                         BaseBusinessFileEntity::getBusinessId,

@@ -77,7 +77,9 @@ public class WardrobeItemController {
 
     @GetMapping("/tags")
     @Operation(summary = "查询衣柜标签汇总")
-    public WardrobeTagSummaryVo tagSummary() {
-        return wardrobeItemService.tagSummary();
+    public WardrobeTagSummaryVo tagSummary(
+            @RequestParam(value = "queryOnlyMyself", required = false) Boolean queryOnlyMyself,
+            @RequestParam(value = "ownerUserId", required = false) Integer ownerUserId) {
+        return wardrobeItemService.tagSummary(queryOnlyMyself, ownerUserId);
     }
 }

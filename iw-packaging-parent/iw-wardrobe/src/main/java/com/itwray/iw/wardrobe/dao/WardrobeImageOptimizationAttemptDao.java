@@ -11,10 +11,28 @@ import java.util.List;
 @Component
 public class WardrobeImageOptimizationAttemptDao extends BaseDao<WardrobeImageOptimizationAttemptMapper, WardrobeImageOptimizationAttemptEntity> {
 
+    public boolean updateByTaskAndOwner(WardrobeImageOptimizationAttemptEntity attempt, Integer ownerUserId) {
+        return this.lambdaUpdate()
+                .eq(WardrobeImageOptimizationAttemptEntity::getTaskId, attempt.getTaskId())
+                .eq(WardrobeImageOptimizationAttemptEntity::getAttemptNo, attempt.getAttemptNo())
+                .eq(WardrobeImageOptimizationAttemptEntity::getUserId, ownerUserId)
+                .update(attempt);
+    }
+
     public WardrobeImageOptimizationAttemptEntity findByTaskAndAttempt(String taskId, Integer attemptNo) {
         return this.lambdaQuery()
                 .eq(WardrobeImageOptimizationAttemptEntity::getTaskId, taskId)
                 .eq(WardrobeImageOptimizationAttemptEntity::getAttemptNo, attemptNo)
+                .last("limit 1")
+                .one();
+    }
+
+    public WardrobeImageOptimizationAttemptEntity findByTaskAndAttempt(String taskId, Integer attemptNo,
+                                                                        Integer ownerUserId) {
+        return this.lambdaQuery()
+                .eq(WardrobeImageOptimizationAttemptEntity::getTaskId, taskId)
+                .eq(WardrobeImageOptimizationAttemptEntity::getAttemptNo, attemptNo)
+                .eq(WardrobeImageOptimizationAttemptEntity::getUserId, ownerUserId)
                 .last("limit 1")
                 .one();
     }

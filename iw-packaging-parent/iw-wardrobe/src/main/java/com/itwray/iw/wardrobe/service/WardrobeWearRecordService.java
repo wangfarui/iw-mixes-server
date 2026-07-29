@@ -6,6 +6,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeWearRecordCopyDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeWearRecordMonthDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeWearRecordUpdateDto;
 import com.itwray.iw.wardrobe.model.vo.WardrobeWearRecordVo;
+import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 
 import java.util.List;
 
@@ -33,7 +34,7 @@ public interface WardrobeWearRecordService {
 
     List<WardrobeWearRecordVo> recent(int limit);
 
-    Integer markWorn(WardrobeMarkWornDto dto);
+    WardrobeMarkWornVo markWorn(WardrobeMarkWornDto dto);
 
     void markRecordWorn(Integer id);
 }

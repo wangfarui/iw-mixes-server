@@ -24,4 +24,18 @@ public class WardrobeItemDao extends BaseDao<WardrobeItemMapper, WardrobeItemEnt
         }
         return item;
     }
+
+    public boolean updateByIdAndOwner(WardrobeItemEntity entity, Integer expectedOwnerUserId) {
+        return this.lambdaUpdate()
+                .eq(WardrobeItemEntity::getId, entity.getId())
+                .eq(WardrobeItemEntity::getUserId, expectedOwnerUserId)
+                .update(entity);
+    }
+
+    public boolean removeByIdAndOwner(Integer id, Integer expectedOwnerUserId) {
+        return this.lambdaUpdate()
+                .eq(WardrobeItemEntity::getId, id)
+                .eq(WardrobeItemEntity::getUserId, expectedOwnerUserId)
+                .remove();
+    }
 }

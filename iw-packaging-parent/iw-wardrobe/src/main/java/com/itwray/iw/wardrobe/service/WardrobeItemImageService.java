@@ -12,11 +12,13 @@ import java.util.Map;
  */
 public interface WardrobeItemImageService {
 
-    Map<Integer, String> getOptimizedImageUrlMap(Collection<Integer> itemIds);
+    Map<Integer, String> getOptimizedImageUrlMap(Collection<Integer> itemIds, Collection<Integer> ownerUserIds);
 
     void applyCoverImages(List<WardrobeItemEntity> itemList);
 
     void replaceOptimizedImage(Integer itemId, FileRecordVo fileRecord);
 
-    void deleteOptimizedImage(Integer itemId);
+    void transferOwnership(Integer itemId, Integer previousOwnerUserId, Integer nextOwnerUserId);
+
+    void deleteOptimizedImage(Integer itemId, Integer ownerUserId);
 }

@@ -8,17 +8,22 @@ import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeImageOptimizationAttemptEntity;
 import com.itwray.iw.wardrobe.model.entity.WardrobeImageOptimizationTaskEntity;
 import com.itwray.iw.wardrobe.model.vo.WardrobeItemImageOptimizeTaskVo;
+import com.itwray.iw.wardrobe.service.WardrobeItemAccessService;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.utils.UserUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class WardrobeImageOptimizationTaskServiceImplTest {
 
@@ -35,18 +40,15 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         WardrobeImageOptimizationAttemptDao attemptDao = mock(WardrobeImageOptimizationAttemptDao.class);
         WardrobeItemEntity item = new WardrobeItemEntity();
         item.setId(7);
+        item.setUserId(13);
         item.setItemName("黑色衬衫");
         item.setItemImage("https://oss.example.com/wardrobe/source-7.jpg");
         item.setCategory(1);
         item.setItemStyle(102);
-        when(itemDao.queryById(7)).thenReturn(item);
+        when(itemDao.queryByIdInOwnerIds(eq(7), anyList())).thenReturn(item);
 
-        WardrobeImageOptimizationTaskServiceImpl service = new WardrobeImageOptimizationTaskServiceImpl(
-                itemDao,
-                taskDao,
-                attemptDao,
-                new WardrobeImageOptimizationPromptFactory()
-        );
+        WardrobeImageOptimizationTaskServiceImpl service = service(itemDao, taskDao, attemptDao,
+                new WardrobeImageOptimizationPromptFactory());
         WardrobeItemImageOptimizeDto request = new WardrobeItemImageOptimizeDto();
         request.setItemId(7);
         request.setPrompt("保留纽扣细节");
@@ -58,6 +60,16 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         assertEquals("queued", task.getStatus());
         assertEquals(1, task.getAttemptNo());
         assertFalse(task.getRetryable());
+        ArgumentCaptor<WardrobeImageOptimizationTaskEntity> taskCaptor =
+                ArgumentCaptor.forClass(WardrobeImageOptimizationTaskEntity.class);
+        ArgumentCaptor<WardrobeImageOptimizationAttemptEntity> attemptCaptor =
+                ArgumentCaptor.forClass(WardrobeImageOptimizationAttemptEntity.class);
+        verify(taskDao).save(taskCaptor.capture());
+        verify(attemptDao).save(attemptCaptor.capture());
+        assertEquals(13, taskCaptor.getValue().getUserId());
+        assertEquals(12, taskCaptor.getValue().getRequesterUserId());
+        assertEquals(13, attemptCaptor.getValue().getUserId());
+        assertEquals(12, attemptCaptor.getValue().getOperatorUserId());
     }
 
     @Test
@@ -71,9 +83,9 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         String fingerprint = factory.create(item, "保留细节").fingerprint();
         WardrobeImageOptimizationTaskEntity active = task("task-1", 7, "queued", 1);
         active.setFingerprint(fingerprint);
-        when(itemDao.queryById(7)).thenReturn(item);
+        when(itemDao.queryByIdInOwnerIds(eq(7), anyList())).thenReturn(item);
         when(taskDao.findActiveByItem(7, 12)).thenReturn(active);
-        when(attemptDao.findByTaskAndAttempt("task-1", 1)).thenReturn(attempt("task-1", 1, "queued"));
+        when(attemptDao.findByTaskAndAttempt("task-1", 1, 12)).thenReturn(attempt("task-1", 1, "queued"));
         WardrobeImageOptimizationTaskServiceImpl service = service(itemDao, taskDao, attemptDao, factory);
 
         WardrobeItemImageOptimizeTaskVo result = service.start(request(7, "保留细节"));
@@ -87,7 +99,8 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         WardrobeItemDao itemDao = mock(WardrobeItemDao.class);
         WardrobeImageOptimizationTaskDao taskDao = mock(WardrobeImageOptimizationTaskDao.class);
         WardrobeImageOptimizationAttemptDao attemptDao = mock(WardrobeImageOptimizationAttemptDao.class);
-        when(itemDao.queryById(7)).thenReturn(item(7, "https://oss.example.com/source.jpg"));
+        when(itemDao.queryByIdInOwnerIds(eq(7), anyList()))
+                .thenReturn(item(7, "https://oss.example.com/source.jpg"));
         WardrobeImageOptimizationTaskEntity active = task("task-1", 7, "running", 1);
         active.setFingerprint("another-fingerprint");
         when(taskDao.findActiveByItem(7, 12)).thenReturn(active);
@@ -106,8 +119,8 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         WardrobeItemEntity item = item(7, "https://oss.example.com/source.jpg");
         WardrobeImageOptimizationTaskEntity failed = task("task-1", 7, "failed", 1);
         failed.setSourceImageUrl(item.getItemImage());
-        when(itemDao.queryById(7)).thenReturn(item);
-        when(taskDao.findByTaskId("task-1", 12)).thenReturn(failed);
+        when(itemDao.queryByIdInOwnerIds(eq(7), anyList())).thenReturn(item);
+        when(taskDao.findByTaskIdInOwners(eq("task-1"), anyList())).thenReturn(failed);
         WardrobeImageOptimizationTaskServiceImpl service = service(itemDao, taskDao, attemptDao,
                 new WardrobeImageOptimizationPromptFactory());
 
@@ -132,9 +145,9 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         WardrobeImageOptimizationTaskServiceImpl service = service(itemDao, taskDao, attemptDao,
                 new WardrobeImageOptimizationPromptFactory());
 
-        service.assertSourceImageChangeAllowed(7, "https://oss.example.com/source.jpg");
+        service.assertSourceImageChangeAllowed(7, 12, "https://oss.example.com/source.jpg");
         assertThrows(BusinessException.class, () -> service.assertSourceImageChangeAllowed(
-                7, "https://oss.example.com/new-source.jpg"));
+                7, 12, "https://oss.example.com/new-source.jpg"));
     }
 
     @Test
@@ -146,13 +159,15 @@ class WardrobeImageOptimizationTaskServiceImplTest {
         WardrobeImageOptimizationTaskEntity active = task("task-1", 7, "running", 1);
         WardrobeImageOptimizationAttemptEntity running = attempt("task-1", 1, "running");
         when(taskDao.findActiveByItem(7, 12)).thenReturn(active);
-        when(taskDao.findByTaskId("task-1", 12)).thenReturn(active);
+        when(taskDao.findByTaskIdInOwners(eq("task-1"), anyList())).thenReturn(active);
         when(taskDao.findByTaskIdForUpdate("task-1", 12)).thenReturn(active);
-        when(attemptDao.findByTaskAndAttempt("task-1", 1)).thenReturn(running);
+        when(attemptDao.findByTaskAndAttempt("task-1", 1, 12)).thenReturn(running);
+        when(itemDao.queryByIdInOwnerIds(eq(7), anyList()))
+                .thenReturn(item(7, "https://oss.example.com/source.jpg"));
         WardrobeImageOptimizationTaskServiceImpl service = service(itemDao, taskDao, attemptDao,
                 new WardrobeImageOptimizationPromptFactory());
 
-        service.cancelForItemDeletion(7);
+        service.cancelForItemDeletion(7, 12);
         WardrobeItemImageOptimizeTaskVo result = service.get("task-1");
 
         assertEquals("cancelled", result.getStatus());
@@ -164,12 +179,15 @@ class WardrobeImageOptimizationTaskServiceImplTest {
                                                                      WardrobeImageOptimizationTaskDao taskDao,
                                                                      WardrobeImageOptimizationAttemptDao attemptDao,
                                                                      WardrobeImageOptimizationPromptFactory factory) {
-        return new WardrobeImageOptimizationTaskServiceImpl(itemDao, taskDao, attemptDao, factory);
+        WardrobeItemAccessService accessService = mock(WardrobeItemAccessService.class);
+        when(accessService.resolveFamilyOwnerIds()).thenReturn(java.util.List.of(12));
+        return new WardrobeImageOptimizationTaskServiceImpl(itemDao, taskDao, attemptDao, factory, accessService);
     }
 
     private static WardrobeItemEntity item(Integer id, String sourceImageUrl) {
         WardrobeItemEntity item = new WardrobeItemEntity();
         item.setId(id);
+        item.setUserId(12);
         item.setItemName("黑色衬衫");
         item.setItemImage(sourceImageUrl);
         item.setCategory(1);
@@ -198,6 +216,7 @@ class WardrobeImageOptimizationTaskServiceImplTest {
     private static WardrobeImageOptimizationAttemptEntity attempt(String taskId, Integer attemptNo, String status) {
         WardrobeImageOptimizationAttemptEntity attempt = new WardrobeImageOptimizationAttemptEntity();
         attempt.setTaskId(taskId);
+        attempt.setUserId(12);
         attempt.setAttemptNo(attemptNo);
         attempt.setStatus(status);
         return attempt;

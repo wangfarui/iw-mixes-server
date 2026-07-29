@@ -2,23 +2,27 @@ package com.itwray.iw.wardrobe.service.impl;
 
 import com.itwray.iw.auth.client.AuthFamilyGroupClient;
 import com.itwray.iw.auth.model.vo.FamilyWardrobeAccessPolicyVo;
+import com.itwray.iw.auth.model.vo.FamilyWardrobeMemberVo;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.utils.UserUtils;
 import com.itwray.iw.wardrobe.model.entity.WardrobeItemEntity;
 import com.itwray.iw.wardrobe.service.WardrobeItemAccessService;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.annotation.RequestScope;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
+@RequestScope
 public class WardrobeItemAccessServiceImpl implements WardrobeItemAccessService {
 
-    private static final int ROLE_OWNER = 1;
-    private static final int ROLE_PARENT = 2;
-    private static final int ROLE_CHILD = 4;
-
     private final AuthFamilyGroupClient familyGroupClient;
+    private AccessContext cachedContext;
 
     public WardrobeItemAccessServiceImpl(AuthFamilyGroupClient familyGroupClient) {
         this.familyGroupClient = familyGroupClient;
@@ -27,10 +31,16 @@ public class WardrobeItemAccessServiceImpl implements WardrobeItemAccessService 
     @Override
     public List<Integer> resolveVisibleOwnerIds(boolean queryOnlyMyself) {
         AccessContext context = this.currentContext();
-        if (queryOnlyMyself || context.child()) {
+        if (queryOnlyMyself || context.child() || context.queryOnlyMyself()) {
             return List.of(context.userId());
         }
         return context.memberUserIds();
+    }
+
+    @Override
+    public List<Integer> resolveFamilyOwnerIds() {
+        AccessContext context = this.currentContext();
+        return context.child() ? List.of(context.userId()) : context.memberUserIds();
     }
 
     @Override
@@ -47,8 +57,8 @@ public class WardrobeItemAccessServiceImpl implements WardrobeItemAccessService 
     }
 
     @Override
-    public void requireView(WardrobeItemEntity item, boolean queryOnlyMyself) {
-        if (item == null || !this.resolveVisibleOwnerIds(queryOnlyMyself).contains(item.getUserId())) {
+    public void requireView(WardrobeItemEntity item) {
+        if (item == null || !this.resolveFamilyOwnerIds().contains(item.getUserId())) {
             throw new BusinessException("衣物不存在或无权查看");
         }
     }
@@ -63,33 +73,57 @@ public class WardrobeItemAccessServiceImpl implements WardrobeItemAccessService 
     }
 
     @Override
-    public boolean canManage(WardrobeItemEntity item) {
-        return this.canManage(item, this.currentContext());
+    public Map<Integer, FamilyWardrobeMemberVo> resolveVisibleMembers() {
+        return this.currentContext().members().stream()
+                .filter(member -> member.getUserId() != null)
+                .collect(Collectors.toMap(FamilyWardrobeMemberVo::getUserId, Function.identity(), (left, right) -> left));
+    }
+
+    @Override
+    public Set<Integer> resolveManageableOwnerIds() {
+        AccessContext context = this.currentContext();
+        return context.canManageFamilyWardrobe()
+                ? Set.copyOf(context.memberUserIds()) : Set.of(context.userId());
     }
 
     private boolean canManage(WardrobeItemEntity item, AccessContext context) {
         return item != null
                 && context.memberUserIds().contains(item.getUserId())
-                && (Objects.equals(item.getUserId(), context.userId()) || context.ownerOrParent());
+                && (Objects.equals(item.getUserId(), context.userId()) || context.canManageFamilyWardrobe());
     }
 
     private AccessContext currentContext() {
-        Integer userId = UserUtils.getUserId();
-        FamilyWardrobeAccessPolicyVo policy = familyGroupClient.queryWardrobeAccessPolicy(userId);
-        if (policy == null || policy.getMemberUserIds() == null || policy.getMemberUserIds().isEmpty()
-                || !policy.getMemberUserIds().contains(userId)) {
-            throw new BusinessException("无法确认当前家庭衣物权限，请稍后重试");
+        if (cachedContext != null) {
+            return cachedContext;
         }
-        return new AccessContext(userId, policy.getCurrentUserRole(), policy.getMemberUserIds());
+        Integer userId = UserUtils.getUserId();
+        try {
+            FamilyWardrobeAccessPolicyVo policy = familyGroupClient.queryWardrobeAccessPolicy(userId);
+            if (policy == null || policy.getMemberUserIds() == null || policy.getMemberUserIds().isEmpty()
+                    || !policy.getMemberUserIds().contains(userId)) {
+                cachedContext = personalContext(userId);
+                return cachedContext;
+            }
+            List<FamilyWardrobeMemberVo> members = policy.getMembers() == null ? List.of() : policy.getMembers();
+            cachedContext = new AccessContext(userId, policy.isChild(), policy.isCanManageFamilyWardrobe(),
+                    policy.isQueryOnlyMyself(),
+                    List.copyOf(policy.getMemberUserIds()), members);
+            return cachedContext;
+        } catch (RuntimeException ignored) {
+            cachedContext = personalContext(userId);
+            return cachedContext;
+        }
     }
 
-    private record AccessContext(Integer userId, Integer role, List<Integer> memberUserIds) {
-        boolean child() {
-            return Objects.equals(role, ROLE_CHILD);
-        }
+    private AccessContext personalContext(Integer userId) {
+        FamilyWardrobeMemberVo member = new FamilyWardrobeMemberVo();
+        member.setUserId(userId);
+        member.setName("我");
+        return new AccessContext(userId, false, false, true, List.of(userId), List.of(member));
+    }
 
-        boolean ownerOrParent() {
-            return Objects.equals(role, ROLE_OWNER) || Objects.equals(role, ROLE_PARENT);
-        }
+    private record AccessContext(Integer userId, boolean child, boolean canManageFamilyWardrobe,
+                                 boolean queryOnlyMyself,
+                                 List<Integer> memberUserIds, List<FamilyWardrobeMemberVo> members) {
     }
 }

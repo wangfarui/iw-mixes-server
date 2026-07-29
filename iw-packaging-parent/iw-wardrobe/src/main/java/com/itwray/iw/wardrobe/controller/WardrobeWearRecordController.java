@@ -6,6 +6,7 @@ import com.itwray.iw.wardrobe.model.dto.WardrobeWearRecordCopyDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeWearRecordMonthDto;
 import com.itwray.iw.wardrobe.model.dto.WardrobeWearRecordUpdateDto;
 import com.itwray.iw.wardrobe.model.vo.WardrobeWearRecordVo;
+import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -77,7 +78,7 @@ public class WardrobeWearRecordController {
 
     @PostMapping("/markWorn")
     @Operation(summary = "直接标记已穿")
-    public Integer markWorn(@RequestBody WardrobeMarkWornDto dto) {
+    public WardrobeMarkWornVo markWorn(@RequestBody WardrobeMarkWornDto dto) {
         return wearRecordService.markWorn(dto);
     }
 

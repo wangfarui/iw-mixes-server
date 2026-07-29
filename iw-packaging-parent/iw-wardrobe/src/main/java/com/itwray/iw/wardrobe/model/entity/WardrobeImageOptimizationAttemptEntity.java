@@ -21,6 +21,9 @@ public class WardrobeImageOptimizationAttemptEntity extends UserEntity<Integer> 
 
     private Integer attemptNo;
 
+    /** 发起本次尝试的登录用户，不随衣物所属人转移而变化。 */
+    private Integer operatorUserId;
+
     private String status;
 
     private String claimToken;
