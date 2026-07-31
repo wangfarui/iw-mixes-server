@@ -99,7 +99,9 @@ access:
 
 ## 安全行为
 
-- CORS 只允许 `BLOG_ACCESS_ALLOWED_ORIGINS` 中配置的 Origin。
+- 生产 CORS 由 Nginx 统一处理，包括预检请求和所有 `Access-Control-*` 响应头；Java 接口不输出 CORS 响应头。
+- Java 接口仍会读取请求 `Origin`，并使用 `BLOG_ACCESS_ALLOWED_ORIGINS` 执行业务级白名单校验；不允许的 Origin 返回 HTTP 403。
+- 本地浏览器调试应通过本地 Nginx、网关或前端开发代理访问，不建议直接跨域访问 `iw-external` 的 18006 端口。
 - 响应头包含 `Cache-Control: no-store`。
 - 同一 IP、同一 scope 的失败请求按 1 分钟 5 次限流。
 - 审计日志记录 scope、postId、path、IP、User-Agent、是否成功和时间，不记录明文密码和 AES key。

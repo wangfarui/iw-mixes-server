@@ -9,7 +9,6 @@ import com.itwray.iw.web.utils.IpUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,7 +18,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -62,35 +60,8 @@ public class BlogAccessController {
         BlogAccessVerifyVo vo = blogAccessService.verify(dto, clientIp, userAgent);
         HttpStatus status = vo.isOk() ? HttpStatus.OK : HttpStatus.UNAUTHORIZED;
         return ResponseEntity.status(status)
-                .headers(accessHeaders(origin))
+                .headers(noStoreHeaders())
                 .body(vo);
-    }
-
-    @RequestMapping(value = "/verify", method = RequestMethod.OPTIONS)
-    @Operation(summary = "博客文章访问密码校验预检请求")
-    public ResponseEntity<Void> options(HttpServletRequest request) {
-        String origin = request.getHeader(HttpHeaders.ORIGIN);
-        if (!properties.isAllowedOrigin(origin)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .headers(noStoreHeaders())
-                    .build();
-        }
-        return ResponseEntity.noContent()
-                .headers(accessHeaders(origin))
-                .build();
-    }
-
-    private HttpHeaders accessHeaders(String origin) {
-        HttpHeaders headers = noStoreHeaders();
-        if (StringUtils.isNotBlank(origin)) {
-            headers.setAccessControlAllowOrigin(origin);
-            headers.add(HttpHeaders.VARY, HttpHeaders.ORIGIN);
-            headers.setAccessControlAllowMethods(
-                    java.util.List.of(org.springframework.http.HttpMethod.POST, org.springframework.http.HttpMethod.OPTIONS));
-            headers.setAccessControlAllowHeaders(java.util.List.of(HttpHeaders.CONTENT_TYPE));
-            headers.setAccessControlMaxAge(3600L);
-        }
-        return headers;
     }
 
     private HttpHeaders noStoreHeaders() {
