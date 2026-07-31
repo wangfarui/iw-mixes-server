@@ -31,7 +31,7 @@ public class WardrobeOutfitSuggestDto {
     @Schema(title = "优先使用闲置衣物")
     private Boolean preferIdle;
 
-    @Schema(title = "避开最近穿过天数")
+    @Schema(title = "最近穿过衣物的降权天数，不会硬过滤")
     private Integer avoidRecentDays;
 
     @Schema(title = "排除衣物id列表")

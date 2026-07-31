@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -156,7 +157,7 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
         String prompt = StringUtils.defaultString(request.getPrompt());
         WardrobeOutfitSuggestDto dto = new WardrobeOutfitSuggestDto();
         dto.setLockedItemId(request.getLockedItemId());
-        dto.setSeason(StringUtils.defaultIfBlank(request.getSeason(), this.inferSeason(prompt)));
+        dto.setSeason(StringUtils.defaultIfBlank(request.getSeason(), inferOutfitSeason(prompt, LocalDate.now())));
         dto.setScene(StringUtils.defaultIfBlank(request.getScene(), this.inferScene(prompt)));
         dto.setStyle(StringUtils.defaultIfBlank(request.getStyle(), this.inferStyle(prompt)));
         dto.setWeatherText(StringUtils.defaultIfBlank(request.getWeatherText(), this.inferWeather(prompt)));
@@ -680,10 +681,24 @@ public class WardrobeAssistantServiceImpl implements WardrobeAssistantService {
 
     private String inferSeason(String prompt) {
         if (StringUtils.contains(prompt, "春")) return "spring";
-        if (StringUtils.containsAny(prompt, "夏", "热", "高温")) return "summer";
+        if (StringUtils.contains(prompt, "夏")) return "summer";
         if (StringUtils.contains(prompt, "秋")) return "autumn";
-        if (StringUtils.containsAny(prompt, "冬", "冷", "降温")) return "winter";
+        if (StringUtils.contains(prompt, "冬")) return "winter";
         return "";
+    }
+
+    static String inferOutfitSeason(String prompt, LocalDate currentDate) {
+        String text = StringUtils.defaultString(prompt);
+        if (StringUtils.contains(text, "春")) return "spring";
+        if (StringUtils.contains(text, "夏")) return "summer";
+        if (StringUtils.contains(text, "秋")) return "autumn";
+        if (StringUtils.contains(text, "冬")) return "winter";
+
+        int month = Objects.requireNonNullElseGet(currentDate, LocalDate::now).getMonthValue();
+        if (month >= 3 && month <= 5) return "spring";
+        if (month >= 6 && month <= 8) return "summer";
+        if (month >= 9 && month <= 11) return "autumn";
+        return "winter";
     }
 
     private String inferScene(String prompt) {

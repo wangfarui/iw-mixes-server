@@ -19,6 +19,7 @@ import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitItemVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitPageVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeMarkWornVo;
 import com.itwray.iw.wardrobe.model.vo.WardrobeOutfitSuggestionVo;
+import com.itwray.iw.wardrobe.service.WardrobeItemAccessService;
 import com.itwray.iw.wardrobe.service.WardrobeItemImageService;
 import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
@@ -34,6 +35,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +61,11 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     private static final int CATEGORY_HAT = 8;
     private static final int CATEGORY_BAG = 9;
     private static final int CATEGORY_JEWELRY = 10;
+    private static final int SCORE_SEASON_MATCH = 5;
+    private static final int SCORE_SCENE_MATCH = 3;
+    private static final int SCORE_STYLE_MATCH = 2;
+    private static final int SCORE_IDLE = 1;
+    private static final int SCORE_RECENT_WEAR = -2;
 
     private final WardrobeOutfitDao wardrobeOutfitDao;
     private final WardrobeOutfitItemDao outfitItemDao;
@@ -66,19 +73,22 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     private final WardrobeWearRecordService wearRecordService;
     private final WardrobeItemImageService wardrobeItemImageService;
     private final WardrobeItemService wardrobeItemService;
+    private final WardrobeItemAccessService wardrobeItemAccessService;
 
     public WardrobeOutfitServiceImpl(WardrobeOutfitDao wardrobeOutfitDao,
                                      WardrobeOutfitItemDao outfitItemDao,
                                      WardrobeItemDao wardrobeItemDao,
                                      @Lazy WardrobeWearRecordService wearRecordService,
                                      WardrobeItemImageService wardrobeItemImageService,
-                                     WardrobeItemService wardrobeItemService) {
+                                     WardrobeItemService wardrobeItemService,
+                                     WardrobeItemAccessService wardrobeItemAccessService) {
         this.wardrobeOutfitDao = wardrobeOutfitDao;
         this.outfitItemDao = outfitItemDao;
         this.wardrobeItemDao = wardrobeItemDao;
         this.wearRecordService = wearRecordService;
         this.wardrobeItemImageService = wardrobeItemImageService;
         this.wardrobeItemService = wardrobeItemService;
+        this.wardrobeItemAccessService = wardrobeItemAccessService;
     }
 
     @Override
@@ -159,20 +169,16 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         if (candidates.isEmpty()) {
             return List.of();
         }
-        Map<Integer, List<WardrobeItemEntity>> categoryMap = candidates.stream()
-                .sorted(Comparator.comparing(WardrobeItemEntity::getWearCount, Comparator.nullsFirst(Integer::compareTo))
-                        .thenComparing(WardrobeItemEntity::getId, Comparator.reverseOrder()))
+        Map<Integer, List<WardrobeItemEntity>> categoryMap = rankSuggestCandidates(
+                candidates, dto, LocalDate.now()).stream()
                 .collect(Collectors.groupingBy(WardrobeItemEntity::getCategory, LinkedHashMap::new, Collectors.toList()));
         WardrobeItemEntity lockedItem = this.resolveLockedItem(dto.getLockedItemId());
 
+        List<List<WardrobeItemEntity>> suggestionItems = this.buildSuggestionItemSets(categoryMap, lockedItem, limit);
         List<WardrobeOutfitSuggestionVo> result = new ArrayList<>();
-        for (int i = 0; i < limit; i++) {
-            List<WardrobeItemEntity> items = this.buildSuggestionItems(categoryMap, lockedItem, i);
-            if (items.size() < 2) {
-                continue;
-            }
+        for (List<WardrobeItemEntity> items : suggestionItems) {
             WardrobeOutfitSuggestionVo vo = new WardrobeOutfitSuggestionVo();
-        vo.setSuggestionName("灵感搭配 " + (result.size() + 1));
+            vo.setSuggestionName("灵感搭配 " + (result.size() + 1));
             vo.setReason(this.buildSuggestionReason(dto, lockedItem));
             vo.setItemList(items.stream().map(this::toOutfitItemVo).toList());
             result.add(vo);
@@ -206,6 +212,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         List<WardrobeItemEntity> itemList = wardrobeItemDao.lambdaQuery()
                 .in(WardrobeItemEntity::getId, distinctIds)
                 .in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
+                .in(WardrobeItemEntity::getUserId, wardrobeItemAccessService.resolveVisibleOwnerIds(false))
                 .list();
         if (itemList.size() != distinctIds.size()) {
             throw new BusinessException("存在不可用的衣物，请刷新后重试");
@@ -316,39 +323,88 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     private List<WardrobeItemEntity> querySuggestCandidates(WardrobeOutfitSuggestDto dto) {
         LambdaQueryWrapper<WardrobeItemEntity> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.in(WardrobeItemEntity::getStatus, WardrobeItemStatusEnum.availableCodes())
-                .like(StringUtils.isNotBlank(dto.getSeason()), WardrobeItemEntity::getSeasonTags, dto.getSeason())
-                .like(StringUtils.isNotBlank(dto.getScene()), WardrobeItemEntity::getSceneTags, dto.getScene())
-                .like(StringUtils.isNotBlank(dto.getStyle()), WardrobeItemEntity::getStyleTags, dto.getStyle());
+                .in(WardrobeItemEntity::getUserId, wardrobeItemAccessService.resolveVisibleOwnerIds(false));
         if (dto.getExcludeItemIds() != null && !dto.getExcludeItemIds().isEmpty()) {
             List<Integer> excludeIds = dto.getExcludeItemIds().stream().filter(Objects::nonNull).toList();
             if (!excludeIds.isEmpty()) {
                 queryWrapper.notIn(WardrobeItemEntity::getId, excludeIds);
             }
         }
-        if (dto.getAvoidRecentDays() != null && dto.getAvoidRecentDays() > 0) {
-            LocalDate avoidAfter = LocalDate.now().minusDays(dto.getAvoidRecentDays());
-            queryWrapper.and(wrapper -> wrapper.isNull(WardrobeItemEntity::getLastWearDate)
-                    .or()
-                    .lt(WardrobeItemEntity::getLastWearDate, avoidAfter));
-        }
-        if (Boolean.TRUE.equals(dto.getPreferIdle())) {
-            queryWrapper.orderByAsc(WardrobeItemEntity::getLastWearDate)
-                    .orderByAsc(WardrobeItemEntity::getWearCount)
-                    .orderByDesc(WardrobeItemEntity::getId);
-        } else {
-            queryWrapper.orderByAsc(WardrobeItemEntity::getWearCount)
-                    .orderByDesc(WardrobeItemEntity::getId);
-        }
+        queryWrapper.orderByDesc(WardrobeItemEntity::getId);
         List<WardrobeItemEntity> itemList = wardrobeItemDao.list(queryWrapper);
         wardrobeItemImageService.applyCoverImages(itemList);
         return itemList;
+    }
+
+    static List<WardrobeItemEntity> rankSuggestCandidates(List<WardrobeItemEntity> candidates,
+                                                           WardrobeOutfitSuggestDto dto,
+                                                           LocalDate currentDate) {
+        LocalDate today = Objects.requireNonNullElseGet(currentDate, LocalDate::now);
+        int recentDays = dto.getAvoidRecentDays() == null ? 0 : Math.max(dto.getAvoidRecentDays(), 0);
+        LocalDate recentCutoff = recentDays > 0 ? today.minusDays(recentDays) : null;
+        Comparator<WardrobeItemEntity> comparator = Comparator
+                .comparingInt((WardrobeItemEntity item) -> scoreSuggestCandidate(item, dto, recentCutoff))
+                .reversed()
+                .thenComparing(item -> Objects.requireNonNullElse(item.getWearCount(), 0))
+                .thenComparing(WardrobeItemEntity::getLastWearDate,
+                        Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(WardrobeItemEntity::getId,
+                        Comparator.nullsLast(Comparator.reverseOrder()));
+        return candidates.stream().sorted(comparator).toList();
+    }
+
+    private static int scoreSuggestCandidate(WardrobeItemEntity item,
+                                             WardrobeOutfitSuggestDto dto,
+                                             LocalDate recentCutoff) {
+        int score = 0;
+        if (containsAnyExactTag(item.getSeasonTags(), dto.getSeason())) {
+            score += SCORE_SEASON_MATCH;
+        }
+        if (containsAnyExactTag(item.getSceneTags(), dto.getScene())) {
+            score += SCORE_SCENE_MATCH;
+        }
+        if (containsAnyExactTag(item.getStyleTags(), dto.getStyle())) {
+            score += SCORE_STYLE_MATCH;
+        }
+        if (Boolean.TRUE.equals(dto.getPreferIdle()) && WardrobeItemStatusEnum.isIdle(item.getStatus())) {
+            score += SCORE_IDLE;
+        }
+        if (isRecentlyWorn(item, recentCutoff)) {
+            score += SCORE_RECENT_WEAR;
+        }
+        return score;
+    }
+
+    static boolean containsAnyExactTag(String itemTags, String requestedTags) {
+        Set<String> itemTagSet = parseTags(itemTags);
+        if (itemTagSet.isEmpty()) {
+            return false;
+        }
+        return parseTags(requestedTags).stream().anyMatch(itemTagSet::contains);
+    }
+
+    private static Set<String> parseTags(String tags) {
+        if (StringUtils.isBlank(tags)) {
+            return Set.of();
+        }
+        return java.util.Arrays.stream(StringUtils.split(tags, ','))
+                .map(StringUtils::trim)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::lowerCase)
+                .collect(Collectors.toSet());
+    }
+
+    private static boolean isRecentlyWorn(WardrobeItemEntity item, LocalDate recentCutoff) {
+        return recentCutoff != null && item.getLastWearDate() != null
+                && !item.getLastWearDate().isBefore(recentCutoff);
     }
 
     private WardrobeItemEntity resolveLockedItem(Integer lockedItemId) {
         if (lockedItemId == null || lockedItemId <= 0) {
             return null;
         }
-        WardrobeItemEntity item = wardrobeItemDao.queryById(lockedItemId);
+        WardrobeItemEntity item = wardrobeItemDao.queryByIdInOwnerIds(
+                lockedItemId, wardrobeItemAccessService.resolveVisibleOwnerIds(false));
         if (!WardrobeItemStatusEnum.isAvailable(item.getStatus())) {
             throw new BusinessException("锁定衣物不可用");
         }
@@ -356,19 +412,96 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         return item;
     }
 
-    private List<WardrobeItemEntity> buildSuggestionItems(Map<Integer, List<WardrobeItemEntity>> categoryMap,
-                                                         WardrobeItemEntity lockedItem,
-                                                         int offset) {
+    private List<List<WardrobeItemEntity>> buildSuggestionItemSets(
+            Map<Integer, List<WardrobeItemEntity>> categoryMap,
+            WardrobeItemEntity lockedItem,
+            int limit) {
+        List<List<WardrobeItemEntity>> separateCores = this.buildSeparateCores(categoryMap, lockedItem, limit);
+        List<List<WardrobeItemEntity>> dressCores = this.buildDressCores(categoryMap, lockedItem, limit);
+        List<List<WardrobeItemEntity>> orderedCores = new ArrayList<>();
+        int coreCount = Math.max(separateCores.size(), dressCores.size());
+        for (int i = 0; i < coreCount; i++) {
+            if (i < separateCores.size()) {
+                orderedCores.add(separateCores.get(i));
+            }
+            if (i < dressCores.size()) {
+                orderedCores.add(dressCores.get(i));
+            }
+        }
+
+        List<List<WardrobeItemEntity>> result = new ArrayList<>();
+        Set<List<Integer>> fingerprints = new LinkedHashSet<>();
+        for (int offset = 0; offset < limit && result.size() < limit; offset++) {
+            for (List<WardrobeItemEntity> core : orderedCores) {
+                List<WardrobeItemEntity> items = this.completeSuggestion(core, categoryMap, lockedItem, offset);
+                List<Integer> fingerprint = items.stream().map(WardrobeItemEntity::getId).sorted().toList();
+                if (fingerprints.add(fingerprint)) {
+                    result.add(items);
+                    if (result.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private List<List<WardrobeItemEntity>> buildSeparateCores(
+            Map<Integer, List<WardrobeItemEntity>> categoryMap,
+            WardrobeItemEntity lockedItem,
+            int limit) {
+        if (lockedItem != null && Objects.equals(lockedItem.getCategory(), CATEGORY_DRESS)) {
+            return List.of();
+        }
+        List<WardrobeItemEntity> tops = lockedItem != null && Objects.equals(lockedItem.getCategory(), CATEGORY_TOP)
+                ? List.of(lockedItem) : categoryMap.getOrDefault(CATEGORY_TOP, List.of());
+        List<WardrobeItemEntity> bottoms = lockedItem != null && Objects.equals(lockedItem.getCategory(), CATEGORY_BOTTOM)
+                ? List.of(lockedItem) : categoryMap.getOrDefault(CATEGORY_BOTTOM, List.of());
+        if (tops.isEmpty() || bottoms.isEmpty()) {
+            return List.of();
+        }
+
+        List<List<WardrobeItemEntity>> result = new ArrayList<>();
+        for (int diagonal = 0; diagonal < tops.size() + bottoms.size() - 1 && result.size() < limit; diagonal++) {
+            for (int topIndex = 0; topIndex <= diagonal && result.size() < limit; topIndex++) {
+                int bottomIndex = diagonal - topIndex;
+                if (topIndex < tops.size() && bottomIndex < bottoms.size()) {
+                    result.add(List.of(tops.get(topIndex), bottoms.get(bottomIndex)));
+                }
+            }
+        }
+        return result;
+    }
+
+    private List<List<WardrobeItemEntity>> buildDressCores(
+            Map<Integer, List<WardrobeItemEntity>> categoryMap,
+            WardrobeItemEntity lockedItem,
+            int limit) {
+        if (lockedItem != null) {
+            if (Objects.equals(lockedItem.getCategory(), CATEGORY_DRESS)) {
+                return List.of(List.of(lockedItem));
+            }
+            if (Objects.equals(lockedItem.getCategory(), CATEGORY_TOP)
+                    || Objects.equals(lockedItem.getCategory(), CATEGORY_BOTTOM)) {
+                return List.of();
+            }
+        }
+        return categoryMap.getOrDefault(CATEGORY_DRESS, List.of()).stream()
+                .limit(limit)
+                .map(List::of)
+                .toList();
+    }
+
+    private List<WardrobeItemEntity> completeSuggestion(
+            List<WardrobeItemEntity> core,
+            Map<Integer, List<WardrobeItemEntity>> categoryMap,
+            WardrobeItemEntity lockedItem,
+            int offset) {
         LinkedHashMap<Integer, WardrobeItemEntity> selected = new LinkedHashMap<>();
         if (lockedItem != null) {
             selected.put(lockedItem.getId(), lockedItem);
         }
-        boolean hasDress = selected.values().stream().anyMatch(item -> Objects.equals(item.getCategory(), CATEGORY_DRESS));
-        if (!hasDress) {
-            this.addByCategory(selected, categoryMap, CATEGORY_TOP, offset);
-            this.addByCategory(selected, categoryMap, CATEGORY_BOTTOM, offset);
-        }
-        this.addByCategory(selected, categoryMap, CATEGORY_DRESS, offset);
+        core.forEach(item -> selected.putIfAbsent(item.getId(), item));
         this.addByCategory(selected, categoryMap, CATEGORY_SHOES, offset);
         this.addByCategory(selected, categoryMap, CATEGORY_BAG, offset);
         this.addByCategory(selected, categoryMap, CATEGORY_ACCESSORY, offset);
@@ -381,6 +514,9 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
                                Map<Integer, List<WardrobeItemEntity>> categoryMap,
                                int category,
                                int offset) {
+        if (selected.values().stream().anyMatch(item -> Objects.equals(item.getCategory(), category))) {
+            return;
+        }
         List<WardrobeItemEntity> items = categoryMap.get(category);
         if (items == null || items.isEmpty()) {
             return;
@@ -406,6 +542,10 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         if (lockedItem != null) {
             reasons.add("围绕「" + lockedItem.getItemName() + "」生成");
         }
+        if (StringUtils.isNotBlank(dto.getSeason()) || StringUtils.isNotBlank(dto.getScene())
+                || StringUtils.isNotBlank(dto.getStyle())) {
+            reasons.add("按季节、场景和风格的精确标签匹配度排序");
+        }
         if (StringUtils.isNotBlank(dto.getWeatherText())) {
             reasons.add("参考天气：" + dto.getWeatherText());
         }
@@ -413,7 +553,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             reasons.add("优先唤醒闲置衣物");
         }
         if (dto.getAvoidRecentDays() != null && dto.getAvoidRecentDays() > 0) {
-            reasons.add("避开近" + dto.getAvoidRecentDays() + "天穿过的衣物");
+            reasons.add("降低近" + dto.getAvoidRecentDays() + "天已穿衣物的优先级");
         }
         if (reasons.isEmpty()) {
             reasons.add("按少穿优先和分类完整度生成");
