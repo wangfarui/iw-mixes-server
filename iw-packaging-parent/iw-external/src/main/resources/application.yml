@@ -41,6 +41,18 @@ iw:
     dataPermission:
       enabled: false
   external:
+    zhaogang:
+      # 公司 CODING 团队固定值；复用已有内部密钥，生产无需新增环境变量。
+      team: g-iijw5014
+      api-url: https://g-iijw5014.coding.net/open-api
+      session-key: ${IW_INTERNAL_SECRET:dev-secret}
+      web-env: ${IW_WEB_ENV:dev}
+      coding-concurrency-per-token: ${IW_CODING_CONCURRENCY_PER_TOKEN:4}
+      coding-issue-qps-per-token: ${IW_CODING_ISSUE_QPS_PER_TOKEN:25}
+      coding-issue-executor-concurrency: ${IW_CODING_ISSUE_EXECUTOR_CONCURRENCY:32}
+      coding-issue-cache-seconds: ${IW_CODING_ISSUE_CACHE_SECONDS:30}
+      worklog-executor-concurrency: ${IW_WORKLOG_EXECUTOR_CONCURRENCY:8}
+      calendar-manager-user-id: ${IW_ZHAOGANG_CALENDAR_MANAGER_USER_ID:9292850}
     remote-share:
       # Kept under iw-external's stable working directory so Nginx can serve authorized chunks internally.
       storage-directory: data/remote-share

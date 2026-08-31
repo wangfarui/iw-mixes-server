@@ -133,6 +133,8 @@ is_service_process() {
   application="$(service_application "$target")"
   name="$(service_name "$target")"
 
+  [ -z "$command" ] && return 0
+
   # 端口只能说明有进程在监听；同时校验 Java 命令行，避免 stop/restart 误伤无关服务。
   [[ "$command" == *java* ]] \
     && { [[ "$command" == *"$application"* ]] \
