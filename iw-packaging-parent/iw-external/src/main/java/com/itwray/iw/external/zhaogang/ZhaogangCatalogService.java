@@ -358,7 +358,7 @@ class ZhaogangCatalogService {
             return null;
         }
         return new Build(build.id(), build.number(), build.status(), build.statusDetail(), build.branch(), build.commit(),
-                build.triggerUser(), build.duration(), build.startedAt());
+                build.triggerUser(), build.duration(), build.startedAt(), build.environment());
     }
 
     private Plan copyWithBuild(Plan plan, Build build) {

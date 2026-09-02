@@ -16,6 +16,8 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModule;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
+import com.itwray.iw.external.zhaogang.k8s.K8sTokenService;
+import com.itwray.iw.external.zhaogang.ZhaogangModels.K8sTokenStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -60,22 +62,32 @@ public class ZhaogangController {
 
     private final CodingCredentialService credentials;
 
+    private final K8sTokenService k8sTokens;
+
     public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
                               ZhaogangCatalogService catalogService, ZhaogangProperties properties,
                               WorklogModule worklogModule) {
         this(sessionManager, workbenchService, catalogService, properties, worklogModule, null);
     }
 
-    @Autowired
     public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
                               ZhaogangCatalogService catalogService, ZhaogangProperties properties,
                               WorklogModule worklogModule, CodingCredentialService credentials) {
+        this(sessionManager, workbenchService, catalogService, properties, worklogModule, credentials, null);
+    }
+
+    @Autowired
+    public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
+                              ZhaogangCatalogService catalogService, ZhaogangProperties properties,
+                              WorklogModule worklogModule, CodingCredentialService credentials,
+                              K8sTokenService k8sTokens) {
         this.sessionManager = sessionManager;
         this.workbenchService = workbenchService;
         this.catalogService = catalogService;
         this.properties = properties;
         this.worklogModule = worklogModule;
         this.credentials = credentials;
+        this.k8sTokens = k8sTokens;
     }
 
     @PostMapping("/session/bind")
@@ -121,6 +133,54 @@ public class ZhaogangController {
         }
         sessionManager.clear(response);
         return GeneralResponse.success();
+    }
+
+    @GetMapping("/k8s-tokens")
+    @Operation(summary = "查询当前用户的 K8s Token 配置状态")
+    public GeneralResponse<K8sTokenStatus> k8sTokenStatus(HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = sessionManager.resolve(request, response);
+        if (k8sTokens == null) {
+            return GeneralResponse.success(new K8sTokenStatus(List.of("test", "uat", "prd"),
+                    java.util.Map.of("test", false, "uat", false, "prd", false)));
+        }
+        return GeneralResponse.success(new K8sTokenStatus(k8sTokens.environments(),
+                k8sTokens.statuses(session.teamId() == null ? 0 : session.teamId(), session.userId())));
+    }
+
+    @PostMapping("/k8s-tokens")
+    @Operation(summary = "保存当前用户的 K8s Token")
+    public GeneralResponse<K8sTokenStatus> upsertK8sToken(@Valid @RequestBody com.itwray.iw.external.zhaogang.k8s.ZhaogangK8sTokenDto dto,
+                                                          HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = sessionManager.resolve(request, response);
+        if (k8sTokens == null) {
+            throw new IllegalStateException("K8s Token 服务未初始化");
+        }
+        k8sTokens.upsert(session.teamId() == null ? 0 : session.teamId(), session.userId(), dto.getEnvironment(), dto.getToken());
+        return k8sTokenStatus(request, response);
+    }
+
+    @GetMapping("/k8s-tokens/{environment}")
+    @Operation(summary = "读取当前用户指定环境的 K8s Token")
+    public GeneralResponse<TokenValue> k8sToken(@PathVariable String environment,
+                                                HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store, max-age=0");
+        response.setHeader(HttpHeaders.PRAGMA, "no-cache");
+        ZhaogangSession session = sessionManager.resolve(request, response);
+        if (k8sTokens == null) {
+            throw new IllegalStateException("K8s Token 服务未初始化");
+        }
+        return GeneralResponse.success(new TokenValue(k8sTokens.token(session.teamId() == null ? 0 : session.teamId(), session.userId(), environment)));
+    }
+
+    @DeleteMapping("/k8s-tokens/{environment}")
+    @Operation(summary = "删除当前用户指定环境的 K8s Token")
+    public GeneralResponse<K8sTokenStatus> deleteK8sToken(@PathVariable String environment,
+                                                          HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = sessionManager.resolve(request, response);
+        if (k8sTokens != null) {
+            k8sTokens.delete(session.teamId() == null ? 0 : session.teamId(), session.userId(), environment);
+        }
+        return k8sTokenStatus(request, response);
     }
 
     @GetMapping("/build-plan-catalog")

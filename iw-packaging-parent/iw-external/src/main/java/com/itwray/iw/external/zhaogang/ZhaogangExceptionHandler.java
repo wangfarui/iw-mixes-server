@@ -16,7 +16,8 @@ import java.util.List;
         ZhaogangController.class,
         ZhaogangCalendarController.class,
         ZhaogangTeamController.class,
-        ZhaogangIterationController.class
+        ZhaogangIterationController.class,
+        ZhaogangReleaseReceiptController.class
 })
 @Order(-1)
 class ZhaogangExceptionHandler {
@@ -52,6 +53,11 @@ class ZhaogangExceptionHandler {
     GeneralResponse<?> handleSessionException(ZhaogangSessionException error, HttpServletResponse response) {
         sessionManager.clear(response);
         return new GeneralResponse<>(401, error.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    GeneralResponse<?> handleIllegalArgumentException(IllegalArgumentException error) {
+        return GeneralResponse.fail(error.getMessage());
     }
 
     private GeneralResponse<?> codingResponse(CodingOpenApiException error) {

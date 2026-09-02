@@ -171,8 +171,12 @@ record CodingBuildParameter(String name, String value, boolean sensitive) {
 }
 
 record CodingBuild(long id, String number, String status, String statusDetail, String branch, String commit,
-                   String triggerUser,
-                   String duration, String startedAt) {
+                   String triggerUser, String duration, String startedAt, String environment) {
+
+    CodingBuild(long id, String number, String status, String statusDetail, String branch, String commit,
+                String triggerUser, String duration, String startedAt) {
+        this(id, number, status, statusDetail, branch, commit, triggerUser, duration, startedAt, "");
+    }
 }
 
 record CodingBranch(String name) {

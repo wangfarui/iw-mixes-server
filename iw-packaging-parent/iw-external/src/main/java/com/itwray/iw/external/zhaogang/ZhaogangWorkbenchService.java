@@ -139,7 +139,7 @@ class ZhaogangWorkbenchService {
             return null;
         }
         return new Build(build.id(), build.number(), build.status(), build.statusDetail(), build.branch(), build.commit(),
-                build.triggerUser(), build.duration(), build.startedAt());
+                build.triggerUser(), build.duration(), build.startedAt(), build.environment());
     }
 
     private String maskToken(String token) {

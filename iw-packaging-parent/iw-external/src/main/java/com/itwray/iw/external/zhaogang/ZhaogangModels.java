@@ -15,6 +15,9 @@ public final class ZhaogangModels {
     public record TokenValue(String token) {
     }
 
+    public record K8sTokenStatus(List<String> environments, java.util.Map<String, Boolean> configured) {
+    }
+
     public record Project(long id, String name, String displayName) {
     }
 
@@ -31,8 +34,12 @@ public final class ZhaogangModels {
     }
 
     public record Build(long id, String number, String status, String statusDetail, String branch, String commit,
-                        String triggerUser,
-                        String duration, String startedAt) {
+                        String triggerUser, String duration, String startedAt, String environment) {
+
+        public Build(long id, String number, String status, String statusDetail, String branch, String commit,
+                     String triggerUser, String duration, String startedAt) {
+            this(id, number, status, statusDetail, branch, commit, triggerUser, duration, startedAt, "");
+        }
     }
 
     public record PlanDetail(Plan plan, List<Build> builds, Long depotId) {

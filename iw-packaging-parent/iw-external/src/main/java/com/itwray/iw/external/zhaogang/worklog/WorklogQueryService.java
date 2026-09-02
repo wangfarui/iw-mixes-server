@@ -135,8 +135,11 @@ class WorklogQueryService {
                 .mapToInt(member -> eligibleWorkdayCount(schedule,
                         leaveDatesByMember.getOrDefault(member.userId(), Set.of()), from, toExclusive))
                 .sum();
+        Summary aggregateSummary = scope == Scope.WORKBENCH_TEAM
+                ? aggregateMemberSummaries(memberDailyTotals, dailyTotals, aggregateWorkdayCount)
+                : summary(dailyTotals, aggregateWorkdayCount);
         return new Statistics(coverage, month.toString(), schedule.versionNo(), syncedAt(),
-                summary(dailyTotals, aggregateWorkdayCount),
+                aggregateSummary,
                 dailyTotals, memberDailyTotals);
     }
 
@@ -361,6 +364,24 @@ class WorklogQueryService {
                 overtimeHours = overtimeHours.add(hours);
             }
         }
+        BigDecimal averageHours = workdayCount == 0 ? BigDecimal.ZERO
+                : totalHours.divide(BigDecimal.valueOf(workdayCount), 2, java.math.RoundingMode.HALF_UP);
+        return new Summary(overtimeDays, normalizeHours(overtimeHours), normalizeHours(averageHours));
+    }
+
+    private Summary aggregateMemberSummaries(List<MemberDailyTotal> memberDailyTotals,
+                                             List<DailyTotal> dailyTotals, int workdayCount) {
+        int overtimeDays = memberDailyTotals.stream()
+                .map(MemberDailyTotal::summary)
+                .mapToInt(Summary::overtimeDays)
+                .sum();
+        BigDecimal overtimeHours = memberDailyTotals.stream()
+                .map(MemberDailyTotal::summary)
+                .map(Summary::overtimeHours)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalHours = dailyTotals.stream()
+                .map(DailyTotal::hours)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal averageHours = workdayCount == 0 ? BigDecimal.ZERO
                 : totalHours.divide(BigDecimal.valueOf(workdayCount), 2, java.math.RoundingMode.HALF_UP);
         return new Summary(overtimeDays, normalizeHours(overtimeHours), normalizeHours(averageHours));

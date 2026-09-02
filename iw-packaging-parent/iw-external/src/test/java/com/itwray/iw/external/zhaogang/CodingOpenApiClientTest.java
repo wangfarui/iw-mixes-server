@@ -393,6 +393,7 @@ class CodingOpenApiClientTest {
         assertEquals(2919L, build.id());
         assertEquals("QUEUED", build.status());
         assertEquals("release_20260821", build.branch());
+        assertEquals("prd", build.environment());
     }
 
     private boolean parameterMatches(JsonNode parameter, String name, String value, boolean sensitive) {
@@ -424,6 +425,18 @@ class CodingOpenApiClientTest {
 
         assertEquals(1, builds.size());
         assertEquals("6866f42", builds.get(0).commit());
+    }
+
+    @Test
+    void latestBuildParsesEnvironmentFromSupportedParameterContainers() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange, """
+                {"Response":{"Data":{"BuildList":[{"Id":2922,"Number":2922,"Status":"SUCCEED",
+                  "ParamList":[{"Name":"env","Value":"uat"}]}]}}}
+                """));
+
+        CodingBuild build = client.latestBuild("test-token", 450L, 6196835L);
+
+        assertEquals("uat", build.environment());
     }
 
     @Test

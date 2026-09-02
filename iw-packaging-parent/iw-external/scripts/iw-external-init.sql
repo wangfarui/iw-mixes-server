@@ -123,6 +123,28 @@ create table external_zhaogang_coding_credential
     key idx_token_fingerprint (token_fingerprint)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台CODING成员凭证备份';
 
+create table external_zhaogang_release_receipt
+(
+    coding_team_id bigint unsigned not null comment 'CODING顶层团队ID',
+    coding_user_id bigint unsigned not null comment 'CODING用户ID',
+    release_id varchar(128) not null comment '找钢工作台版本不可变标识',
+    read_at datetime not null comment '服务端确认已读时间',
+    primary key (coding_team_id, coding_user_id, release_id),
+    key idx_release_id (release_id)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台版本更新已读记录';
+
+create table external_zhaogang_k8s_token
+(
+    coding_team_id bigint unsigned not null comment 'CODING团队ID',
+    coding_user_id bigint unsigned not null comment 'CODING用户ID',
+    environment    varchar(16)     not null comment 'K8s环境：test/uat/prd',
+    token_plaintext varchar(4096)   not null comment '用户上传的K8s Dashboard Token',
+    create_time    datetime default current_timestamp not null,
+    update_time    datetime default current_timestamp not null on update current_timestamp,
+    primary key (coding_team_id, coding_user_id, environment),
+    key idx_user_environment (coding_user_id, environment)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台用户K8s Token';
+
 create table external_zhaogang_work_calendar
 (
     id             bigint unsigned                    not null auto_increment comment '工作日历ID',

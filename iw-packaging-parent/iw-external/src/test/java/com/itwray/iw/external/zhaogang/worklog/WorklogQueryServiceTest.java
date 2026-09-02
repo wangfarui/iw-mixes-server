@@ -108,6 +108,33 @@ class WorklogQueryServiceTest {
     }
 
     @Test
+    void teamSummarySumsOvertimePerMemberWhenMembersWorkOvertimeOnSameDay() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        long start = Instant.parse("2026-08-10T01:00:00Z").toEpochMilli();
+        when(coding.worklogPage("token", 1785513599999L, 1788192000001L, 1L, 0, 1000))
+                .thenReturn(new WorklogPage(List.of(new Worklog(11L, 1L, 1L, "project-a", 1L,
+                        new BigDecimal("9"), "成员一", start, start, start))));
+        when(coding.worklogPage("member-token", 1785513599999L, 1788192000001L, 2L, 0, 1000))
+                .thenReturn(new WorklogPage(List.of(new Worklog(22L, 2L, 2L, "project-a", 2L,
+                        new BigDecimal("9"), "成员二", start, start, start))));
+        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+                Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE));
+
+        Statistics statistics = service.queryStatistics(
+                new WorklogModule.Context("token", 1L, "成员一", "avatar-a", 10L,
+                        "g-iijw5014", "https://g-iijw5014.coding.net"),
+                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+                List.of(new WorklogModule.MemberCredential(1L, "成员一", "avatar-a", "token"),
+                        new WorklogModule.MemberCredential(2L, "成员二", "avatar-b", "member-token")),
+                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+
+        assertThat(statistics.memberDailyTotals()).extracting(total -> total.summary().overtimeDays())
+                .containsExactly(1, 1);
+        assertThat(statistics.summary().overtimeDays()).isEqualTo(2);
+        assertThat(statistics.summary().overtimeHours()).isEqualByComparingTo("2");
+    }
+
+    @Test
     void absenceCountsWeekdaysBelowEightHoursAndSkipsWeekends() {
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         long julyFirst = Instant.parse("2026-07-01T03:00:00Z").toEpochMilli();

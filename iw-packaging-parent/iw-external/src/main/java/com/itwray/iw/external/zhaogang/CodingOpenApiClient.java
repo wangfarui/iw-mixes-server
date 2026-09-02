@@ -142,11 +142,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             buildList = array(response, "Builds", "BuildList", "CIBuilds");
         }
         for (JsonNode item : buildList) {
-            result.add(new CodingBuild(longValue(item, "Id", "BuildId"), text(item, "Number", "BuildNumber", "Id"),
-                    text(item, "Status", "BuildStatus"), buildStatusDetail(item), buildBranch(item),
-                    abbreviateCommit(text(item, "CommitId", "Commit", "Sha")),
-                    buildUserName(item),
-                    duration(item), time(item, "CreatedAt", "StartTime", "StartedAt")));
+            result.add(toBuild(item));
         }
         return result;
     }
@@ -189,10 +185,13 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         if (build.isMissingNode()) {
             build = response.has("Build") ? response.path("Build") : response;
         }
-        return new CodingBuild(longValue(build, "Id", "BuildId"), text(build, "Number", "BuildNumber", "Id"),
-                text(build, "Status", "BuildStatus"), buildStatusDetail(build), branch,
-                abbreviateCommit(text(build, "CommitId", "Commit")),
-                buildUserName(build), duration(build), time(build, "CreatedAt", "StartTime"));
+        CodingBuild parsed = toBuild(build);
+        if (parsed == null) {
+            return new CodingBuild(0L, "", "", "", branch, "", "", "", "", environment);
+        }
+        return new CodingBuild(parsed.id(), parsed.number(), parsed.status(), parsed.statusDetail(), branch,
+                parsed.commit(), parsed.triggerUser(), parsed.duration(), parsed.startedAt(),
+                StringUtils.defaultIfBlank(parsed.environment(), environment));
     }
 
     @Override
@@ -620,7 +619,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 text(item, "Status", "BuildStatus"), buildStatusDetail(item), buildBranch(item),
                 abbreviateCommit(text(item, "CommitId", "Commit", "Sha")),
                 buildUserName(item), duration(item),
-                time(item, "CreatedAt", "StartTime", "StartedAt"));
+                time(item, "CreatedAt", "StartTime", "StartedAt"), environment(item));
     }
 
     private String buildBranch(JsonNode item) {
@@ -721,10 +720,19 @@ class CodingOpenApiClient implements CodingOpenApiPort {
 
     private List<JsonNode> parameters(JsonNode item) {
         List<JsonNode> result = new ArrayList<>();
-        for (String name : List.of("EnvList", "Parameters", "BuildParameters", "Params")) {
+        for (String name : List.of("ParamList", "EnvList", "Parameters", "BuildParameters", "Params")) {
             result.addAll(array(item, name));
         }
         return result;
+    }
+
+    private String environment(JsonNode item) {
+        for (JsonNode parameter : parameters(item)) {
+            if ("env".equalsIgnoreCase(text(parameter, "Name", "Key", "VariableName"))) {
+                return StringUtils.trimToEmpty(text(parameter, "Value", "DefaultValue"));
+            }
+        }
+        return "";
     }
 
     private boolean isStandardEnvironment(String environment) {

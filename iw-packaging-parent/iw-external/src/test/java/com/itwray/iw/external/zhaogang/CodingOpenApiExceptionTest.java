@@ -48,4 +48,15 @@ class CodingOpenApiExceptionTest {
                 "#4781 事项类型为“任务”，暂不支持关联。")).getMessage())
                 .isEqualTo("#4781 事项类型为“任务”，暂不支持关联。");
     }
+
+    @Test
+    void keepsExpectedValidationMessageForK8sTokenRequests() {
+        ZhaogangExceptionHandler handler = new ZhaogangExceptionHandler(mock(ZhaogangSessionManager.class));
+
+        GeneralResponse<?> response = handler.handleIllegalArgumentException(
+                new IllegalArgumentException("环境必须是 test、uat 或 prd"));
+
+        assertThat(response.getCode()).isEqualTo(500);
+        assertThat(response.getMessage()).isEqualTo("环境必须是 test、uat 或 prd");
+    }
 }
