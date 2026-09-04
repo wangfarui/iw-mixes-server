@@ -78,7 +78,12 @@ public interface ZhaogangIterationMapper extends BaseMapper<IterationEntity> {
 
     @Update("""
             update external_zhaogang_iteration
-               set name = #{name}, version = #{version}, start_date = #{startDate},
+               set name = #{name}, version = coalesce(#{version}, version), stage = #{stage},
+                   start_date = #{startDate},
+                   released_at = case
+                       when #{stage} = 'RELEASED' then coalesce(released_at, current_timestamp)
+                       else null
+                   end,
                    planned_release_date = #{plannedReleaseDate}, updater_user_id = #{updaterUserId},
                    updater_user_name = #{updaterUserName}, version_no = version_no + 1,
                    update_time = current_timestamp
@@ -86,6 +91,7 @@ public interface ZhaogangIterationMapper extends BaseMapper<IterationEntity> {
             """)
     int updateBasic(@Param("id") long id, @Param("versionNo") int versionNo,
                     @Param("name") String name, @Param("version") String version,
+                    @Param("stage") String stage,
                     @Param("startDate") LocalDate startDate,
                     @Param("plannedReleaseDate") LocalDate plannedReleaseDate,
                     @Param("updaterUserId") long updaterUserId, @Param("updaterUserName") String updaterUserName);

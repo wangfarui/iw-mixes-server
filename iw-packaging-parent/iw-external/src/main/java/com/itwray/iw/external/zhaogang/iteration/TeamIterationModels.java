@@ -80,14 +80,15 @@ public final class TeamIterationModels {
     public record IterationQuery(Stage stage, Long memberUserId, String keyword, int pageNumber, int pageSize) {
     }
 
-    public record CreateCommand(String requestId, String name, String version, LocalDate startDate,
+    public record CreateCommand(String requestId, String name, String version, Stage stage, LocalDate startDate,
                                 LocalDate plannedReleaseDate, List<MemberInput> members) {
         public CreateCommand {
+            stage = stage == null ? Stage.NOT_STARTED : stage;
             members = members == null ? List.of() : List.copyOf(members);
         }
     }
 
-    public record UpdateCommand(int versionNo, String name, String version, LocalDate startDate,
+    public record UpdateCommand(int versionNo, String name, String version, Stage stage, LocalDate startDate,
                                 LocalDate plannedReleaseDate) {
     }
 
@@ -109,9 +110,17 @@ public final class TeamIterationModels {
     public record CreateChildIssueCommand(CodingIssueType issueType, String title, String description,
                                           String developmentTeam, String definitionOfDone,
                                           BigDecimal estimatedHours, String taskType,
-                                          Boolean onlineBug, String bugPriority) {
+                                          Boolean onlineBug, String bugPriority, Boolean syncToCoding) {
+        public CreateChildIssueCommand(CodingIssueType issueType, String title, String description,
+                                       String developmentTeam, String definitionOfDone,
+                                       BigDecimal estimatedHours, String taskType,
+                                       Boolean onlineBug, String bugPriority) {
+            this(issueType, title, description, developmentTeam, definitionOfDone, estimatedHours, taskType,
+                    onlineBug, bugPriority, null);
+        }
+
         public CreateChildIssueCommand(CodingIssueType issueType, String title, String description) {
-            this(issueType, title, description, null, null, null, null, null, null);
+            this(issueType, title, description, null, null, null, null, null, null, null);
         }
     }
 

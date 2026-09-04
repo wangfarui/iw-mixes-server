@@ -93,7 +93,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setTeamKey(actor.teamKey());
         entity.setName(command.name());
         entity.setVersion(command.version());
-        entity.setStage(Stage.NOT_STARTED.name());
+        entity.setStage(command.stage().name());
         entity.setStartDate(command.startDate());
         entity.setPlannedReleaseDate(command.plannedReleaseDate());
         entity.setCreatorUserId(actor.userId());
@@ -102,6 +102,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setUpdaterUserId(actor.userId());
         entity.setUpdaterUserName(actor.userName());
         entity.setVersionNo(1);
+        entity.setReleasedAt(command.stage() == Stage.RELEASED ? LocalDateTime.now() : null);
         iterationMapper.insert(entity);
         insertMembers(entity.getId(), members);
         return load(entity);
@@ -111,7 +112,8 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     @Transactional
     public StoredIteration update(long iterationId, UpdateCommand command, Actor actor) {
         int changed = iterationMapper.updateBasic(iterationId, command.versionNo(), command.name(), command.version(),
-                command.startDate(), command.plannedReleaseDate(), actor.userId(), actor.userName());
+                command.stage().name(), command.startDate(), command.plannedReleaseDate(),
+                actor.userId(), actor.userName());
         requireChanged(changed);
         return findById(iterationId).orElseThrow(() -> new TeamIterationException("迭代不存在"));
     }

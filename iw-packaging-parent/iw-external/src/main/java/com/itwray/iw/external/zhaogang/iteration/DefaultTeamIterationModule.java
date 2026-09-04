@@ -143,8 +143,10 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     public IterationDetail update(Actor actor, long iterationId, UpdateCommand command) {
         StoredIteration stored = requireStored(iterationId);
         requireMember(actor, stored);
-        validateBasic(command.name(), command.version(), command.startDate(), command.plannedReleaseDate());
-        return toDetail(actor, repository.update(iterationId, normalize(command), actor));
+        UpdateCommand normalized = normalize(command, Stage.valueOf(stored.iteration().getStage()));
+        validateBasic(normalized.name(), normalized.version(), normalized.stage(), normalized.startDate(),
+                normalized.plannedReleaseDate());
+        return toDetail(actor, repository.update(iterationId, normalized, actor));
     }
 
     @Override
@@ -253,6 +255,14 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 StringUtils.trimToNull(command.definitionOfDone()), command.estimatedHours(),
                 StringUtils.trimToNull(command.taskType()), command.onlineBug(),
                 StringUtils.trimToNull(command.bugPriority()), syncStatus, actor);
+        if (Boolean.TRUE.equals(command.syncToCoding()) && syncStatus == IssueSyncStatus.PENDING) {
+            try {
+                return performIssueSync(actor, iterationId, entity, stored.issues(), stored.worklogs(), true);
+            } catch (TeamIterationException error) {
+                return autoSyncFailure(actor, iterationId, entity, IssueSyncStatus.FAILED,
+                        "AUTO_SYNC_FAILED", error.getMessage());
+            }
+        }
         return toIssue(actor, entity, Map.of(), Map.of(), new HashSet<>());
     }
 
@@ -367,8 +377,15 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         CodingIssueType type = CodingIssueType.valueOf(entity.getIssueType());
         if (type == CodingIssueType.REQUIREMENT) throw new TeamIterationException("需求不允许同步到 CODING");
         if (type == CodingIssueType.TASK) throw new TeamIterationException("任务只能从 CODING 关联");
+        return performIssueSync(actor, iterationId, entity, stored.issues(), stored.worklogs(), false);
+    }
+
+    private IterationIssue performIssueSync(Actor actor, long iterationId, IssueEntity entity,
+                                            List<IssueEntity> issues, List<IssueWorklogEntity> worklogs,
+                                            boolean returnFailure) {
+        CodingIssueType type = CodingIssueType.valueOf(entity.getIssueType());
         validateSyncFields(entity, type);
-        IssueEntity codingParent = codingParentFor(type, entity, stored.issues());
+        IssueEntity codingParent = codingParentFor(type, entity, issues);
         Long parentCode = type == CodingIssueType.DEFECT ? null : codingParent.getIssueCode();
         CodingIssueMetadataCatalog.IssueMetadata metadata;
         try {
@@ -383,27 +400,50 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         }
         CreateIssueRequest request = createIssueRequest(entity, type, codingParent.getProjectName(),
                 parentCode, actor.userId(), metadata);
-        if (!repository.claimIssueSync(iterationId, issueId, actor)) {
+        if (!repository.claimIssueSync(iterationId, entity.getId(), actor)) {
             throw new TeamIterationException("该事项的同步状态已变化，请刷新后重试");
         }
         try {
             CodingOpenApiPort.Issue created = coding.createIssue(actor.token(), request);
             CodingIssueType actualType = supportedType(created);
             String url = codingIssueUrl(actor.teamKey(), codingParent.getProjectName(), actualType, created.code());
-            IssueEntity updated = repository.markIssueSynced(iterationId, issueId, url,
+            IssueEntity updated = repository.markIssueSynced(iterationId, entity.getId(), url,
                     issueHash(codingParent.getProjectName(), created.code()), created.id(), created.code(), actualType,
                     created.type(), created.issueTypeId(), displayTypeName(created, actualType), created.title(),
                     parentCode, actor);
-            return toIssue(actor, updated, Map.of(), worklogsByIssue(stored.worklogs()), new HashSet<>());
+            return toIssue(actor, updated, Map.of(), worklogsByIssue(worklogs), new HashSet<>());
         } catch (CodingOpenApiException error) {
             String message = error.isPermissionDenied()
                     ? error.permissionMessage()
                     : "CODING 事项同步失败：" + StringUtils.defaultIfBlank(error.getMessage(), "请稍后重试");
             IssueSyncStatus failureStatus = error.isTransportFailure()
                     ? IssueSyncStatus.UNKNOWN : IssueSyncStatus.FAILED;
-            repository.markIssueSyncFailed(iterationId, issueId, failureStatus, error.code(), message, actor);
+            repository.markIssueSyncFailed(iterationId, entity.getId(), failureStatus, error.code(), message, actor);
+            if (returnFailure) {
+                entity.setSyncStatus(failureStatus.name());
+                entity.setSyncMessage(message);
+                entity.setSyncErrorCode(error.code());
+                entity.setSyncStartedAt(null);
+                return toIssue(actor, entity, Map.of(), Map.of(), new HashSet<>());
+            }
             throw new TeamIterationException(message, error);
         }
+    }
+
+    private IterationIssue autoSyncFailure(Actor actor, long iterationId, IssueEntity entity,
+                                           IssueSyncStatus status, String errorCode, String message) {
+        IssueEntity latest = repository.findIssue(iterationId, entity.getId()).orElse(entity);
+        IssueSyncStatus latestStatus = syncStatus(latest);
+        if (latestStatus != IssueSyncStatus.PENDING && latestStatus != IssueSyncStatus.FAILED) {
+            return toIssue(actor, latest, Map.of(), Map.of(), new HashSet<>());
+        }
+        String failureMessage = StringUtils.defaultIfBlank(message, "自动同步 CODING 失败，请稍后重试");
+        repository.markIssueSyncFailed(iterationId, latest.getId(), status, errorCode, failureMessage, actor);
+        latest.setSyncStatus(status.name());
+        latest.setSyncMessage(failureMessage);
+        latest.setSyncErrorCode(errorCode);
+        latest.setSyncStartedAt(null);
+        return toIssue(actor, latest, Map.of(), Map.of(), new HashSet<>());
     }
 
     @Override
@@ -1065,7 +1105,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         if (command == null || StringUtils.isBlank(command.requestId()) || command.requestId().length() > 64) {
             throw new TeamIterationException("创建请求标识不正确");
         }
-        validateBasic(command.name(), command.version(), command.startDate(), command.plannedReleaseDate());
+        validateBasic(command.name(), command.version(), command.stage(), command.startDate(),
+                command.plannedReleaseDate());
         validateMembers(command.members(), creatorUserId);
     }
 
@@ -1085,12 +1126,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         }
     }
 
-    private void validateBasic(String name, String version, java.time.LocalDate startDate,
+    private void validateBasic(String name, String version, Stage stage, java.time.LocalDate startDate,
                                java.time.LocalDate plannedReleaseDate) {
         if (StringUtils.isBlank(name) || name.trim().length() > 128) {
             throw new TeamIterationException("迭代标题不能为空且不能超过 128 个字符");
         }
         if (StringUtils.length(version) > 64) throw new TeamIterationException("版本不能超过 64 个字符");
+        if (stage == null) throw new TeamIterationException("请选择迭代状态");
         if (startDate != null && plannedReleaseDate != null && plannedReleaseDate.isBefore(startDate)) {
             throw new TeamIterationException("计划上线日期不能早于开始日期");
         }
@@ -1180,11 +1222,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
 
     private CreateCommand normalize(CreateCommand command) {
         return new CreateCommand(command.requestId(), command.name().trim(), StringUtils.trimToNull(command.version()),
+                command.stage(),
                 command.startDate(), command.plannedReleaseDate(), command.members());
     }
 
-    private UpdateCommand normalize(UpdateCommand command) {
-        return new UpdateCommand(command.versionNo(), command.name().trim(), StringUtils.trimToNull(command.version()),
+    private UpdateCommand normalize(UpdateCommand command, Stage currentStage) {
+        return new UpdateCommand(command.versionNo(), command.name().trim(),
+                StringUtils.trimToNull(command.version()), command.stage() == null ? currentStage : command.stage(),
                 command.startDate(), command.plannedReleaseDate());
     }
 
