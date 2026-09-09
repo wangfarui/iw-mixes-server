@@ -12,6 +12,7 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssueSyncSt
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.MemberInput;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Role;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Stage;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.StageCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.RegisterWorklogCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.RemoveIssuesCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateIssueCommand;
@@ -171,6 +172,43 @@ class DefaultTeamIterationModuleTest {
         verify(repository).update(eq(1L), commandCaptor.capture(), eq(actor));
         assertThat(commandCaptor.getValue().stage()).isEqualTo(Stage.NOT_STARTED);
         assertThat(commandCaptor.getValue().version()).isEqualTo("legacy-version");
+    }
+
+    @Test
+    void transitionPersistsTargetStageAndVisibleOrderingAnchors() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        StoredIteration moved = stored(selfMember(), List.of());
+        StoredIteration previous = stored(selfMember(), List.of());
+        previous.iteration().setId(2L);
+        previous.iteration().setStage(Stage.TESTING.name());
+        when(repository.findById(1L)).thenReturn(Optional.of(moved));
+        when(repository.findById(2L)).thenReturn(Optional.of(previous));
+        when(repository.move(1L, 1, Stage.TESTING, 2L, null, actor)).thenReturn(moved);
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
+                new CodingIssueUrlParser());
+
+        module.transition(actor, 1L, new StageCommand(1, Stage.TESTING, 2L, null));
+
+        verify(repository).move(1L, 1, Stage.TESTING, 2L, null, actor);
+    }
+
+    @Test
+    void transitionRejectsAnchorOutsideTargetStage() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        StoredIteration moved = stored(selfMember(), List.of());
+        StoredIteration wrongStage = stored(selfMember(), List.of());
+        wrongStage.iteration().setId(2L);
+        when(repository.findById(1L)).thenReturn(Optional.of(moved));
+        when(repository.findById(2L)).thenReturn(Optional.of(wrongStage));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
+                new CodingIssueUrlParser());
+
+        assertThatThrownBy(() -> module.transition(actor, 1L,
+                new StageCommand(1, Stage.TESTING, 2L, null)))
+                .isInstanceOf(TeamIterationException.class)
+                .hasMessageContaining("目标位置已变化");
     }
 
     @Test

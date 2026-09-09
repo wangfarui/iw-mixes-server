@@ -192,6 +192,7 @@ create table external_zhaogang_iteration
     name                 varchar(128)                       not null comment '迭代标题',
     version              varchar(64)                        null comment '版本号',
     stage                varchar(32)                        not null comment 'NOT_STARTED/DEVELOPING/TESTING/RELEASED',
+    board_order          bigint default 0                   not null comment '看板内排序值，越小越靠前',
     start_date           date                               null comment '开始日期',
     planned_release_date date                               null comment '计划上线日期',
     creator_user_id      bigint unsigned                    not null comment '创建人CODING用户ID',
@@ -206,6 +207,7 @@ create table external_zhaogang_iteration
     update_time          datetime default current_timestamp not null on update current_timestamp comment '更新时间',
     primary key (id),
     unique key uk_request_id (request_id),
+    key idx_team_stage_order (team_key, stage, board_order, id),
     key idx_team_stage_update (team_key, stage, update_time),
     key idx_creator_update (creator_user_id, update_time)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台人工迭代';

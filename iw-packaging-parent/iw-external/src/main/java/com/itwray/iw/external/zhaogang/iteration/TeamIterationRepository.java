@@ -53,7 +53,8 @@ interface TeamIterationRepository {
 
     StoredIteration update(long iterationId, UpdateCommand command, Actor actor);
 
-    StoredIteration updateStage(long iterationId, int versionNo, Stage stage, Actor actor);
+    StoredIteration move(long iterationId, int versionNo, Stage stage, Long previousIterationId,
+                         Long nextIterationId, Actor actor);
 
     StoredIteration replaceMembers(long iterationId, int versionNo, Actor actor, List<ResolvedMember> members);
 

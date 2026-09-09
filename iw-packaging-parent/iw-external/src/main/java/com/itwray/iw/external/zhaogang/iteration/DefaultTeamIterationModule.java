@@ -154,7 +154,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         StoredIteration stored = requireStored(iterationId);
         requireMember(actor, stored);
         if (command == null || command.targetStage() == null) throw new TeamIterationException("请选择迭代状态");
-        return toDetail(actor, repository.updateStage(iterationId, command.versionNo(), command.targetStage(), actor));
+        validatePositionAnchor(actor, stored, command.targetStage(), command.previousIterationId());
+        validatePositionAnchor(actor, stored, command.targetStage(), command.nextIterationId());
+        if (command.previousIterationId() != null && command.previousIterationId().equals(command.nextIterationId())) {
+            throw new TeamIterationException("目标位置不正确，请刷新后重试");
+        }
+        return toDetail(actor, repository.move(iterationId, command.versionNo(), command.targetStage(),
+                command.previousIterationId(), command.nextIterationId(), actor));
     }
 
     @Override
@@ -641,6 +647,19 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         if (stored.iteration().getCreatorUserId() != actor.userId()) {
             throw new TeamIterationException("只有创建人可以维护迭代成员或删除迭代");
         }
+    }
+
+    private void validatePositionAnchor(Actor actor, StoredIteration moved, Stage targetStage, Long anchorId) {
+        if (anchorId == null) return;
+        if (anchorId.equals(moved.iteration().getId())) {
+            throw new TeamIterationException("目标位置不正确，请刷新后重试");
+        }
+        StoredIteration anchor = requireStored(anchorId);
+        boolean sameBoard = moved.iteration().getTeamKey().equals(anchor.iteration().getTeamKey())
+                && targetStage.name().equals(anchor.iteration().getStage());
+        boolean visible = anchor.members().stream()
+                .anyMatch(item -> item.member().getCodingUserId() == actor.userId());
+        if (!sameBoard || !visible) throw new TeamIterationException("目标位置已变化，请刷新后重试");
     }
 
     private List<ResolvedMember> resolveMembers(Actor actor, List<MemberInput> inputs, boolean creating) {

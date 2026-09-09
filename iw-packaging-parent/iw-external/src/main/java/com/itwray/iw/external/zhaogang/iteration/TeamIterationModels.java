@@ -92,7 +92,10 @@ public final class TeamIterationModels {
                                 LocalDate plannedReleaseDate) {
     }
 
-    public record StageCommand(int versionNo, Stage targetStage) {
+    public record StageCommand(int versionNo, Stage targetStage, Long previousIterationId, Long nextIterationId) {
+        public StageCommand(int versionNo, Stage targetStage) {
+            this(versionNo, targetStage, null, null);
+        }
     }
 
     public record ReplaceMembersCommand(int versionNo, List<MemberInput> members) {

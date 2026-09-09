@@ -41,6 +41,8 @@ import java.util.Optional;
 @Repository
 class MybatisTeamIterationRepository implements TeamIterationRepository {
 
+    private static final long BOARD_ORDER_STEP = 1024L;
+
     private final ZhaogangIterationMapper iterationMapper;
     private final ZhaogangIterationMemberMapper memberMapper;
     private final ZhaogangIterationMemberRoleMapper roleMapper;
@@ -94,6 +96,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setName(command.name());
         entity.setVersion(command.version());
         entity.setStage(command.stage().name());
+        entity.setBoardOrder(newBoardOrder());
         entity.setStartDate(command.startDate());
         entity.setPlannedReleaseDate(command.plannedReleaseDate());
         entity.setCreatorUserId(actor.userId());
@@ -112,7 +115,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     @Transactional
     public StoredIteration update(long iterationId, UpdateCommand command, Actor actor) {
         int changed = iterationMapper.updateBasic(iterationId, command.versionNo(), command.name(), command.version(),
-                command.stage().name(), command.startDate(), command.plannedReleaseDate(),
+                command.stage().name(), newBoardOrder(), command.startDate(), command.plannedReleaseDate(),
                 actor.userId(), actor.userName());
         requireChanged(changed);
         return findById(iterationId).orElseThrow(() -> new TeamIterationException("迭代不存在"));
@@ -120,11 +123,29 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
 
     @Override
     @Transactional
-    public StoredIteration updateStage(long iterationId, int versionNo, Stage stage, Actor actor) {
+    public StoredIteration move(long iterationId, int versionNo, Stage stage, Long previousIterationId,
+                                Long nextIterationId, Actor actor) {
+        IterationEntity current = iterationMapper.selectById(iterationId);
+        if (current == null) throw new TeamIterationException("迭代不存在");
+        Map<String, List<Long>> boardIds = new HashMap<>();
+        java.util.stream.Stream.of(current.getStage(), stage.name()).distinct().sorted()
+                .forEach(boardStage -> boardIds.put(boardStage,
+                        iterationMapper.selectStageIdsForUpdate(actor.teamKey(), boardStage)));
         LocalDateTime releasedAt = stage == Stage.RELEASED ? LocalDateTime.now() : null;
         requireChanged(iterationMapper.updateStage(iterationId, versionNo, stage.name(), releasedAt,
                 actor.userId(), actor.userName()));
+        List<Long> orderedIds = new ArrayList<>(boardIds.get(stage.name()));
+        orderedIds.remove(iterationId);
+        int targetIndex = IterationBoardOrdering.insertionIndex(orderedIds, previousIterationId, nextIterationId);
+        orderedIds.add(targetIndex, iterationId);
+        for (int index = 0; index < orderedIds.size(); index++) {
+            iterationMapper.updateBoardOrder(orderedIds.get(index), (index + 1L) * BOARD_ORDER_STEP);
+        }
         return findById(iterationId).orElseThrow(() -> new TeamIterationException("迭代不存在"));
+    }
+
+    private long newBoardOrder() {
+        return -System.currentTimeMillis();
     }
 
     @Override

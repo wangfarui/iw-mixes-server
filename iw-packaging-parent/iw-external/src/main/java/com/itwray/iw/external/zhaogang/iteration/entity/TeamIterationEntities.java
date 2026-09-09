@@ -27,6 +27,7 @@ public final class TeamIterationEntities {
         private String name;
         private String version;
         private String stage;
+        private Long boardOrder;
         private LocalDate startDate;
         private LocalDate plannedReleaseDate;
         private Long creatorUserId;

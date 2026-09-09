@@ -34,7 +34,7 @@ public interface ZhaogangIterationMapper extends BaseMapper<IterationEntity> {
                <if test='keyword != null and keyword != ""'>
                and i.name like concat('%', #{keyword}, '%')
                </if>
-             order by i.update_time desc, i.id desc
+             order by i.board_order asc, i.update_time desc, i.id desc
              limit #{offset}, #{pageSize}
             </script>
             """)
@@ -76,9 +76,19 @@ public interface ZhaogangIterationMapper extends BaseMapper<IterationEntity> {
                     @Param("memberUserId") Long memberUserId,
                     @Param("keyword") String keyword);
 
+    @Select("""
+            select id
+             from external_zhaogang_iteration
+             where deleted = 0 and team_key = #{teamKey} and stage = #{stage}
+             order by board_order asc, update_time desc, id desc
+             for update
+            """)
+    List<Long> selectStageIdsForUpdate(@Param("teamKey") String teamKey, @Param("stage") String stage);
+
     @Update("""
             update external_zhaogang_iteration
-               set name = #{name}, version = coalesce(#{version}, version), stage = #{stage},
+               set board_order = case when stage != #{stage} then #{boardOrder} else board_order end,
+                   name = #{name}, version = coalesce(#{version}, version), stage = #{stage},
                    start_date = #{startDate},
                    released_at = case
                        when #{stage} = 'RELEASED' then coalesce(released_at, current_timestamp)
@@ -92,13 +102,15 @@ public interface ZhaogangIterationMapper extends BaseMapper<IterationEntity> {
     int updateBasic(@Param("id") long id, @Param("versionNo") int versionNo,
                     @Param("name") String name, @Param("version") String version,
                     @Param("stage") String stage,
+                    @Param("boardOrder") long boardOrder,
                     @Param("startDate") LocalDate startDate,
                     @Param("plannedReleaseDate") LocalDate plannedReleaseDate,
                     @Param("updaterUserId") long updaterUserId, @Param("updaterUserName") String updaterUserName);
 
     @Update("""
             update external_zhaogang_iteration
-               set stage = #{stage}, released_at = #{releasedAt}, updater_user_id = #{updaterUserId},
+               set released_at = case when stage = #{stage} then released_at else #{releasedAt} end,
+                   stage = #{stage}, updater_user_id = #{updaterUserId},
                    updater_user_name = #{updaterUserName}, version_no = version_no + 1,
                    update_time = current_timestamp
              where id = #{id} and version_no = #{versionNo} and deleted = 0
@@ -106,6 +118,13 @@ public interface ZhaogangIterationMapper extends BaseMapper<IterationEntity> {
     int updateStage(@Param("id") long id, @Param("versionNo") int versionNo, @Param("stage") String stage,
                     @Param("releasedAt") LocalDateTime releasedAt, @Param("updaterUserId") long updaterUserId,
                     @Param("updaterUserName") String updaterUserName);
+
+    @Update("""
+            update external_zhaogang_iteration
+               set board_order = #{boardOrder}
+             where id = #{id} and deleted = 0
+            """)
+    int updateBoardOrder(@Param("id") long id, @Param("boardOrder") long boardOrder);
 
     @Update("""
             update external_zhaogang_iteration
