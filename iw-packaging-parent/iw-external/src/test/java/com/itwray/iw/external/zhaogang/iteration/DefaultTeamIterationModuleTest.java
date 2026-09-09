@@ -44,6 +44,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -779,6 +780,29 @@ class DefaultTeamIterationModuleTest {
     }
 
     @Test
+    void detailUsesPersistedCodingWorklogSummaryWithoutReadingCodingWorklogs() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity subTask = linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "数据来源修复");
+        subTask.setCodingRecordedHours(BigDecimal.ZERO);
+        subTask.setCodingWorklogCount(0);
+        IssueWorklogEntity localAudit = worklog(9L, IssueSyncStatus.SYNCED);
+        when(repository.findById(1L)).thenReturn(Optional.of(
+                stored(selfMember(), List.of(subTask), List.of(localAudit))));
+        when(coding.issue("token", "project-a", 7780L)).thenReturn(new CodingOpenApiPort.Issue(
+                7780L, "SUB_TASK", "子工作项", 31L, "数据来源修复", "项目A", true, 17780L,
+                "已完成", "COMPLETED", new BigDecimal("8")));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
+                new CodingIssueUrlParser());
+
+        var result = module.detail(actor, 1L).issues().get(0);
+
+        assertThat(result.recordedHours()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.recordedWorklogCount()).isZero();
+        verify(coding, never()).issueWorklogs(anyString(), anyString(), anyLong());
+    }
+
+    @Test
     void linkingCodingChildUsesParentIdAndRejectsChildrenUnderSubTasks() {
         TeamIterationRepository repository = mock(TeamIterationRepository.class);
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
@@ -867,6 +891,7 @@ class DefaultTeamIterationModuleTest {
         assertThat(result.syncStatus()).isEqualTo(IssueSyncStatus.SYNCED);
         verify(coding).createIssueWorkHours(eq("token"), eq("project-a"), eq(8001L),
                 eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong());
+        verify(repository).updateCodingWorklogSummary(1L, 2L, new BigDecimal("2.5"), 1, actor);
     }
 
     @Test
@@ -922,6 +947,11 @@ class DefaultTeamIterationModuleTest {
     }
 
     private StoredIteration stored(List<ResolvedMember> resolvedMembers, List<IssueEntity> issues) {
+        return stored(resolvedMembers, issues, List.of());
+    }
+
+    private StoredIteration stored(List<ResolvedMember> resolvedMembers, List<IssueEntity> issues,
+                                   List<IssueWorklogEntity> worklogs) {
         IterationEntity iteration = new IterationEntity();
         iteration.setId(1L);
         iteration.setRequestId("request-1");
@@ -944,7 +974,7 @@ class DefaultTeamIterationModuleTest {
             entity.setAvatar(resolved.user().avatar());
             return new StoredMember(entity, resolved.roles());
         }).toList();
-        return new StoredIteration(iteration, members, issues);
+        return new StoredIteration(iteration, members, issues, worklogs);
     }
 
     private ReleasePlanEntity releasePlan(long id,

@@ -936,8 +936,9 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         try {
             CodingOpenApiPort.Issue codingIssue = coding.issue(actor.token(), issue.getProjectName(),
                     issue.getIssueCode());
-            BigDecimal currentRemaining = coding.issueWorklogs(actor.token(), issue.getProjectName(),
-                            issue.getIssueCode()).stream()
+            List<CodingOpenApiPort.IssueWorklog> codingWorklogs = coding.issueWorklogs(actor.token(),
+                    issue.getProjectName(), issue.getIssueCode());
+            BigDecimal currentRemaining = codingWorklogs.stream()
                     .max(Comparator.comparingLong(CodingOpenApiPort.IssueWorklog::updatedAt)
                     .thenComparingLong(CodingOpenApiPort.IssueWorklog::createdAt)
                             .thenComparingLong(CodingOpenApiPort.IssueWorklog::id))
@@ -948,7 +949,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             long startAt = worklog.getRegisteredAt().atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
             String requestId = coding.createIssueWorkHours(actor.token(), issue.getProjectName(), issue.getIssueCode(),
                     worklog.getSpendHours(), remaining, startAt);
-            return repository.markWorklogSynced(worklog.getId(), requestId);
+            IssueWorklogEntity synced = repository.markWorklogSynced(worklog.getId(), requestId);
+            BigDecimal recordedHours = codingWorklogs.stream().map(CodingOpenApiPort.IssueWorklog::spendHours)
+                    .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .add(worklog.getSpendHours());
+            repository.updateCodingWorklogSummary(issue.getIterationId(), issue.getId(), recordedHours,
+                    codingWorklogs.size() + 1, actor);
+            return synced;
         } catch (CodingOpenApiException error) {
             IssueSyncStatus status = error.isTransportFailure() ? IssueSyncStatus.UNKNOWN : IssueSyncStatus.FAILED;
             String message = error.isPermissionDenied()
@@ -1030,12 +1037,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 .map(IssueWorklogEntity::getSpendHours).filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal codingTotal = entity.getCodingRecordedHours();
-        return codingTotal == null ? localTotal : codingTotal.max(localTotal);
+        return codingTotal == null ? localTotal : codingTotal;
     }
 
     private int recordedWorklogCount(IssueEntity entity, List<IssueWorklogEntity> localWorklogs) {
         int localCount = localWorklogs == null ? 0 : localWorklogs.size();
-        return Math.max(entity.getCodingWorklogCount() == null ? 0 : entity.getCodingWorklogCount(), localCount);
+        Integer codingCount = entity.getCodingWorklogCount();
+        return codingCount == null ? localCount : Math.max(0, codingCount);
     }
 
     private IssueWorklog toWorklog(IssueWorklogEntity entity) {
