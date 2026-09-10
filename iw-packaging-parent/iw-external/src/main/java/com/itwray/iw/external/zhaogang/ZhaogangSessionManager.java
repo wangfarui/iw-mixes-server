@@ -22,7 +22,7 @@ import java.util.Optional;
  * 保持两个无状态 Cookie：短期会话 Cookie 失效后，可由长期令牌 Cookie 自动恢复。
  */
 @Component
-class ZhaogangSessionManager {
+public class ZhaogangSessionManager {
 
     private static final String PAYLOAD_PREFIX = "v2:";
 
@@ -34,12 +34,12 @@ class ZhaogangSessionManager {
 
     private final ObjectMapper objectMapper;
 
-    ZhaogangSessionManager(ZhaogangProperties properties, ObjectMapper objectMapper) {
+    public ZhaogangSessionManager(ZhaogangProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
         this.objectMapper = objectMapper;
     }
 
-    ZhaogangSession resolve(HttpServletRequest request, HttpServletResponse response) {
+    public ZhaogangSession resolve(HttpServletRequest request, HttpServletResponse response) {
         Optional<ZhaogangSession> shortSession = readCookie(request, SESSION_COOKIE);
         if (shortSession.isPresent()) {
             renewSessionCookie(response, shortSession.get());

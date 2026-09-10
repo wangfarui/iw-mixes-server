@@ -53,6 +53,11 @@ iw:
       coding-issue-cache-seconds: ${IW_CODING_ISSUE_CACHE_SECONDS:30}
       worklog-executor-concurrency: ${IW_WORKLOG_EXECUTOR_CONCURRENCY:8}
       calendar-manager-user-id: ${IW_ZHAOGANG_CALENDAR_MANAGER_USER_ID:9292850}
+      agent-backend-url: ${IW_ZHAOGANG_AGENT_BACKEND_URL:https://web.itwray.com}
+      ai-default-model: ${IW_ZHAOGANG_AI_DEFAULT_MODEL:gpt-5.6-terra}
+      ai-connect-timeout-ms: ${IW_ZHAOGANG_AI_CONNECT_TIMEOUT_MS:5000}
+      ai-request-timeout-ms: ${IW_ZHAOGANG_AI_REQUEST_TIMEOUT_MS:60000}
+      ai-max-image-bytes: ${IW_ZHAOGANG_AI_MAX_IMAGE_BYTES:10485760}
     remote-share:
       # Kept under iw-external's stable working directory so Nginx can serve authorized chunks internally.
       storage-directory: data/remote-share

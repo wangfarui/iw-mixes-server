@@ -15,7 +15,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         ZhaogangCalendarController.class,
         ZhaogangTeamController.class,
         ZhaogangIterationController.class,
-        ZhaogangReleaseReceiptController.class
+        ZhaogangReleaseReceiptController.class,
+        com.itwray.iw.external.zhaogang.ai.ZhaogangAiController.class,
+        ZhaogangReleaseImportController.class
 })
 @Order(-1)
 class ZhaogangExceptionHandler {

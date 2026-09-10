@@ -60,6 +60,20 @@ public class ZhaogangProperties {
     /** 复用现有部署环境标记，生产 Cookie 自动带 Secure。 */
     private String webEnv = "dev";
 
+    private String agentBackendUrl = "https://web.itwray.com";
+
+    private String aiDefaultModel = "gpt-5.6-terra";
+
+    private int aiConnectTimeoutMs = 5000;
+
+    private int aiRequestTimeoutMs = 60000;
+
+    private long aiMaxImageBytes = 10 * 1024 * 1024;
+
+    public String getAgentBackendUrl() {
+        return StringUtils.defaultIfBlank(agentBackendUrl, "https://web.itwray.com");
+    }
+
     public String safeApiUrl() {
         return StringUtils.defaultIfBlank(apiUrl, "https://g-iijw5014.coding.net/open-api");
     }

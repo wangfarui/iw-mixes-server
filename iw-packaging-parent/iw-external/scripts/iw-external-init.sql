@@ -145,6 +145,19 @@ create table external_zhaogang_k8s_token
     key idx_user_environment (coding_user_id, environment)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台用户K8s Token';
 
+create table external_zhaogang_ai_config
+(
+    coding_team_id       bigint unsigned not null comment 'CODING顶层团队ID',
+    coding_user_id       bigint unsigned not null comment 'CODING用户ID',
+    api_url              varchar(1000)   not null comment 'OpenAI-compatible Chat Completions完整地址',
+    api_key              varchar(2048)   not null comment '用户AI API Key明文，仅服务端受控读取',
+    model                varchar(128)    not null default 'gpt-5.6-terra' comment '模型名称',
+    execution_location   varchar(16)     not null comment 'AUTO/SERVER/LOCAL_AGENT',
+    create_time          datetime default current_timestamp not null,
+    update_time          datetime default current_timestamp not null on update current_timestamp,
+    primary key (coding_team_id, coding_user_id)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台用户AI识别配置';
+
 create table external_zhaogang_work_calendar
 (
     id             bigint unsigned                    not null auto_increment comment '工作日历ID',
