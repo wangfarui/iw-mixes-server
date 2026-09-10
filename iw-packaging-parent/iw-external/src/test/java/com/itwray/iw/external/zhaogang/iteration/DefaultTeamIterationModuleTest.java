@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.iteration;
 
+import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
@@ -751,6 +752,28 @@ class DefaultTeamIterationModuleTest {
         verify(repository).upsertCodingSnapshot(eq(1L), isNull(), anyString(), anyString(), eq("project-a"),
                 eq(17778L), eq(7778L), eq(CodingIssueType.USER_STORY), eq("REQUIREMENT"), eq(11L), eq("用户故事"),
                 eq("用户故事"), eq("说明"), eq("基础服务组"), eq("测试通过"), isNull(), isNull(), isNull(), eq(actor));
+    }
+
+    @Test
+    void syncCodingIssuesReturnsStructuredPermissionFailure() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity task = linkedIssue(2L, CodingIssueType.TASK, 7780L, "权限调整事项");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(task))));
+        when(coding.issue("token", "project-a", 7780L)).thenThrow(new CodingOpenApiException(
+                "DescribeIssue", "UnauthorizedOperation", "permission denied"));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
+                new CodingIssueUrlParser());
+
+        var result = module.syncCodingIssues(actor, 1L);
+
+        assertThat(result.successCount()).isZero();
+        assertThat(result.failureCount()).isEqualTo(1);
+        assertThat(result.failures().get(0).permissionError()).isNotNull();
+        assertThat(result.failures().get(0).permissionError().type()).isEqualTo("CODING_PERMISSION_DENIED");
+        assertThat(result.failures().get(0).permissionError().action()).isEqualTo("DescribeIssue");
+        assertThat(result.failures().get(0).permissionError().missingPermissions())
+                .containsExactly("项目协同（读写）");
     }
 
     @Test

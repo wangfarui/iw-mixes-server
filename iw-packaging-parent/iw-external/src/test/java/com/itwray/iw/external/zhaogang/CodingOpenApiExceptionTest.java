@@ -31,9 +31,9 @@ class CodingOpenApiExceptionTest {
 
         assertThat(response.getCode()).isEqualTo(403);
         assertThat(response.getMessage()).contains("持续集成构建（读写）");
-        assertThat(response.getData()).isEqualTo(new ZhaogangExceptionHandler.PermissionError(
-                "CODING_PERMISSION_DENIED", java.util.List.of("持续集成构建（读写）"),
-                "TriggerCodingCIBuild", "UnauthorizedOperation"));
+        assertThat(response.getData()).isEqualTo(new CodingPermissionError(
+                "CODING_PERMISSION_DENIED", error.permissionMessage(),
+                java.util.List.of("持续集成构建（读写）"), "TriggerCodingCIBuild", "UnauthorizedOperation"));
     }
 
     @Test

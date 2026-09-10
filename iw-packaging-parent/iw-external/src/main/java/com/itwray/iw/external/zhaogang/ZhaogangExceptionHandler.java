@@ -9,8 +9,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.List;
-
 /** 找钢工作台统一异常契约，避免不同页面丢失 CODING 权限上下文。 */
 @RestControllerAdvice(assignableTypes = {
         ZhaogangController.class,
@@ -64,8 +62,7 @@ class ZhaogangExceptionHandler {
         if (!error.isPermissionDenied()) {
             return GeneralResponse.fail(error.getMessage());
         }
-        return new GeneralResponse<>(403, error.permissionMessage(), new PermissionError(
-                "CODING_PERMISSION_DENIED", error.requiredPermissions(), error.action(), error.code()));
+        return new GeneralResponse<>(403, error.permissionMessage(), CodingPermissionError.from(error));
     }
 
     private CodingOpenApiException permissionCause(Throwable error) {
@@ -77,8 +74,5 @@ class ZhaogangExceptionHandler {
             current = current.getCause();
         }
         return null;
-    }
-
-    record PermissionError(String type, List<String> missingPermissions, String action, String codingErrorCode) {
     }
 }

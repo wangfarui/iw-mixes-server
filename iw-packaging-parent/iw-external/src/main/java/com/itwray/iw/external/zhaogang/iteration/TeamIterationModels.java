@@ -1,5 +1,7 @@
 package com.itwray.iw.external.zhaogang.iteration;
 
+import com.itwray.iw.external.zhaogang.CodingPermissionError;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -166,7 +168,11 @@ public final class TeamIterationModels {
                                UserSnapshot creator, LocalDateTime createdAt) {
     }
 
-    public record CodingSyncFailure(long issueId, String title, String reason) {
+    public record CodingSyncFailure(long issueId, String title, String reason,
+                                    CodingPermissionError permissionError) {
+        public CodingSyncFailure(long issueId, String title, String reason) {
+            this(issueId, title, reason, null);
+        }
     }
 
     public record CodingSyncResult(int successCount, int failureCount, List<CodingSyncFailure> failures) {

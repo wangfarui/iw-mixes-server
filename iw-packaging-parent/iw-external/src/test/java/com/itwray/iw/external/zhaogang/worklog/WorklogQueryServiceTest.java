@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.worklog;
 
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingPermissionError;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Worklog;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.WorklogPage;
@@ -53,7 +54,8 @@ class WorklogQueryServiceTest {
         when(coding.worklogPage("token", 1787500799999L, 1788105600001L, 1L, 1000, 1000))
                 .thenReturn(new WorklogPage(List.of(second)));
         when(coding.worklogPage("member-token", 1787500799999L, 1788105600001L, 2L, 0, 1000))
-                .thenThrow(new CodingOpenApiException("member denied"));
+                .thenThrow(new CodingOpenApiException("DescribeAllProjectsIssueWorkLogList",
+                        "UnauthorizedOperation", "permission denied"));
         when(coding.issue("token", "project-a", 101L))
                 .thenReturn(new CodingOpenApiPort.Issue(101L, "REQUIREMENT", "需求", "第一项", "项目 A", false));
         when(coding.issue("token", "project-a", 102L))
@@ -71,6 +73,10 @@ class WorklogQueryServiceTest {
 
         assertThat(entries.coverage().partial()).isTrue();
         assertThat(entries.coverage().failedMemberCount()).isEqualTo(1);
+        assertThat(entries.coverage().permissionError()).isEqualTo(new CodingPermissionError(
+                "CODING_PERMISSION_DENIED",
+                "当前 CODING 令牌缺少“项目协同（读写）”权限。请前往 CODING 令牌管理开通后重试；若已开通，请联系团队管理员检查账号权限",
+                List.of("项目协同（读写）"), "DescribeAllProjectsIssueWorkLogList", "UnauthorizedOperation"));
         assertThat(entries.syncedAt()).isEqualTo("2026-08-24T12:00:00+08:00");
         assertThat(entries.items()).extracting(item -> item.issue().code()).containsExactly(102L, 101L);
         assertThat(entries.items().get(0).issueUrl()).contains("/assignments/issues/102/detail");

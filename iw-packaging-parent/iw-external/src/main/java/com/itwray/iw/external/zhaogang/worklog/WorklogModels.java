@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.worklog;
 
+import com.itwray.iw.external.zhaogang.CodingPermissionError;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarDefaults;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.DayType;
 
@@ -24,7 +25,12 @@ public final class WorklogModels {
     }
 
     public record Coverage(Scope scope, Long workbenchTeamId, int memberCount, int visibleProjectCount,
-                           boolean partial, int failedMemberCount, String warning) {
+                           boolean partial, int failedMemberCount, String warning,
+                           CodingPermissionError permissionError) {
+        public Coverage(Scope scope, Long workbenchTeamId, int memberCount, int visibleProjectCount,
+                        boolean partial, int failedMemberCount, String warning) {
+            this(scope, workbenchTeamId, memberCount, visibleProjectCount, partial, failedMemberCount, warning, null);
+        }
     }
 
     public record DailyTotal(String date, BigDecimal hours, DayType dayType) {

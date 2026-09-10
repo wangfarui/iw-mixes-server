@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.iteration;
 
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingPermissionError;
 import com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CreateIssueRequest;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CustomFieldValue;
@@ -474,11 +475,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                         snapshots, syncedEntities, new HashSet<>());
                 success++;
             } catch (RuntimeException error) {
-                String reason = error instanceof CodingOpenApiException codingError
-                        && codingError.isPermissionDenied() ? codingError.permissionMessage()
+                CodingOpenApiException permissionError = error instanceof CodingOpenApiException codingError
+                        && codingError.isPermissionDenied() ? codingError : null;
+                String reason = permissionError != null ? permissionError.permissionMessage()
                         : StringUtils.defaultIfBlank(error.getMessage(), "同步失败");
                 failures.add(new CodingSyncFailure(entity.getId(), StringUtils.defaultIfBlank(entity.getTitle(),
-                        "#" + entity.getIssueCode()), reason));
+                        "#" + entity.getIssueCode()), reason,
+                        permissionError == null ? null : CodingPermissionError.from(permissionError)));
             }
         }
         return new CodingSyncResult(success, failures.size(), failures);

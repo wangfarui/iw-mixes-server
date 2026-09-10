@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.worklog;
 
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingPermissionError;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Worklog;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Day;
@@ -252,12 +253,14 @@ class WorklogQueryService {
                               List<MemberLogs> results, int projectCount) {
         int failedMembers = (int) results.stream().filter(MemberLogs::failed).count();
         boolean partial = failedMembers > 0 || results.stream().anyMatch(MemberLogs::partial);
-        String permissionWarning = results.stream().map(MemberLogs::error)
+        CodingOpenApiException permissionError = results.stream().map(MemberLogs::error)
                 .filter(CodingOpenApiException.class::isInstance).map(CodingOpenApiException.class::cast)
                 .filter(CodingOpenApiException::isPermissionDenied)
-                .map(CodingOpenApiException::permissionMessage).findFirst().orElse("");
+                .findFirst().orElse(null);
+        String permissionWarning = permissionError == null ? "" : permissionError.permissionMessage();
         String warning = StringUtils.isNotBlank(permissionWarning) ? permissionWarning : "";
-        return new Coverage(scope, workbenchTeamId, members.size(), projectCount, partial, failedMembers, warning);
+        return new Coverage(scope, workbenchTeamId, members.size(), projectCount, partial, failedMembers, warning,
+                permissionError == null ? null : CodingPermissionError.from(permissionError));
     }
 
     private int projectCount(List<Worklog> items) {
