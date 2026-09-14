@@ -154,7 +154,7 @@ class ZhaogangReleaseImportServiceTest {
         ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
         when(aiConfig.vision(eq(8L), eq(7L), any(byte[].class), eq("image/png"), prompt.capture()))
                 .thenReturn(new ObjectMapper().readTree("""
-                        {"choices":[{"message":{"content":"{\\\"rows\\\":[]}"}}]}
+                        {"output":[{"type":"message","content":[{"type":"output_text","text":"{\\\"rows\\\":[]}"}]}]}
                         """));
         when(catalog.catalog(any())).thenReturn(new ZhaogangModels.PlanCatalog(List.of(), List.of(),
                 List.of(), "now", false));

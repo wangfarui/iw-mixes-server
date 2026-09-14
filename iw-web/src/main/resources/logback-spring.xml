@@ -4,7 +4,8 @@
     <springProperty name="APP_NAME" source="spring.application.name"/>
 
     <!-- 定义全局变量，日志文件路径和格式 -->
-    <property name="log.path" value="${user.home}/logs/iw-mixes/${APP_NAME}"/>
+    <!-- 本地启动脚本可通过 IW_LOG_PATH 覆盖；未设置时保持原有用户目录。 -->
+    <property name="log.path" value="${IW_LOG_PATH:-${user.home}/logs/iw-mixes/${APP_NAME}}"/>
     <property name="log.name" value="${APP_NAME}"/>
     <property name="log.pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{traceId:-}] [%X{spanId:-}] %logger{50} - %msg%n"/>
 

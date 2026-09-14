@@ -4,12 +4,15 @@ import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.BatchAddCommand;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.BatchAddResult;
+import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.AsyncTaskSnapshot;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.MatchCommand;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.Preview;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,13 +27,41 @@ public class ZhaogangReleaseImportController {
 
     private final ZhaogangSessionManager sessions;
     private final ZhaogangReleaseImportService service;
+    private final ZhaogangReleaseImportAsyncTaskService asyncTasks;
     private final ZhaogangProperties properties;
 
     public ZhaogangReleaseImportController(ZhaogangSessionManager sessions, ZhaogangReleaseImportService service,
+                                           ZhaogangReleaseImportAsyncTaskService asyncTasks,
                                            ZhaogangProperties properties) {
         this.sessions = sessions;
         this.service = service;
+        this.asyncTasks = asyncTasks;
         this.properties = properties;
+    }
+
+    @PostMapping(value = "/recognize-tasks", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public GeneralResponse<AsyncTaskSnapshot> createTask(@PathVariable long iterationId,
+                                                          @RequestPart("file") MultipartFile file,
+                                                          @RequestParam(value = "projectColumnName", required = false) String projectColumnName,
+                                                          @RequestParam(value = "planColumnName", required = false) String planColumnName,
+                                                          HttpServletRequest request, HttpServletResponse response) throws Exception {
+        validateImage(file);
+        return GeneralResponse.success(asyncTasks.create(actor(request, response), iterationId, file.getBytes(),
+                file.getContentType(), projectColumnName, planColumnName));
+    }
+
+    @GetMapping("/recognize-tasks/{taskId}")
+    public GeneralResponse<AsyncTaskSnapshot> getTask(@PathVariable long iterationId, @PathVariable String taskId,
+                                                       HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = sessions.resolve(request, response);
+        return GeneralResponse.success(asyncTasks.get(teamId(session), session.userId(), iterationId, taskId));
+    }
+
+    @DeleteMapping("/recognize-tasks/{taskId}")
+    public GeneralResponse<AsyncTaskSnapshot> cancelTask(@PathVariable long iterationId, @PathVariable String taskId,
+                                                          HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = sessions.resolve(request, response);
+        return GeneralResponse.success(asyncTasks.cancel(teamId(session), session.userId(), iterationId, taskId));
     }
 
     @PostMapping(value = "/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -66,5 +97,20 @@ public class ZhaogangReleaseImportController {
         ZhaogangSession session = sessions.resolve(request, response);
         return new Actor(session.userId(), session.userName(), session.avatar(), session.token(), session.team(),
                 session.teamId() == null ? 0 : session.teamId(), properties.configuredTeamHost());
+    }
+
+    private void validateImage(MultipartFile file) throws Exception {
+        if (file == null || file.isEmpty() || file.getSize() > properties.getAiMaxImageBytes()) {
+            throw new IllegalArgumentException("截图不能为空且不能超过 10 MB");
+        }
+        String type = file.getContentType();
+        if (!"image/png".equalsIgnoreCase(type) && !"image/jpeg".equalsIgnoreCase(type)
+                && !"image/webp".equalsIgnoreCase(type)) {
+            throw new IllegalArgumentException("只支持 PNG、JPEG、WebP 截图");
+        }
+    }
+
+    private long teamId(ZhaogangSession session) {
+        return session.teamId() == null ? 0 : session.teamId();
     }
 }

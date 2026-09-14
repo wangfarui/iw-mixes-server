@@ -346,6 +346,7 @@ start_service() {
   echo "Starting ${name} on port ${port} ..."
   (
     cd "$PROJECT_ROOT"
+    export IW_LOG_PATH="${IW_LOCAL_SPRING_LOG_DIR:-${PROJECT_ROOT}/logs/spring}"
     # shellcheck disable=SC2086
     nohup java ${JAVA_OPTS} -jar "$jar_path" --spring.profiles.active="$PROFILE" >> "$log_path" 2>&1 &
     echo $! > "$(pid_file "$target")"

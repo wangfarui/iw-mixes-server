@@ -40,6 +40,26 @@ public final class ReleaseImportModels {
         }
     }
 
+    public enum TaskStatus {
+        QUEUED,
+        RUNNING,
+        SUCCEEDED,
+        FAILED,
+        CANCELLED,
+        EXPIRED
+    }
+
+    public enum TaskPhase {
+        QUEUED,
+        WAITING_AI,
+        MATCHING,
+        COMPLETED
+    }
+
+    public record AsyncTaskSnapshot(String taskId, TaskStatus status, TaskPhase phase, int progress,
+                                    Preview preview, String errorCode, String message, boolean retryable) {
+    }
+
     public record MatchCommand(List<RecognizedRow> items) {
         public MatchCommand {
             items = items == null ? List.of() : List.copyOf(items);

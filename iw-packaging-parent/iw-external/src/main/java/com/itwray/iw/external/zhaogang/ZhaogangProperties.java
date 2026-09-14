@@ -60,7 +60,7 @@ public class ZhaogangProperties {
     /** 复用现有部署环境标记，生产 Cookie 自动带 Secure。 */
     private String webEnv = "dev";
 
-    private String agentBackendUrl = "https://web.itwray.com";
+    private String agentBackendUrl = "https://api.itwray.com";
 
     private String aiDefaultModel = "gpt-5.6-terra";
 
@@ -70,8 +70,12 @@ public class ZhaogangProperties {
 
     private long aiMaxImageBytes = 10 * 1024 * 1024;
 
+    private int releaseImportTaskTtlSeconds = 900;
+
+    private int releaseImportTaskConcurrency = 2;
+
     public String getAgentBackendUrl() {
-        return StringUtils.defaultIfBlank(agentBackendUrl, "https://web.itwray.com");
+        return StringUtils.defaultIfBlank(agentBackendUrl, "https://api.itwray.com");
     }
 
     public String safeApiUrl() {

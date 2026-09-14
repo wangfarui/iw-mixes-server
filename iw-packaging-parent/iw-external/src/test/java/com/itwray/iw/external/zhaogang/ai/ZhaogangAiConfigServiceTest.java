@@ -7,7 +7,13 @@ import com.itwray.iw.external.zhaogang.ai.ZhaogangAiModels.ConfigCommand;
 import com.itwray.iw.external.zhaogang.ai.entity.ZhaogangAiConfigEntity;
 import org.junit.jupiter.api.Test;
 
+import java.net.ConnectException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,7 +22,9 @@ class ZhaogangAiConfigServiceTest {
 
     private final ZhaogangAiConfigMapper mapper = mock(ZhaogangAiConfigMapper.class);
     private final ZhaogangProperties properties = new ZhaogangProperties();
-    private final ZhaogangAiConfigService service = new ZhaogangAiConfigService(mapper, properties, new ObjectMapper());
+    private final HttpClient httpClient = mock(HttpClient.class);
+    private final ZhaogangAiConfigService service = new ZhaogangAiConfigService(
+            mapper, properties, new ObjectMapper(), httpClient);
 
     @Test
     void usesTerraAsDefaultModel() {
@@ -33,7 +41,7 @@ class ZhaogangAiConfigServiceTest {
     @Test
     void statusNeverReturnsApiKey() {
         ZhaogangAiConfigEntity entity = new ZhaogangAiConfigEntity();
-        entity.setApiUrl("https://ai.example/v1/chat/completions");
+        entity.setApiUrl("https://ai.example");
         entity.setApiKey("secret-value");
         entity.setModel("vision-model");
         entity.setExecutionLocation("SERVER");
@@ -42,7 +50,7 @@ class ZhaogangAiConfigServiceTest {
         var status = service.status(11L, 22L);
 
         assertThat(status.configured()).isTrue();
-        assertThat(status.apiUrl()).isEqualTo(entity.getApiUrl());
+        assertThat(status.apiUrl()).isEqualTo("https://ai.example");
         assertThat(status.apiKeyMasked()).isEqualTo("secr********alue");
         assertThat(status.apiKeyMasked()).doesNotContain(entity.getApiKey());
         assertThat(status.model()).isEqualTo("vision-model");
@@ -55,10 +63,56 @@ class ZhaogangAiConfigServiceTest {
         entity.setApiKey("old-secret");
         when(mapper.find(11L, 22L)).thenReturn(entity);
 
-        service.save(11L, 22L, new ConfigCommand("https://ai.example/v1/chat/completions", " ", "", "AUTO"));
+        service.save(11L, 22L, new ConfigCommand("https://ai.example", " ", "", "AUTO"));
 
-        verify(mapper).upsert(11L, 22L, "https://ai.example/v1/chat/completions", "old-secret",
+        verify(mapper).upsert(11L, 22L, "https://ai.example", "old-secret",
                 properties.getAiDefaultModel(), "AUTO");
+    }
+
+    @Test
+    void storesOnlyHostAndUsesFixedResponsesEndpoint() {
+        assertThat(ZhaogangAiConfigService.normalizeApiBaseUrl(" https://ai.example/v1/responses/ "))
+                .isEqualTo("https://ai.example");
+        assertThat(ZhaogangAiConfigService.responsesEndpoint("https://ai.example"))
+                .isEqualTo("https://ai.example/v1/responses");
+    }
+
+    @Test
+    void rejectsNonRootApiPaths() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.save(11L, 22L,
+                        new ConfigCommand("https://ai.example/openai", "secret", "model", "SERVER")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不要填写接口路径");
+    }
+
+    @Test
+    void serverConnectionTestReturnsNetworkCodeForAutoFallback() throws Exception {
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenThrow(new ConnectException("connection refused"));
+
+        var result = service.test(11L, 22L,
+                new ConfigCommand("https://ai.example", "secret", "model", "AUTO"));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.executionLocation()).isEqualTo(ZhaogangAiModels.ExecutionLocation.SERVER);
+        assertThat(result.errorCode()).isEqualTo("NETWORK");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void serverConnectionTestCallsFixedEndpoint() throws Exception {
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"OK\"}]}]}");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+        org.mockito.ArgumentCaptor<HttpRequest> request = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+
+        var result = service.test(11L, 22L,
+                new ConfigCommand("https://ai.example", "secret", "model", "SERVER"));
+
+        assertThat(result.success()).isTrue();
+        verify(httpClient).send(request.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(request.getValue().uri().toString()).isEqualTo("https://ai.example/v1/responses");
     }
 
     @Test

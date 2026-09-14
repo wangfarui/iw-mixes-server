@@ -149,7 +149,7 @@ create table external_zhaogang_ai_config
 (
     coding_team_id       bigint unsigned not null comment 'CODING顶层团队ID',
     coding_user_id       bigint unsigned not null comment 'CODING用户ID',
-    api_url              varchar(1000)   not null comment 'OpenAI-compatible Chat Completions完整地址',
+    api_url              varchar(1000)   not null comment 'OpenAI Responses API服务地址，调用时固定补充/v1/responses',
     api_key              varchar(2048)   not null comment '用户AI API Key明文，仅服务端受控读取',
     model                varchar(128)    not null default 'gpt-5.6-terra' comment '模型名称',
     execution_location   varchar(16)     not null comment 'AUTO/SERVER/LOCAL_AGENT',

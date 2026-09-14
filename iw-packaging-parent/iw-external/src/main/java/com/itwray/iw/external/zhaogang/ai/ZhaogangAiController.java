@@ -8,6 +8,7 @@ import com.itwray.iw.external.zhaogang.ai.ZhaogangAiModels.AgentRedeem;
 import com.itwray.iw.external.zhaogang.ai.ZhaogangAiModels.AgentTicket;
 import com.itwray.iw.external.zhaogang.ai.ZhaogangAiModels.ConfigCommand;
 import com.itwray.iw.external.zhaogang.ai.ZhaogangAiModels.ConfigStatus;
+import com.itwray.iw.external.zhaogang.ai.ZhaogangAiModels.ConnectionTestResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -58,10 +59,17 @@ public class ZhaogangAiController {
     }
 
     @PostMapping("/config/test")
-    public GeneralResponse<String> test(@RequestBody(required = false) ConfigCommand command,
-                                        HttpServletRequest request, HttpServletResponse response) {
+    public GeneralResponse<ConnectionTestResult> test(@RequestBody(required = false) ConfigCommand command,
+                                                       HttpServletRequest request, HttpServletResponse response) {
         ZhaogangSession session = sessions.resolve(request, response);
         return GeneralResponse.success(aiConfig.test(teamId(session), session.userId(), command));
+    }
+
+    @PostMapping("/config/test-ticket")
+    public GeneralResponse<AgentTicket> issueTestTicket(@RequestBody(required = false) ConfigCommand command,
+                                                         HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = sessions.resolve(request, response);
+        return GeneralResponse.success(tickets.issueConnectionTest(teamId(session), session.userId(), command));
     }
 
     @PostMapping("/agent-tickets")

@@ -32,6 +32,10 @@ public final class ZhaogangAiModels {
                                 String executionLocation) {
     }
 
+    public record ConnectionTestResult(boolean success, ExecutionLocation executionLocation,
+                                       String errorCode, String message) {
+    }
+
     public record AgentTicket(String ticket, String recognitionTaskId, String backendUrl, int expiresInSeconds) {
     }
 

@@ -38,22 +38,33 @@ public class ZhaogangAgentTicketService {
         if (teamId <= 0 || userId <= 0 || iterationId <= 0) {
             throw new IllegalArgumentException("找钢工作台票据参数不完整");
         }
-        String ticket = randomTicket();
-        String recognitionTaskId = UUID.randomUUID().toString();
         ZhaogangAiModels.ConfigCommand config = aiConfig.stored(teamId, userId);
         if (config == null || config.apiUrl() == null || config.apiUrl().isBlank()
                 || config.apiKey() == null || config.apiKey().isBlank()) {
             throw new IllegalArgumentException("请先在设置中配置 AI 识别");
         }
-        AgentRedeem redeem = new AgentRedeem(config.apiUrl(), ZhaogangAiConfigService.normalizeApiKey(config.apiKey()),
+        return store(new AgentRedeem(ZhaogangAiConfigService.responsesEndpoint(config.apiUrl()),
+                ZhaogangAiConfigService.normalizeApiKey(config.apiKey()),
                 config.model(), ReleaseImportPrompt.build(projectColumnName, planColumnName),
-                properties.getTeam(), teamId, userId, iterationId, recognitionTaskId);
+                properties.getTeam(), teamId, userId, iterationId, UUID.randomUUID().toString()));
+    }
+
+    public AgentTicket issueConnectionTest(long teamId, long userId, ZhaogangAiModels.ConfigCommand command) {
+        ZhaogangAiModels.ConfigCommand config = aiConfig.resolve(teamId, userId, command);
+        return store(new AgentRedeem(ZhaogangAiConfigService.responsesEndpoint(config.apiUrl()),
+                ZhaogangAiConfigService.normalizeApiKey(config.apiKey()), config.model(),
+                "这是 AI 视觉连接测试。忽略图片内容，只返回 OK，不要输出其它内容。", "",
+                teamId, userId, 0, UUID.randomUUID().toString()));
+    }
+
+    private AgentTicket store(AgentRedeem redeem) {
+        String ticket = randomTicket();
         try {
             redis.opsForValue().set(KEY_PREFIX + ticket, objectMapper.writeValueAsString(redeem), TTL);
         } catch (Exception error) {
             throw new IllegalStateException("本机 Agent 票据创建失败", error);
         }
-        return new AgentTicket(ticket, recognitionTaskId, properties.getAgentBackendUrl(), 60);
+        return new AgentTicket(ticket, redeem.recognitionTaskId(), properties.getAgentBackendUrl(), 60);
     }
 
     public AgentRedeem redeem(String ticket) {

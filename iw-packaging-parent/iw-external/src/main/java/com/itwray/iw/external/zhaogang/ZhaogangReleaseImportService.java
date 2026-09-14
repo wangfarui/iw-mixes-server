@@ -21,6 +21,7 @@ import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.MatchRo
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.Preview;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.RecognizedRow;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.Status;
+import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportModels.TaskPhase;
 import com.itwray.iw.external.zhaogang.releaseimport.ReleaseImportPrompt;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -58,13 +60,23 @@ public class ZhaogangReleaseImportService {
 
     public Preview recognizeAndMatch(Actor actor, long iterationId, byte[] image, String contentType,
                                      String projectColumnName, String planColumnName) {
+        return recognizeAndMatch(actor, iterationId, image, contentType, projectColumnName, planColumnName, ignored -> {
+        });
+    }
+
+    public Preview recognizeAndMatch(Actor actor, long iterationId, byte[] image, String contentType,
+                                     String projectColumnName, String planColumnName,
+                                     Consumer<TaskPhase> phaseConsumer) {
         if (image == null || image.length == 0 || image.length > properties.getAiMaxImageBytes()) {
             throw new IllegalArgumentException("截图不能为空且不能超过 10 MB");
         }
+        Consumer<TaskPhase> progress = phaseConsumer == null ? ignored -> { } : phaseConsumer;
+        progress.accept(TaskPhase.WAITING_AI);
         JsonNode response = aiConfig.vision(actor.codingTeamId(), actor.userId(), image,
                 contentType, ReleaseImportPrompt.build(projectColumnName, planColumnName));
         String content = ZhaogangAiConfigService.content(response);
         List<RecognizedRow> rows = parseRows(content);
+        progress.accept(TaskPhase.MATCHING);
         return match(actor, iterationId, rows);
     }
 
