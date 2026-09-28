@@ -37,6 +37,7 @@ public class CodingIssueSnapshotLoader {
     private final ExecutorService executor;
     private final Map<CacheKey, CachedIssue> cache = new ConcurrentHashMap<>();
     private final Map<CacheKey, CompletableFuture<Lookup>> inFlight = new ConcurrentHashMap<>();
+    private final Map<IssueKey, Long> versions = new ConcurrentHashMap<>();
 
     @Autowired
     public CodingIssueSnapshotLoader(CodingOpenApiPort coding, ZhaogangProperties properties) {
@@ -57,8 +58,9 @@ public class CodingIssueSnapshotLoader {
                 continue;
             }
             futures.put(issueKey, inFlight.computeIfAbsent(cacheKey, key -> {
+                long version = versions.getOrDefault(issueKey, 0L);
                 CompletableFuture<Lookup> future = CompletableFuture.supplyAsync(
-                        () -> fetch(token, issueKey), executor);
+                        () -> fetch(token, issueKey, version), executor);
                 future.whenComplete((ignored, error) -> inFlight.remove(key, future));
                 return future;
             }));
@@ -69,12 +71,23 @@ public class CodingIssueSnapshotLoader {
         return result;
     }
 
-    private Lookup fetch(String token, IssueKey issueKey) {
+    public synchronized void invalidate(String projectName, long issueCode) {
+        IssueKey issueKey = new IssueKey(projectName, issueCode);
+        versions.merge(issueKey, 1L, Long::sum);
+        cache.keySet().removeIf(key -> key.issueKey().equals(issueKey));
+        inFlight.keySet().removeIf(key -> key.issueKey().equals(issueKey));
+    }
+
+    private Lookup fetch(String token, IssueKey issueKey, long version) {
         try {
             CodingOpenApiPort.Issue issue = coding.issue(token, issueKey.projectName(), issueKey.issueCode());
             if (issue != null && !cacheTtl.isZero()) {
-                cache.put(new CacheKey(CodingRequestLimiter.fingerprint(token), issueKey),
-                        new CachedIssue(issue, Instant.now().plus(cacheTtl)));
+                synchronized (this) {
+                    if (versions.getOrDefault(issueKey, 0L) == version) {
+                        cache.put(new CacheKey(CodingRequestLimiter.fingerprint(token), issueKey),
+                                new CachedIssue(issue, Instant.now().plus(cacheTtl)));
+                    }
+                }
             }
             return new Lookup(issue, null);
         } catch (RuntimeException error) {

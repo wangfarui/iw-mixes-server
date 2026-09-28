@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.iteration;
 
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
@@ -35,6 +36,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -552,6 +554,7 @@ class DefaultTeamIterationModuleTest {
     void editingLinkedIssueAutomaticallyUpdatesCoding() {
         TeamIterationRepository repository = mock(TeamIterationRepository.class);
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        CodingIssueSnapshotLoader snapshots = mock(CodingIssueSnapshotLoader.class);
         IssueEntity issue = linkedIssue(2L, CodingIssueType.REQUIREMENT, 8001L, "原需求");
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
         when(coding.modifyIssue(eq("token"), any(CodingOpenApiPort.ModifyIssueRequest.class)))
@@ -562,10 +565,12 @@ class DefaultTeamIterationModuleTest {
             issue.setDescription(command.description());
             return issue;
         });
-        when(coding.issue("token", "project-a", 8001L))
-                .thenReturn(codingIssue(8001L, "REQUIREMENT", "需求", "更新后的需求", false));
+        when(snapshots.load(eq("token"), any())).thenReturn(Map.of(
+                new CodingIssueSnapshotLoader.IssueKey("project-a", 8001L),
+                new CodingIssueSnapshotLoader.Lookup(
+                        codingIssue(8001L, "REQUIREMENT", "需求", "更新后的需求", false), null)));
         DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
-                new CodingIssueUrlParser());
+                new CodingIssueUrlParser(), null, new CodingIssueMetadataCatalog(coding), null, snapshots);
 
         module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("更新后的需求", "更新说明",
                 null, null, null, null, null, null));
@@ -576,6 +581,7 @@ class DefaultTeamIterationModuleTest {
         assertThat(request.getValue().issueCode()).isEqualTo(8001L);
         assertThat(request.getValue().name()).isEqualTo("更新后的需求");
         assertThat(request.getValue().description()).isEqualTo("更新说明");
+        verify(snapshots).invalidate("project-a", 8001L);
     }
 
     @Test

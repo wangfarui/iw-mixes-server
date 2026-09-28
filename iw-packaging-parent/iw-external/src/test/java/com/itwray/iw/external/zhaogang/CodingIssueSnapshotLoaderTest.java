@@ -4,12 +4,37 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class CodingIssueSnapshotLoaderTest {
+
+    @Test
+    void successfulCodingEditMustNotLeaveOldTitleInSnapshot() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        ZhaogangProperties properties = new ZhaogangProperties();
+        properties.setCodingIssueCacheSeconds(30);
+        AtomicReference<String> title = new AtomicReference<>("编辑前");
+        when(coding.issue(anyString(), eq("project-a"), eq(1L))).thenAnswer(invocation ->
+                new CodingOpenApiPort.Issue(1L, "SUB_TASK", "子工作项", title.get(), "project-a", true));
+        CodingIssueSnapshotLoader loader = new CodingIssueSnapshotLoader(coding, properties);
+        try {
+            var key = new CodingIssueSnapshotLoader.IssueKey("project-a", 1L);
+            assertThat(loader.load("token", List.of(key)).get(key).issue().title()).isEqualTo("编辑前");
+            assertThat(loader.load("another-token", List.of(key)).get(key).issue().title()).isEqualTo("编辑前");
+            title.set("编辑后");
+            loader.invalidate("project-a", 1L);
+            assertThat(loader.load("token", List.of(key)).get(key).issue().title()).isEqualTo("编辑后");
+            assertThat(loader.load("another-token", List.of(key)).get(key).issue().title()).isEqualTo("编辑后");
+        } finally {
+            loader.shutdown();
+        }
+    }
 
     @Test
     void deduplicatesAndLoadsIssueSnapshotsInParallel() {

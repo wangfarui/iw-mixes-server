@@ -338,6 +338,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         UpdateIssueCommand normalized = normalize(type, command);
         if (isCodingBacked(issue)) {
             modifyCodingIssue(actor, issue, type, normalized);
+            invalidateIssueSnapshot(issue.getProjectName(), issue.getIssueCode());
         }
         IssueEntity updated = repository.updateIssue(iterationId, issueId, normalized, actor);
         return toIssue(actor, updated, Map.of(), worklogsByIssue(stored.worklogs()), new HashSet<>());
@@ -355,6 +356,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         try {
             coding.modifyIssue(actor.token(), new ModifyIssueRequest(issue.getProjectName(), issue.getIssueCode(),
                     null, null, command.statusId(), null, null, List.of()));
+            invalidateIssueSnapshot(issue.getProjectName(), issue.getIssueCode());
         } catch (CodingOpenApiException error) {
             throw codingUpdateException(error, "CODING 状态同步失败，请稍后重试");
         }
@@ -527,8 +529,13 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 developmentTeam, definitionOfDone,
                 type == CodingIssueType.SUB_TASK ? issue.workingHours() : null, taskType, parentCode, actor);
         result = applyCodingWorklogSummary(actor, iterationId, result, worklogSummary);
+        invalidateIssueSnapshot(normalizedProject, normalizedCode);
         syncedEntities.put(key, result);
         return result;
+    }
+
+    private void invalidateIssueSnapshot(String projectName, long issueCode) {
+        if (issueSnapshotLoader != null) issueSnapshotLoader.invalidate(projectName, issueCode);
     }
 
     private IssueEntity applyCodingWorklogSummary(Actor actor, long iterationId, IssueEntity entity,
