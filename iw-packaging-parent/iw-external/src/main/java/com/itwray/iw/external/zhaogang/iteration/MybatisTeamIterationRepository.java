@@ -170,7 +170,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     public IssueEntity addCodingIssue(long iterationId, Long parentId, String url, String urlHash, String projectName,
                                       long issueId, long issueCode, CodingIssueType issueType,
                                       String codingSystemType, long codingIssueTypeId, String issueTypeName,
-                                      String title, Actor actor) {
+                                      String title, String priority, Actor actor) {
         IssueEntity entity = new IssueEntity();
         entity.setIterationId(iterationId);
         entity.setParentId(parentId);
@@ -185,6 +185,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setCodingIssueTypeId(codingIssueTypeId > 0 ? codingIssueTypeId : null);
         entity.setIssueTypeName(issueTypeName);
         entity.setTitle(title);
+        entity.setPriority(priority);
         entity.setSyncStatus(IssueSyncStatus.SYNCED.name());
         entity.setSyncAttemptCount(0);
         entity.setSyncedAt(LocalDateTime.now());
@@ -200,7 +201,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     public IssueEntity addChildIssue(long iterationId, long parentId, String projectName, CodingIssueType issueType,
                                      String issueTypeName, String title, String description, String developmentTeam,
                                      String definitionOfDone, BigDecimal estimatedHours, String taskType,
-                                     Boolean onlineBug, String bugPriority, IssueSyncStatus syncStatus, Actor actor) {
+                                     Boolean onlineBug, String bugPriority, String priority, IssueSyncStatus syncStatus, Actor actor) {
         IssueEntity entity = new IssueEntity();
         entity.setIterationId(iterationId);
         entity.setParentId(parentId);
@@ -209,6 +210,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setIssueType(issueType.name());
         entity.setIssueTypeName(issueTypeName);
         entity.setTitle(title);
+        entity.setPriority(priority);
         entity.setDescription(description);
         entity.setDevelopmentTeam(developmentTeam);
         entity.setDefinitionOfDone(definitionOfDone);
@@ -250,6 +252,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setDefinitionOfDone(command.definitionOfDone());
         entity.setEstimatedHours(command.estimatedHours());
         entity.setTaskType(command.taskType());
+        entity.setPriority(command.priority());
         entity.setOnlineBug(command.onlineBug());
         entity.setBugPriority(command.bugPriority());
         issueMapper.updateById(entity);
@@ -308,7 +311,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
                                              CodingIssueType issueType, String codingSystemType,
                                              long codingIssueTypeId, String issueTypeName, String title,
                                              String description, String developmentTeam, String definitionOfDone,
-                                             BigDecimal estimatedHours, String taskType, Long codingParentCode,
+                                             BigDecimal estimatedHours, String taskType, String priority, Long codingParentCode,
                                              Actor actor) {
         IssueEntity entity = findIssue(iterationId, urlHash).orElseGet(IssueEntity::new);
         entity.setIterationId(iterationId);
@@ -324,6 +327,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setCodingIssueTypeId(codingIssueTypeId > 0 ? codingIssueTypeId : null);
         entity.setIssueTypeName(issueTypeName);
         entity.setTitle(title);
+        entity.setPriority(priority);
         entity.setDescription(description);
         entity.setDevelopmentTeam(developmentTeam);
         entity.setDefinitionOfDone(definitionOfDone);

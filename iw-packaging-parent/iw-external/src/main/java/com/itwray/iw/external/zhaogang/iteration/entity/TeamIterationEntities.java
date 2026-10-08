@@ -87,6 +87,7 @@ public final class TeamIterationEntities {
         private String definitionOfDone;
         private BigDecimal estimatedHours;
         private String taskType;
+        private String priority;
         private BigDecimal codingRecordedHours;
         private Integer codingWorklogCount;
         private Boolean onlineBug;

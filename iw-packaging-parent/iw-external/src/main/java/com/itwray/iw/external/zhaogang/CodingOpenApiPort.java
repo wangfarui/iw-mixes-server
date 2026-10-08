@@ -121,7 +121,17 @@ public interface CodingOpenApiPort {
                  String projectDisplayName, boolean subtask, long id, String statusName, String statusType,
                  BigDecimal workingHours, String description, Long parentCode, String parentProjectName,
                  String parentType, String parentTypeName, String developmentTeam, String definitionOfDone,
-                 String taskType, String assigneeName) {
+                 String taskType, String assigneeName, String priority) {
+
+        public Issue(long code, String type, String typeName, long issueTypeId, String title,
+                     String projectDisplayName, boolean subtask, long id, String statusName, String statusType,
+                     BigDecimal workingHours, String description, Long parentCode, String parentProjectName,
+                     String parentType, String parentTypeName, String developmentTeam, String definitionOfDone,
+                     String taskType, String assigneeName) {
+            this(code, type, typeName, issueTypeId, title, projectDisplayName, subtask, id, statusName, statusType,
+                    workingHours, description, parentCode, parentProjectName, parentType, parentTypeName,
+                    developmentTeam, definitionOfDone, taskType, assigneeName, null);
+        }
 
         public Issue(long code, String type, String typeName, long issueTypeId, String title,
                      String projectDisplayName, boolean subtask, long id, String statusName, String statusType,

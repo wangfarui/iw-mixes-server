@@ -6,6 +6,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -209,6 +211,42 @@ class CodingOpenApiClientTest {
                 7550L, "核销异常处理故事", null, "0", 100L, null, List.of()));
 
         assertEquals(100L, requests.get(0).path("AssigneeId").asLong());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "1", "2", "3"})
+    void subTaskPriorityRoundTripsThroughCodingCreateReadAndModify(String priority) throws Exception {
+        List<JsonNode> requests = new java.util.ArrayList<>();
+        CodingOpenApiClient client = client(exchange -> {
+            requests.add(objectMapper.readTree(exchange.getRequestBody()));
+            respond(exchange, "{\"Response\":{\"Issue\":{\"Id\":18001,\"Code\":8001,"
+                    + "\"Name\":\"实现接口\",\"Type\":\"SUB_TASK\",\"Priority\":" + priority + "}}}");
+        });
+
+        var created = client.createIssue("test-token", new CodingOpenApiPort.CreateIssueRequest("project-a",
+                "SUB_TASK", 31L, 7000L, "实现接口", null, priority, new BigDecimal("8"), List.of()));
+        var read = client.issue("test-token", "project-a", 8001L);
+        var updated = client.modifyIssue("test-token", new CodingOpenApiPort.ModifyIssueRequest("project-a",
+                8001L, "实现接口", null, null, priority, new BigDecimal("8"), List.of()));
+
+        assertEquals(priority, created.priority());
+        assertEquals(priority, read.priority());
+        assertEquals(priority, updated.priority());
+        assertEquals(priority, requests.get(0).path("Priority").asText());
+        assertEquals(priority, requests.get(2).path("Priority").asText());
+        assertTrue(requests.get(0).path("Priority").isTextual());
+        assertTrue(requests.get(2).path("Priority").isTextual());
+    }
+
+    @Test
+    void issuePriorityReadsStringZeroAndLeavesMissingPriorityUnknown() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange,
+                "{\"Response\":{\"Issue\":{\"Code\":8001,\"Type\":\"SUB_TASK\",\"Priority\":\"0\"}}}"));
+        assertEquals("0", client.issue("test-token", "project-a", 8001L).priority());
+        server.stop(0);
+        client = client(exchange -> respond(exchange,
+                "{\"Response\":{\"Issue\":{\"Code\":8001,\"Type\":\"SUB_TASK\"}}}"));
+        org.junit.jupiter.api.Assertions.assertNull(client.issue("test-token", "project-a", 8001L).priority());
     }
 
     @Test

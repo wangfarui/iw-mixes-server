@@ -237,7 +237,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         IssueEntity entity = repository.addCodingIssue(iterationId, effectiveParent == null ? null : effectiveParent.getId(),
                 parsed.url(), urlHash, parsed.projectName(),
                 issue.id(), issue.code(), type, issue.type(), issue.issueTypeId(), displayTypeName(issue, type),
-                issue.title(), actor);
+                issue.title(), type == CodingIssueType.SUB_TASK ? issue.priority() : null, actor);
         entity = applyCodingWorklogSummary(actor, iterationId, entity, worklogSummary);
         return toIssue(actor, entity, Map.of(), Map.of(), new HashSet<>());
     }
@@ -261,7 +261,9 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 StringUtils.trimToNull(command.description()), StringUtils.trimToNull(command.developmentTeam()),
                 StringUtils.trimToNull(command.definitionOfDone()), command.estimatedHours(),
                 StringUtils.trimToNull(command.taskType()), command.onlineBug(),
-                StringUtils.trimToNull(command.bugPriority()), syncStatus, actor);
+                StringUtils.trimToNull(command.bugPriority()),
+                command.issueType() == CodingIssueType.SUB_TASK
+                        ? StringUtils.defaultIfBlank(command.priority(), "1").trim() : null, syncStatus, actor);
         if (Boolean.TRUE.equals(command.syncToCoding()) && syncStatus == IssueSyncStatus.PENDING) {
             try {
                 return performIssueSync(actor, iterationId, entity, stored.issues(), stored.worklogs(), true);
@@ -335,7 +337,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         }
         CodingIssueType type = CodingIssueType.valueOf(issue.getIssueType());
         validateIssueUpdate(type, command);
-        UpdateIssueCommand normalized = normalize(type, command);
+        UpdateIssueCommand normalized = normalize(type, command, issue);
         if (isCodingBacked(issue)) {
             modifyCodingIssue(actor, issue, type, normalized);
             invalidateIssueSnapshot(issue.getProjectName(), issue.getIssueCode());
@@ -527,7 +529,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 issueHash(normalizedProject, normalizedCode), normalizedProject, normalizedIssueId, normalizedCode, type,
                 issue.type(), issue.issueTypeId(), displayTypeName(issue, type), issue.title(), issue.description(),
                 developmentTeam, definitionOfDone,
-                type == CodingIssueType.SUB_TASK ? issue.workingHours() : null, taskType, parentCode, actor);
+                type == CodingIssueType.SUB_TASK ? issue.workingHours() : null, taskType,
+                type == CodingIssueType.SUB_TASK ? issue.priority() : null, parentCode, actor);
         result = applyCodingWorklogSummary(actor, iterationId, result, worklogSummary);
         invalidateIssueSnapshot(normalizedProject, normalizedCode);
         syncedEntities.put(key, result);
@@ -810,7 +813,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                     entity.getBugPriority(), entity.getSyncedAt(), entity.getCreateTime(),
                     worklogs.getOrDefault(entity.getId(), List.of()).stream().map(this::toWorklog).toList(), childViews,
                     recordedHours(entity, worklogs.get(entity.getId())), recordedWorklogCount(entity, worklogs.get(entity.getId())),
-                    issue.assigneeName());
+                    issue.assigneeName(), type == CodingIssueType.SUB_TASK
+                            ? StringUtils.defaultIfBlank(issue.priority(), entity.getPriority()) : null);
         } catch (CodingOpenApiException error) {
             return snapshotIssue(actor, entity, false, error.isPermissionDenied()
                             ? error.permissionMessage() : "当前令牌无法读取该 CODING 事项",
@@ -855,7 +859,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 entity.getDevelopmentTeam(), entity.getDefinitionOfDone(), entity.getEstimatedHours(),
                 entity.getTaskType(), entity.getOnlineBug(), entity.getBugPriority(), entity.getSyncedAt(),
                 entity.getCreateTime(), worklogs == null ? List.of() : worklogs.stream().map(this::toWorklog).toList(),
-                children, recordedHours(entity, worklogs), recordedWorklogCount(entity, worklogs));
+                children, recordedHours(entity, worklogs), recordedWorklogCount(entity, worklogs), null, entity.getPriority());
     }
 
     private IssueSource source(IssueEntity entity) {
@@ -902,6 +906,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             addCustom(customFields, metadataCatalog.customValue(metadata, entity.getDefinitionOfDone(),
                     "DoD", "DOD", "Definition of Done"));
         } else if (type == CodingIssueType.SUB_TASK) {
+            priority = StringUtils.defaultIfBlank(entity.getPriority(), "0");
             if (metadataCatalog.findField(metadata, "任务类型") != null) {
                 addCustom(customFields, metadataCatalog.customValue(metadata, entity.getTaskType(), "任务类型"));
             } else {
@@ -993,6 +998,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 addCustom(customFields, metadataCatalog.customValue(metadata, command.definitionOfDone(),
                         "DoD", "DOD", "Definition of Done"));
             } else if (type == CodingIssueType.SUB_TASK) {
+                priority = command.priority();
                 workingHours = command.estimatedHours();
                 if (metadataCatalog.findField(metadata, "任务类型") != null) {
                     addCustom(customFields, metadataCatalog.customValue(metadata, command.taskType(), "任务类型"));
@@ -1193,6 +1199,10 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 }
             }
             case SUB_TASK -> {
+                if (StringUtils.isNotBlank(command.priority())
+                        && !List.of("0", "1", "2", "3").contains(command.priority().trim())) {
+                    throw new TeamIterationException("子工作项优先级必须为低、中、高或紧急");
+                }
                 if (command.estimatedHours() == null || command.estimatedHours().signum() <= 0
                         || command.estimatedHours().compareTo(new BigDecimal("10000")) >= 0
                         || command.estimatedHours().scale() > 2) {
@@ -1241,7 +1251,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     private void validateSyncFields(IssueEntity entity, CodingIssueType type) {
         CreateChildIssueCommand command = new CreateChildIssueCommand(type, entity.getTitle(), entity.getDescription(),
                 entity.getDevelopmentTeam(), entity.getDefinitionOfDone(), entity.getEstimatedHours(),
-                entity.getTaskType(), entity.getOnlineBug(), entity.getBugPriority());
+                entity.getTaskType(), entity.getOnlineBug(), entity.getBugPriority(), null, entity.getPriority());
         validateChild(command);
     }
 
@@ -1249,7 +1259,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         if (command == null) throw new TeamIterationException("事项信息不能为空");
         validateChild(new CreateChildIssueCommand(type, command.title(), command.description(),
                 command.developmentTeam(), command.definitionOfDone(), command.estimatedHours(),
-                command.taskType(), command.onlineBug(), command.bugPriority()));
+                command.taskType(), command.onlineBug(), command.bugPriority(), null, command.priority()));
     }
 
     private com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor toWorkbenchActor(Actor actor) {
@@ -1269,14 +1279,16 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 command.startDate(), command.plannedReleaseDate());
     }
 
-    private UpdateIssueCommand normalize(CodingIssueType type, UpdateIssueCommand command) {
+    private UpdateIssueCommand normalize(CodingIssueType type, UpdateIssueCommand command, IssueEntity issue) {
         return new UpdateIssueCommand(command.title().trim(), StringUtils.trim(command.description()),
                 type == CodingIssueType.USER_STORY ? StringUtils.trimToNull(command.developmentTeam()) : null,
                 type == CodingIssueType.USER_STORY ? StringUtils.trimToNull(command.definitionOfDone()) : null,
                 type == CodingIssueType.SUB_TASK ? command.estimatedHours() : null,
                 type == CodingIssueType.SUB_TASK ? StringUtils.trimToNull(command.taskType()) : null,
                 type == CodingIssueType.DEFECT ? command.onlineBug() : null,
-                type == CodingIssueType.DEFECT ? StringUtils.trimToNull(command.bugPriority()) : null);
+                type == CodingIssueType.DEFECT ? StringUtils.trimToNull(command.bugPriority()) : null,
+                type == CodingIssueType.SUB_TASK
+                        ? StringUtils.defaultIfBlank(StringUtils.trimToNull(command.priority()), issue.getPriority()) : null);
     }
 
     private String issueHash(String projectName, long issueCode) {

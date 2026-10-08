@@ -63,12 +63,12 @@ interface TeamIterationRepository {
     IssueEntity addCodingIssue(long iterationId, Long parentId, String url, String urlHash, String projectName,
                                long issueId, long issueCode, CodingIssueType issueType,
                                String codingSystemType, long codingIssueTypeId, String issueTypeName,
-                               String title, Actor actor);
+                               String title, String priority, Actor actor);
 
     IssueEntity addChildIssue(long iterationId, long parentId, String projectName, CodingIssueType issueType,
                               String issueTypeName, String title, String description, String developmentTeam,
                               String definitionOfDone, BigDecimal estimatedHours, String taskType,
-                              Boolean onlineBug, String bugPriority, IssueSyncStatus syncStatus, Actor actor);
+                              Boolean onlineBug, String bugPriority, String priority, IssueSyncStatus syncStatus, Actor actor);
 
     Optional<IssueEntity> findIssue(long iterationId, String urlHash);
 
@@ -88,7 +88,7 @@ interface TeamIterationRepository {
                                      String codingSystemType, long codingIssueTypeId, String issueTypeName,
                                      String title, String description, String developmentTeam,
                                      String definitionOfDone, BigDecimal estimatedHours, String taskType,
-                                     Long codingParentCode, Actor actor);
+                                     String priority, Long codingParentCode, Actor actor);
 
     IssueEntity updateCodingWorklogSummary(long iterationId, long issueId, BigDecimal recordedHours,
                                            int worklogCount, Actor actor);

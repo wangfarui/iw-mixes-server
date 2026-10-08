@@ -275,6 +275,7 @@ create table external_zhaogang_iteration_issue
     definition_of_done varchar(256)                         null comment '用户故事DoD业务值',
     estimated_hours   decimal(10, 2)                        null comment '子工作项预估工时（小时）',
     task_type         varchar(128)                          null comment '子工作项任务类型业务值',
+    priority          varchar(1)                            null comment '子工作项优先级：0低/1中/2高/3紧急',
     coding_recorded_hours decimal(10, 2)                    null comment 'CODING已记录工时（小时）',
     coding_worklog_count int unsigned                       null comment 'CODING工时记录次数',
     online_bug        tinyint(1)                            null comment '缺陷是否线上Bug',
