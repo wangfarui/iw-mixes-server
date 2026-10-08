@@ -73,6 +73,10 @@ class WorklogQueryServiceTest {
 
         assertThat(entries.coverage().partial()).isTrue();
         assertThat(entries.coverage().failedMemberCount()).isEqualTo(1);
+        assertThat(entries.coverage().memberIssues()).hasSize(1);
+        assertThat(entries.coverage().memberIssues().get(0).user().name()).isEqualTo("李四");
+        assertThat(entries.coverage().memberIssues().get(0).reasonCode()).isEqualTo("PERMISSION_DENIED");
+        assertThat(entries.coverage().memberIssues().get(0).reason()).contains("项目协同（读写）");
         assertThat(entries.coverage().permissionError()).isEqualTo(new CodingPermissionError(
                 "CODING_PERMISSION_DENIED",
                 "当前 CODING 令牌缺少“项目协同（读写）”权限。请前往 CODING 令牌管理开通后重试；若已开通，请联系团队管理员检查账号权限",
@@ -81,6 +85,58 @@ class WorklogQueryServiceTest {
         assertThat(entries.items()).extracting(item -> item.issue().code()).containsExactly(102L, 101L);
         assertThat(entries.items().get(0).issueUrl()).contains("/assignments/issues/102/detail");
         verify(coding).worklogPage("token", 1787500799999L, 1788105600001L, 1L, 1000, 1000);
+    }
+
+    @Test
+    void coverageIdentifiesMembersWithMissingTokenAndRequestFailure() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        when(coding.worklogPage(eq("good-token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of()));
+        when(coding.worklogPage(eq("bad-token"), anyLong(), anyLong(), eq(3L), eq(0), eq(1000)))
+                .thenThrow(new CodingOpenApiException("工时请求失败", new IllegalStateException("private detail")));
+        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+                Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE));
+
+        Statistics statistics = service.queryStatistics(
+                new WorklogModule.Context("good-token", 1L, "成员一", "", 10L,
+                        "g-iijw5014", "https://g-iijw5014.coding.net"),
+                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+                List.of(new WorklogModule.MemberCredential(1L, "成员一", "", "good-token"),
+                        new WorklogModule.MemberCredential(2L, "成员二", "", ""),
+                        new WorklogModule.MemberCredential(3L, "成员三", "", "bad-token")),
+                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+
+        assertThat(statistics.coverage().failedMemberCount()).isEqualTo(2);
+        assertThat(statistics.coverage().memberIssues())
+                .extracting(issue -> issue.user().name() + ":" + issue.reasonCode())
+                .containsExactly("成员二:TOKEN_MISSING", "成员三:REQUEST_FAILED");
+        assertThat(statistics.coverage().memberIssues().get(1).reason()).doesNotContain("private detail", "bad-token");
+    }
+
+    @Test
+    void coverageNamesMemberWhosePaginationReachedTheLimit() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        when(coding.worklogPage(eq("good-token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of()));
+        when(coding.worklogPage(eq("many-token"), anyLong(), anyLong(), eq(2L), anyInt(), eq(1000)))
+                .thenReturn(new WorklogPage(Collections.nCopies(1000,
+                        new Worklog(1L, 1L, 1L, "project-a", 2L, BigDecimal.ONE, "工时", 0L, 0L, 0L))));
+        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+                Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE));
+
+        Statistics statistics = service.queryStatistics(
+                new WorklogModule.Context("good-token", 1L, "成员一", "", 10L,
+                        "g-iijw5014", "https://g-iijw5014.coding.net"),
+                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+                List.of(new WorklogModule.MemberCredential(1L, "成员一", "", "good-token"),
+                        new WorklogModule.MemberCredential(2L, "成员二", "", "many-token")),
+                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+
+        assertThat(statistics.coverage().partial()).isTrue();
+        assertThat(statistics.coverage().failedMemberCount()).isZero();
+        assertThat(statistics.coverage().memberIssues())
+                .extracting(issue -> issue.user().name() + ":" + issue.reasonCode())
+                .containsExactly("成员二:INCOMPLETE");
     }
 
     @Test

@@ -26,11 +26,21 @@ public final class WorklogModels {
 
     public record Coverage(Scope scope, Long workbenchTeamId, int memberCount, int visibleProjectCount,
                            boolean partial, int failedMemberCount, String warning,
-                           CodingPermissionError permissionError) {
+                           CodingPermissionError permissionError, List<MemberIssue> memberIssues) {
+        public Coverage(Scope scope, Long workbenchTeamId, int memberCount, int visibleProjectCount,
+                        boolean partial, int failedMemberCount, String warning,
+                        CodingPermissionError permissionError) {
+            this(scope, workbenchTeamId, memberCount, visibleProjectCount, partial, failedMemberCount,
+                    warning, permissionError, List.of());
+        }
+
         public Coverage(Scope scope, Long workbenchTeamId, int memberCount, int visibleProjectCount,
                         boolean partial, int failedMemberCount, String warning) {
             this(scope, workbenchTeamId, memberCount, visibleProjectCount, partial, failedMemberCount, warning, null);
         }
+    }
+
+    public record MemberIssue(User user, String reasonCode, String reason) {
     }
 
     public record DailyTotal(String date, BigDecimal hours, DayType dayType) {

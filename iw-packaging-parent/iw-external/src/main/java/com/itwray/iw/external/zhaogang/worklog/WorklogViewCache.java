@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Component
 class WorklogViewCache {
 
-    private static final String KEY_PREFIX = "zhaogang:worklog:v2:";
+    private static final String KEY_PREFIX = "zhaogang:worklog:v3:";
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;

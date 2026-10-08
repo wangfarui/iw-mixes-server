@@ -17,6 +17,7 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Item;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberDailyTotal;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberAbsence;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberIssue;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Project;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Scope;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
@@ -259,8 +260,37 @@ class WorklogQueryService {
                 .findFirst().orElse(null);
         String permissionWarning = permissionError == null ? "" : permissionError.permissionMessage();
         String warning = StringUtils.isNotBlank(permissionWarning) ? permissionWarning : "";
+        Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
+                (map, member) -> map.put(member.userId(), member), LinkedHashMap::putAll);
+        List<MemberIssue> memberIssues = results.stream().filter(MemberLogs::partial)
+                .map(result -> memberIssue(memberMap.get(result.userId()), result))
+                .toList();
         return new Coverage(scope, workbenchTeamId, members.size(), projectCount, partial, failedMembers, warning,
-                permissionError == null ? null : CodingPermissionError.from(permissionError));
+                permissionError == null ? null : CodingPermissionError.from(permissionError), memberIssues);
+    }
+
+    private MemberIssue memberIssue(WorklogModule.MemberCredential member, MemberLogs result) {
+        User user = new User(member.userId(), member.userName(), member.avatar());
+        if (StringUtils.isBlank(member.token())) {
+            return new MemberIssue(user, "TOKEN_MISSING", "尚未绑定 CODING 令牌，请该成员在工作台登录并绑定令牌");
+        }
+        if (!result.failed()) {
+            return new MemberIssue(user, "INCOMPLETE", "工时记录达到查询页数上限，数据未完整取得");
+        }
+        RuntimeException error = result.error();
+        if (error instanceof CodingOpenApiException codingError) {
+            if (codingError.isPermissionDenied()) {
+                return new MemberIssue(user, "PERMISSION_DENIED", codingError.permissionMessage());
+            }
+            if (codingError.isTransportFailure()) {
+                return new MemberIssue(user, "REQUEST_FAILED", "与 CODING 服务通信失败，请稍后重试");
+            }
+            String code = codingError.code();
+            if (StringUtils.isNotBlank(code) && code.matches("[A-Za-z0-9_-]{1,64}")) {
+                return new MemberIssue(user, "CODING_ERROR", "CODING 工时接口返回错误（" + code + "），请稍后重试");
+            }
+        }
+        return new MemberIssue(user, "REQUEST_FAILED", "工时获取失败，请稍后重试");
     }
 
     private int projectCount(List<Worklog> items) {
