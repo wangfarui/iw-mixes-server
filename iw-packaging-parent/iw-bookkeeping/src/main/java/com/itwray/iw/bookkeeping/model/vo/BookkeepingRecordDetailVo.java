@@ -23,6 +23,8 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class BookkeepingRecordDetailVo extends UserOwnerDetailVo<Integer> {
 
+    private com.itwray.iw.points.bookkeeping.TaskBookkeepingSourceVo taskSource;
+
     /**
      * 订单号
      */

@@ -15,6 +15,11 @@
     <dependencies>
         <dependency>
             <groupId>com.itwray.mixes</groupId>
+            <artifactId>iw-auth</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.itwray.mixes</groupId>
             <artifactId>iw-points</artifactId>
             <version>${revision}</version>
         </dependency>

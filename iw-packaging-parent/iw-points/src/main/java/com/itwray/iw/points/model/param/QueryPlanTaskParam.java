@@ -25,4 +25,5 @@ public class QueryPlanTaskParam extends PageDto {
      * 状态(0禁用 1启用)
      */
     private Integer status;
+    private java.util.List<Integer> excludedIds;
 }

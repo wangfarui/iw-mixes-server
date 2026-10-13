@@ -21,7 +21,9 @@ public interface PointsTaskBasicsService extends WebService<TaskBasicsAddDto, Ta
 
     List<TaskBasicsListVo> queryList(TaskBasicsListDto dto);
 
-    void updateTaskStatus(TaskBasicsUpdateStatusDto dto);
+    com.itwray.iw.points.model.vo.task.TaskStatusResultVo updateTaskStatus(TaskBasicsUpdateStatusDto dto);
+
+    void updateBookkeepingTemplate(TaskBasicsUpdateBookkeepingTemplateDto dto);
 
     List<TaskBasicsListVo> doneList(Integer taskGroupId, Integer currentPage);
 

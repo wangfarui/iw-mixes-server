@@ -4,6 +4,7 @@ import com.itwray.iw.points.mapper.PointsTotalMapper;
 import com.itwray.iw.points.model.entity.PointsTotalEntity;
 import com.itwray.iw.web.dao.BaseDao;
 import com.itwray.iw.web.utils.UserUtils;
+import com.itwray.iw.web.exception.BusinessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +26,10 @@ public class PointsTotalDao extends BaseDao<PointsTotalMapper, PointsTotalEntity
      */
     @Transactional
     public void updatePointsBalance(Integer points) {
-        this.lambdaUpdate()
+        boolean updated = this.lambdaUpdate()
                 .eq(PointsTotalEntity::getUserId, UserUtils.getUserId())
                 .setSql("points_balance = points_balance + " + points)
                 .update(new PointsTotalEntity());
+        if (!updated) { throw new BusinessException("积分账户不存在，本次操作未保存"); }
     }
 }

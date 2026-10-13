@@ -5,7 +5,12 @@
     <select id="queryPlanTask" resultType="com.itwray.iw.points.model.entity.PointsTaskPlanEntity">
         select *
         from points_task_plan
-        where deleted = 0 and status = #{status} and next_plan_date = #{nextPlanDate}
+        where deleted = 0 and status = #{status} and next_plan_date <![CDATA[<=]]> #{nextPlanDate}
+        <if test="excludedIds != null and excludedIds.size() > 0">
+            and id not in
+            <foreach collection="excludedIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+        </if>
+        order by next_plan_date, id
         limit #{pageStart}, #{pageSize}
     </select>
 </mapper>

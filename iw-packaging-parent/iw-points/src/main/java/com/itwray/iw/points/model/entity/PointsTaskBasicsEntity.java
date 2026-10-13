@@ -83,4 +83,7 @@ public class PointsTaskBasicsEntity extends UserEntity<Integer> {
      * 任务完成时间
      */
     private LocalDateTime doneTime;
+    private Integer sourcePlanId;
+    private LocalDate sourcePlanDate;
+    private Integer completionRewardPoints;
 }

@@ -48,4 +48,6 @@ public class PointsTaskPlanAddDto implements AddDto {
 
     @Schema(title = "处罚积分")
     private Integer punishPoints;
+    private Boolean bookkeepingEnabled;
+    private com.itwray.iw.points.bookkeeping.TaskBookkeepingTemplateDto bookkeepingTemplate;
 }

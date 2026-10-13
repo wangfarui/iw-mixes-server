@@ -2,6 +2,14 @@ package com.itwray.iw.points.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.json.JSONUtil;
+import com.itwray.iw.points.bookkeeping.*;
+import com.itwray.iw.points.dao.PointsTaskBookkeepingDao;
+import com.itwray.iw.points.model.entity.PointsTaskBookkeepingEntity;
+import com.itwray.iw.points.model.vo.task.TaskStatusResultVo;
+import com.itwray.iw.points.service.PointsRecordsService;
+import com.itwray.iw.web.exception.BusinessException;
+import com.itwray.iw.web.utils.UserUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itwray.iw.common.utils.DateUtils;
 import com.itwray.iw.points.dao.PointsTaskBasicsDao;
@@ -19,11 +27,9 @@ import com.itwray.iw.points.model.vo.task.TaskBasicsDetailVo;
 import com.itwray.iw.points.model.vo.task.TaskBasicsListVo;
 import com.itwray.iw.points.model.vo.task.TaskBasicsPageVo;
 import com.itwray.iw.points.service.PointsTaskBasicsService;
-import com.itwray.iw.starter.rocketmq.MQProducerHelper;
 import com.itwray.iw.web.constants.WebCommonConstants;
 import com.itwray.iw.web.dao.BaseBusinessFileDao;
 import com.itwray.iw.web.model.enums.BusinessFileTypeEnum;
-import com.itwray.iw.web.model.enums.mq.PointsRecordsTopicEnum;
 import com.itwray.iw.web.model.vo.FileVo;
 import com.itwray.iw.web.model.vo.PageVo;
 import com.itwray.iw.web.service.impl.WebServiceImpl;
@@ -34,6 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +63,16 @@ public class PointsTaskBasicsServiceImpl extends WebServiceImpl<PointsTaskBasics
     private final PointsTaskRelationDao pointsTaskRelationDao;
 
     private BaseBusinessFileDao baseBusinessFileDao;
+    private PointsTaskBookkeepingDao taskBookkeepingDao;
+    private TaskBookkeepingGateway bookkeepingGateway;
+    private PointsRecordsService pointsRecordsService;
+
+    @Autowired
+    public void setTaskBookkeepingDao(PointsTaskBookkeepingDao dao) { this.taskBookkeepingDao = dao; }
+    @Autowired
+    public void setBookkeepingGateway(TaskBookkeepingGateway gateway) { this.bookkeepingGateway = gateway; }
+    @Autowired
+    public void setPointsRecordsService(PointsRecordsService service) { this.pointsRecordsService = service; }
 
     @Autowired
     public PointsTaskBasicsServiceImpl(PointsTaskBasicsDao baseDao, PointsTaskGroupDao pointsTaskGroupDao, PointsTaskRelationDao pointsTaskRelationDao) {
@@ -75,37 +94,117 @@ public class PointsTaskBasicsServiceImpl extends WebServiceImpl<PointsTaskBasics
     }
 
     @Override
+    @Transactional
+    public void update(TaskBasicsUpdateDto dto) {
+        lockTask(dto.getId());
+        super.update(dto);
+    }
+
+    @Override
     public List<TaskBasicsListVo> queryList(TaskBasicsListDto dto) {
         List<PointsTaskBasicsEntity> entityList = getBaseDao().getBaseMapper().queryList(dto);
         return this.buildListVo(entityList);
     }
 
     @Override
-    @Transactional
-    public void updateTaskStatus(TaskBasicsUpdateStatusDto dto) {
-        PointsTaskBasicsEntity taskBasicsEntity = getBaseDao().queryById(dto.getId());
-        getBaseDao().lambdaUpdate()
-                .eq(PointsTaskBasicsEntity::getId, dto.getId())
-                .set(PointsTaskBasicsEntity::getTaskStatus, dto.getTaskStatus())
-                .set(TaskStatusEnum.DONE.equals(dto.getTaskStatus()), PointsTaskBasicsEntity::getDoneTime, LocalDateTime.now())
-                .set(PointsTaskBasicsEntity::getUpdateTime, LocalDateTime.now())
-                .update();
-
-        // 如果是完成任务操作
+    @Transactional(rollbackFor = Exception.class)
+    public TaskStatusResultVo updateTaskStatus(TaskBasicsUpdateStatusDto dto) {
+        PointsTaskBasicsEntity task = lockTask(dto.getId());
+        PointsTaskBookkeepingEntity link = taskBookkeepingDao.lockByTaskId(task.getId());
+        boolean pending = needsBookkeeping(link, queryLinkedRecord(link));
+        String action = link != null && !pending ? "KEPT" : "NONE";
+        if (task.getTaskStatus().equals(dto.getTaskStatus())) {
+            return statusResult(task, link, action);
+        }
+        if (TaskStatusEnum.DONE.equals(dto.getTaskStatus()) && !TaskStatusEnum.WAIT.equals(task.getTaskStatus())) {
+            throw new BusinessException("只有待办任务可以完成");
+        }
+        LocalDateTime completedAt = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
+        int reward = 0;
         if (TaskStatusEnum.DONE.equals(dto.getTaskStatus())) {
-            PointsTaskRelationEntity taskRelationEntity = pointsTaskRelationDao.getByTaskId(taskBasicsEntity.getId());
-            if (taskRelationEntity != null && (taskBasicsEntity.getDeadlineDate() == null || !LocalDate.now().isAfter(taskBasicsEntity.getDeadlineDate()))) {
-                this.syncPoints(taskBasicsEntity, taskRelationEntity.getRewardPoints(), true);
-            }
-        } else {
-            // 如果完成任务后又取消完成
-            if (TaskStatusEnum.DONE.equals(taskBasicsEntity.getTaskStatus())) {
-                PointsTaskRelationEntity taskRelationEntity = pointsTaskRelationDao.getByTaskId(taskBasicsEntity.getId());
-                if (taskRelationEntity != null) {
-                    this.syncPoints(taskBasicsEntity, taskRelationEntity.getRewardPoints(), false);
+            if (pending) {
+                TaskBookkeepingTemplateDto snapshot = JSONUtil.toBean(link.getTemplateSnapshot(), TaskBookkeepingTemplateDto.class);
+                TaskBookkeepingRecordVo record = bookkeepingGateway.create(snapshot, completedAt);
+                link.setBookkeepingRecordId(record.getId());
+                link.setRecordedAt(completedAt);
+                link.setUpdateTime(completedAt);
+                if (!taskBookkeepingDao.updateById(link)) {
+                    throw new BusinessException("保存任务记账关联失败，本次操作未保存");
                 }
+                action = "CREATED";
+            }
+            PointsTaskRelationEntity relation = pointsTaskRelationDao.getByTaskId(task.getId());
+            if (relation != null && (task.getDeadlineDate() == null || !completedAt.toLocalDate().isAfter(task.getDeadlineDate()))) {
+                reward = relation.getRewardPoints() == null ? 0 : relation.getRewardPoints();
+                syncPoints(task, reward, true);
+            }
+        } else if (TaskStatusEnum.DONE.equals(task.getTaskStatus())) {
+            syncPoints(task, task.getCompletionRewardPoints(), false);
+        }
+        getBaseDao().lambdaUpdate().eq(PointsTaskBasicsEntity::getId, task.getId())
+                .set(PointsTaskBasicsEntity::getTaskStatus, dto.getTaskStatus())
+                .set(PointsTaskBasicsEntity::getDoneTime, TaskStatusEnum.DONE.equals(dto.getTaskStatus()) ? completedAt : null)
+                .set(PointsTaskBasicsEntity::getCompletionRewardPoints, reward)
+                .set(PointsTaskBasicsEntity::getUpdateTime, completedAt).update();
+        task.setTaskStatus(dto.getTaskStatus());
+        return statusResult(task, link, action);
+    }
+
+    private PointsTaskBasicsEntity lockTask(Integer id) {
+        PointsTaskBasicsEntity task = getBaseDao().lambdaQuery().eq(PointsTaskBasicsEntity::getId, id)
+                .eq(PointsTaskBasicsEntity::getUserId, UserUtils.getUserId()).last("FOR UPDATE").one();
+        if (task == null) { throw new BusinessException("任务不存在或无权操作"); }
+        return task;
+    }
+
+    private TaskStatusResultVo statusResult(PointsTaskBasicsEntity task, PointsTaskBookkeepingEntity link, String action) {
+        TaskStatusResultVo result = new TaskStatusResultVo();
+        result.setId(task.getId());
+        result.setTaskStatus(task.getTaskStatus().getCode());
+        result.setBookkeepingAction(action);
+        if (link != null && link.getBookkeepingRecordId() != null) {
+            TaskBookkeepingRecordVo record = queryLinkedRecord(link);
+            if (needsBookkeeping(link, record)) { return result; }
+            result.setBookkeepingRecordId(link.getBookkeepingRecordId());
+            if (record != null && "AVAILABLE".equals(record.getAvailability())) {
+                result.setRecordedAmount(record.getAmount());
+                result.setRecordedDate(record.getRecordDate());
             }
         }
+        return result;
+    }
+
+    private TaskBookkeepingRecordVo queryLinkedRecord(PointsTaskBookkeepingEntity link) {
+        if (link == null || link.getBookkeepingRecordId() == null) { return null; }
+        return bookkeepingGateway.queryRecords(Collections.singletonList(link.getBookkeepingRecordId()))
+                .get(link.getBookkeepingRecordId());
+    }
+
+    private boolean needsBookkeeping(PointsTaskBookkeepingEntity link, TaskBookkeepingRecordVo record) {
+        return link != null && (link.getBookkeepingRecordId() == null
+                || record != null && "DELETED".equals(record.getAvailability()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateBookkeepingTemplate(TaskBasicsUpdateBookkeepingTemplateDto dto) {
+        PointsTaskBasicsEntity task = lockTask(dto.getId());
+        PointsTaskBookkeepingEntity link = taskBookkeepingDao.lockByTaskId(task.getId());
+        if (link == null) { throw new BusinessException("该任务没有记账模板"); }
+        if (!needsBookkeeping(link, queryLinkedRecord(link))) { throw new BusinessException("该任务已有关联账单，不能修改记账模板"); }
+        if (!TaskStatusEnum.WAIT.equals(task.getTaskStatus())) { throw new BusinessException("仅待办任务可以修改本次记账模板"); }
+        link.setTemplateSnapshot(JSONUtil.toJsonStr(bookkeepingGateway.validateAndBind(dto.getBookkeepingTemplate())));
+        link.setUpdateTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
+        taskBookkeepingDao.updateById(link);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Integer id) {
+        TaskBasicsUpdateStatusDto status = new TaskBasicsUpdateStatusDto();
+        status.setId(id);
+        status.setTaskStatus(TaskStatusEnum.DELETED);
+        updateTaskStatus(status);
     }
 
     private void syncPoints(PointsTaskBasicsEntity taskBasicsEntity, Integer points, boolean isFinish) {
@@ -118,7 +217,7 @@ public class PointsTaskBasicsServiceImpl extends WebServiceImpl<PointsTaskBasics
         pointsRecordsAddDto.setSource((isFinish ? "完成任务" : "取消任务") + "[" + taskBasicsEntity.getId() + "]" + taskBasicsEntity.getTaskName());
         pointsRecordsAddDto.setSourceType(PointsSourceTypeEnum.POINTS_TASK_MANUAL.getCode());
         pointsRecordsAddDto.setUserId(taskBasicsEntity.getUserId());
-        MQProducerHelper.send(PointsRecordsTopicEnum.TASK, pointsRecordsAddDto);
+        pointsRecordsService.add(pointsRecordsAddDto);
     }
 
     @Override
@@ -196,6 +295,23 @@ public class PointsTaskBasicsServiceImpl extends WebServiceImpl<PointsTaskBasics
         }
         List<FileVo> fileVoList = baseBusinessFileDao.getBusinessFile(vo.getId(), BusinessFileTypeEnum.POINTS_TASK_BASICS);
         vo.setFileList(fileVoList);
+        PointsTaskBookkeepingEntity link = taskBookkeepingDao.byTaskId(id);
+        TaskBookkeepingRecordVo record = queryLinkedRecord(link);
+        boolean pending = needsBookkeeping(link, record);
+        vo.setBookkeepingStatus(link == null ? "NONE" : pending ? "PENDING" : "RECORDED");
+        if (link != null) {
+            TaskBookkeepingTemplateDto template = JSONUtil.toBean(link.getTemplateSnapshot(), TaskBookkeepingTemplateDto.class);
+            vo.setBookkeepingTemplate(template);
+            vo.setBookkeepingRecordCategory(template.getRecordCategory());
+            if (pending) {
+                vo.setBookkeepingAmount(template.getAmount());
+                vo.setBookkeepingRecordAvailability(record == null ? "NOT_CREATED" : "DELETED");
+            } else {
+                vo.setBookkeepingRecordId(link.getBookkeepingRecordId());
+                vo.setBookkeepingRecordAvailability(record == null ? "INACCESSIBLE" : record.getAvailability());
+                if (record != null && "AVAILABLE".equals(record.getAvailability())) { vo.setBookkeepingAmount(record.getAmount()); }
+            }
+        }
         return vo;
     }
 
@@ -205,10 +321,32 @@ public class PointsTaskBasicsServiceImpl extends WebServiceImpl<PointsTaskBasics
         }
         List<Integer> taskGroupIdList = entityList.stream().map(PointsTaskBasicsEntity::getTaskGroupId).distinct().toList();
         Map<Integer, String> groupNameMap = pointsTaskGroupDao.queryTaskGroupNameMap(taskGroupIdList);
+        Map<Integer, PointsTaskBookkeepingEntity> links = taskBookkeepingDao.lambdaQuery()
+                .in(PointsTaskBookkeepingEntity::getTaskId, entityList.stream().map(PointsTaskBasicsEntity::getId).toList()).list()
+                .stream().collect(Collectors.toMap(PointsTaskBookkeepingEntity::getTaskId, Function.identity()));
+        List<Integer> recordIds = links.values().stream().map(PointsTaskBookkeepingEntity::getBookkeepingRecordId).filter(Objects::nonNull).toList();
+        Map<Integer, TaskBookkeepingRecordVo> records = recordIds.isEmpty() ? Collections.emptyMap() : bookkeepingGateway.queryRecords(recordIds);
         return entityList.stream()
                 .map(t -> {
                     TaskBasicsListVo vo = BeanUtil.copyProperties(t, TaskBasicsListVo.class);
                     vo.setTaskGroupName(groupNameMap.get(vo.getTaskGroupId()));
+                    PointsTaskBookkeepingEntity link = links.get(t.getId());
+                    TaskBookkeepingRecordVo record = link == null ? null : records.get(link.getBookkeepingRecordId());
+                    boolean pending = needsBookkeeping(link, record);
+                    vo.setBookkeepingStatus(link == null ? "NONE" : pending ? "PENDING" : "RECORDED");
+                    if (link != null) {
+                        TaskBookkeepingTemplateDto template = JSONUtil.toBean(link.getTemplateSnapshot(), TaskBookkeepingTemplateDto.class);
+                        vo.setBookkeepingRecordCategory(template.getRecordCategory());
+                        vo.setBookkeepingRecordSource(template.getRecordSource());
+                        if (pending) {
+                            vo.setBookkeepingAmount(template.getAmount());
+                            vo.setBookkeepingRecordAvailability(record == null ? "NOT_CREATED" : "DELETED");
+                        } else {
+                            vo.setBookkeepingRecordId(link.getBookkeepingRecordId());
+                            vo.setBookkeepingRecordAvailability(record == null ? "INACCESSIBLE" : record.getAvailability());
+                            if (record != null && "AVAILABLE".equals(record.getAvailability())) { vo.setBookkeepingAmount(record.getAmount()); }
+                        }
+                    }
                     return vo;
                 })
                 .toList();

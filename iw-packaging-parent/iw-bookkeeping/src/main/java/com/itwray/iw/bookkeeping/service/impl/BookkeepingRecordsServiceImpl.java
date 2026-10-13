@@ -6,10 +6,18 @@ import cn.idev.excel.FastExcel;
 import com.itwray.iw.auth.client.AuthFamilyGroupClient;
 import com.itwray.iw.auth.client.AuthUserClient;
 import com.itwray.iw.auth.client.BaseDictClient;
+import com.itwray.iw.auth.service.AuthFamilyGroupService;
 import com.itwray.iw.auth.model.enums.ShareStateEnum;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
 import com.itwray.iw.auth.model.vo.DictListVo;
 import com.itwray.iw.bookkeeping.dao.BookkeepingRecordsDao;
+import com.itwray.iw.bookkeeping.dao.BookkeepingWalletDao;
+import com.itwray.iw.bookkeeping.dao.BookkeepingWalletRecordsDao;
+import com.itwray.iw.bookkeeping.model.entity.BookkeepingWalletEntity;
+import com.itwray.iw.bookkeeping.model.enums.WalletRecordsChangeTypeEnum;
+import com.itwray.iw.points.service.PointsRecordsService;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
 import com.itwray.iw.bookkeeping.excel.listener.BookkeepingRecordsImportDataListener;
 import com.itwray.iw.bookkeeping.mapper.BookkeepingRecordsMapper;
 import com.itwray.iw.bookkeeping.model.bo.BookkeepingRecordsImportBo;
@@ -97,6 +105,63 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     private AuthFamilyGroupClient authFamilyGroupClient;
 
     @Autowired
+    private BookkeepingWalletDao walletDao;
+    @Autowired
+    private BookkeepingWalletRecordsDao walletRecordsDao;
+    @Autowired
+    private PointsRecordsService pointsRecordsService;
+    @Autowired
+    private JdbcTemplate jdbc;
+    @Autowired
+    private AuthFamilyGroupService familyService;
+    @Autowired
+    private com.itwray.iw.points.bookkeeping.TaskBookkeepingSourceQuery taskSourceQuery;
+
+    /** All balance writes use wallet then points, also on later edit/delete. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Integer addFromTask(BookkeepingRecordAddDto dto, LocalDateTime completedAt, Integer groupId) {
+        BookkeepingRecordsEntity entity = this.buildBookkeepingRecordAddDto(dto);
+        entity.setRecordDate(completedAt.toLocalDate());
+        entity.setRecordTime(completedAt);
+        entity.setGroupId(groupId);
+        entity.setShareState(Objects.equals(dto.getShared(), 1) ? ShareStateEnum.SHARED : ShareStateEnum.NOT_SHARED);
+        entity.setOrderNo(OrderNoUtils.getAndIncrement(OrderNoEnum.BOOKKEEPING_RECORDS));
+        if (!getBaseDao().save(entity)) throw new BusinessException("记账保存失败，请重试");
+        baseDictBusinessRelationDao.saveRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, entity.getId(), dto.getRecordTags());
+        syncWalletBalanceInTransaction(dto.getRecordCategory(), entity.getAmount());
+        if (RecordCategoryEnum.INCOME.equals(dto.getRecordCategory()) && Objects.equals(dto.getIsExcitationRecord(), 1)) {
+            syncExcitationInTransaction(entity.getOrderNo(), 1);
+        }
+        return entity.getId();
+    }
+
+    private boolean isTaskRecord(Integer id) {
+        Integer count = jdbc.queryForObject("select count(*) from points_task_bookkeeping where bookkeeping_record_id = ?", Integer.class, id);
+        return count != null && count > 0;
+    }
+
+    private void syncWalletBalanceInTransaction(RecordCategoryEnum category, BigDecimal amount) {
+        BookkeepingWalletEntity wallet = walletDao.lambdaQuery()
+                .eq(BookkeepingWalletEntity::getUserId, UserUtils.getUserId()).last("FOR UPDATE").one();
+        if (wallet == null) throw new BusinessException("用户钱包不存在，本次操作未保存");
+        BigDecimal delta = RecordCategoryEnum.CONSUME.equals(category) ? amount.negate() : amount;
+        if (walletDao.getBaseMapper().updateWalletBalance(UserUtils.getUserId(), delta) != 1) {
+            throw new BusinessException("钱包更新失败，本次操作未保存");
+        }
+        walletRecordsDao.saveChangeRecord(WalletRecordsChangeTypeEnum.BALANCE, wallet.getWalletBalance(), delta);
+    }
+
+    private void syncExcitationInTransaction(String orderNo, int points) {
+        PointsRecordsAddDto dto = new PointsRecordsAddDto();
+        dto.setPoints(points);
+        dto.setSource((points > 0 ? "记账收入: " : "记账收入被撤回: ") + orderNo);
+        dto.setSourceType(PointsSourceTypeEnum.BOOKKEEPING.getCode());
+        dto.setUserId(UserUtils.getUserId());
+        pointsRecordsService.add(dto);
+    }
+
+    @Autowired
     public BookkeepingRecordsServiceImpl(BookkeepingRecordsDao baseDao,
                                          BaseDictBusinessRelationDao baseDictBusinessRelationDao,
                                          BaseBusinessFileDao baseBusinessFileDao) {
@@ -166,7 +231,9 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     @Override
     @Transactional
     public void update(BookkeepingRecordUpdateDto dto) {
+        taskSourceQuery.lockTaskForRecord(dto.getId());
         BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryEditableRecord(dto.getId(), "修改");
+        boolean taskRecord = isTaskRecord(dto.getId());
         if (!bookkeepingRecordsEntity.getRecordCategory().equals(dto.getRecordCategory())) {
             throw new BusinessException("不支持修改记账记录类型操作");
         }
@@ -180,7 +247,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         // 记账记录类型为收入类型时
         if (RecordCategoryEnum.INCOME.equals(dto.getRecordCategory())) {
             // 如果修改了激励记录状态, 则同步积分数据
-            if (!bookkeepingRecordsEntity.getIsExcitationRecord().equals(dto.getIsExcitationRecord())) {
+            if (!taskRecord && !bookkeepingRecordsEntity.getIsExcitationRecord().equals(dto.getIsExcitationRecord())) {
                 if (BoolEnum.TRUE.getCode().equals(dto.getIsExcitationRecord())) {
                     this.addPointsRecordsByExcitation(bookkeepingRecordsEntity.getOrderNo());
                 } else {
@@ -190,14 +257,22 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         }
 
         BookkeepingRecordsEntity recordsEntity = this.buildBookkeepingRecordAddDto(dto);
-        FamilySharedSavePolicyVo sharedSavePolicy = this.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId());
+        FamilySharedSavePolicyVo sharedSavePolicy = taskRecord
+                ? familyService.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId())
+                : this.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId());
         recordsEntity.setGroupId(bookkeepingRecordsEntity.getGroupId());
         recordsEntity.setShareState(this.resolveRecordShareState(bookkeepingRecordsEntity.getGroupId(), sharedSavePolicy, dto.getShared()));
         getBaseDao().updateById(recordsEntity);
 
         // 同步用户钱包余额
         if (bookkeepingRecordsEntity.getAmount().compareTo(recordsEntity.getAmount()) != 0) {
-            this.syncWalletBalance(dto.getRecordCategory(), recordsEntity.getAmount().subtract(bookkeepingRecordsEntity.getAmount()));
+            BigDecimal change = recordsEntity.getAmount().subtract(bookkeepingRecordsEntity.getAmount());
+            if (taskRecord) syncWalletBalanceInTransaction(dto.getRecordCategory(), change);
+            else this.syncWalletBalance(dto.getRecordCategory(), change);
+        }
+        if (taskRecord && RecordCategoryEnum.INCOME.equals(dto.getRecordCategory())
+                && !Objects.equals(bookkeepingRecordsEntity.getIsExcitationRecord(), dto.getIsExcitationRecord())) {
+            syncExcitationInTransaction(bookkeepingRecordsEntity.getOrderNo(), Objects.equals(dto.getIsExcitationRecord(), 1) ? 1 : -1);
         }
     }
 
@@ -234,7 +309,9 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     @Override
     @Transactional
     public void delete(Integer id) {
+        taskSourceQuery.lockTaskForRecord(id);
         BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryEditableRecord(id, "删除");
+        boolean taskRecord = isTaskRecord(id);
         super.delete(id);
 
         // 删除标签
@@ -244,18 +321,21 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         baseBusinessFileDao.removeBusinessFile(id, BusinessFileTypeEnum.BOOKKEEPING_RECORDS);
 
         // 同步积分数据
+        if (taskRecord) syncWalletBalanceInTransaction(bookkeepingRecordsEntity.getRecordCategory(), bookkeepingRecordsEntity.getAmount().negate());
         if (RecordCategoryEnum.INCOME.equals(bookkeepingRecordsEntity.getRecordCategory())
                 && BoolEnum.TRUE.getCode().equals(bookkeepingRecordsEntity.getIsExcitationRecord())) {
-            this.deductPointsRecordsByExcitation(bookkeepingRecordsEntity.getOrderNo());
+            if (taskRecord) syncExcitationInTransaction(bookkeepingRecordsEntity.getOrderNo(), -1);
+            else this.deductPointsRecordsByExcitation(bookkeepingRecordsEntity.getOrderNo());
         }
 
         // 同步用户钱包余额
-        this.syncWalletBalance(bookkeepingRecordsEntity.getRecordCategory(), bookkeepingRecordsEntity.getAmount().negate());
+        if (!taskRecord) this.syncWalletBalance(bookkeepingRecordsEntity.getRecordCategory(), bookkeepingRecordsEntity.getAmount().negate());
     }
 
     @Override
     public BookkeepingRecordDetailVo detail(Integer id) {
         BookkeepingRecordDetailVo vo = super.detail(id);
+        vo.setTaskSource(taskSourceQuery.query(id));
         BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryRecordByIdIgnorePermission(id);
 
         // 查询标签
@@ -834,7 +914,10 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     }
 
     private BookkeepingRecordsEntity queryEditableRecord(Integer id, String actionName) {
-        BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryRecordByIdIgnorePermission(id);
+        BookkeepingRecordsEntity bookkeepingRecordsEntity = getBaseDao().lambdaQuery()
+                .eq(BookkeepingRecordsEntity::getId, id)
+                .eq(BookkeepingRecordsEntity::getUserId, UserUtils.getUserId()).last("FOR UPDATE").one();
+        if (bookkeepingRecordsEntity == null) throw new BusinessException("记账记录不存在或无权" + actionName);
         if (!Objects.equals(bookkeepingRecordsEntity.getUserId(), UserUtils.getUserId())) {
             throw new BusinessException("不能" + actionName + "他人记账记录");
         }

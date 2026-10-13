@@ -40,8 +40,14 @@ public class PointsTaskBasicsController extends WebController<PointsTaskBasicsSe
 
     @PutMapping("/updateStatus")
     @Operation(summary = "更新任务状态")
-    public void updateTaskStatus(@RequestBody TaskBasicsUpdateStatusDto dto) {
-        getWebService().updateTaskStatus(dto);
+    public com.itwray.iw.points.model.vo.task.TaskStatusResultVo updateTaskStatus(@RequestBody @Valid TaskBasicsUpdateStatusDto dto) {
+        return getWebService().updateTaskStatus(dto);
+    }
+
+    @PutMapping("/updateBookkeepingTemplate")
+    @Operation(summary = "修正本次任务记账模板")
+    public void updateBookkeepingTemplate(@RequestBody @Valid TaskBasicsUpdateBookkeepingTemplateDto dto) {
+        getWebService().updateBookkeepingTemplate(dto);
     }
 
     @GetMapping("/doneList")

@@ -73,4 +73,10 @@ public class TaskBasicsDetailVo implements DetailVo {
 
     @Schema(title = "任务附件")
     private List<FileVo> fileList;
+    private String bookkeepingStatus;
+    private Integer bookkeepingRecordId;
+    private java.math.BigDecimal bookkeepingAmount;
+    private Integer bookkeepingRecordCategory;
+    private String bookkeepingRecordAvailability;
+    private com.itwray.iw.points.bookkeeping.TaskBookkeepingTemplateDto bookkeepingTemplate;
 }

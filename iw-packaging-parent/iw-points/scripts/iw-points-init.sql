@@ -112,3 +112,38 @@ create table points_task_fixed (
     primary key (id),
     key idx_user_id (user_id)
 ) comment '常用任务表';
+
+
+-- 任务计划完成时自动记账（v1）。在部署新版 iw-core 前执行一次。
+-- 历史计划默认关闭，历史任务不推断来源、不补建快照或账单。
+-- DDL 会自动提交；执行前备份，勿在生产事务中运行。
+ALTER TABLE points_task_plan
+    ADD COLUMN bookkeeping_enabled tinyint(1) NOT NULL DEFAULT 0 COMMENT '完成时自动记账' AFTER status,
+    ADD COLUMN bookkeeping_template json NULL COMMENT '服务端校验后的记账模板（含版本及家庭上下文）' AFTER bookkeeping_enabled;
+
+ALTER TABLE points_task_basics
+    ADD COLUMN source_plan_id int unsigned NULL COMMENT '来源任务计划id，历史及普通任务为空' AFTER done_time,
+    ADD COLUMN source_plan_date date NULL COMMENT '生成时的本期计划日期' AFTER source_plan_id,
+    ADD COLUMN completion_reward_points int NOT NULL DEFAULT 0 COMMENT '当前完成实际发放的任务积分' AFTER source_plan_date,
+    ADD UNIQUE KEY uk_source_plan_date (source_plan_id, source_plan_date);
+
+-- 不设外键、级联删除或 deleted：保留任务快照；账单删除后允许下次完成时重新记账。
+-- uk_source_plan_date 不含 deleted，逻辑删除的任务同样占用该期生成凭据。
+CREATE TABLE points_task_bookkeeping
+(
+    id                    int unsigned AUTO_INCREMENT NOT NULL COMMENT 'id',
+    user_id               int unsigned NOT NULL COMMENT '所属用户id',
+    task_id               int unsigned NOT NULL COMMENT '任务id（永久唯一）',
+    source_plan_id        int unsigned NULL COMMENT '历史来源计划id',
+    source_plan_date      date NULL COMMENT '历史本期计划日期',
+    task_name_snapshot    varchar(128) NOT NULL DEFAULT '' COMMENT '来源任务名称快照',
+    template_snapshot     json NOT NULL COMMENT '独立记账快照（含版本及家庭上下文）',
+    bookkeeping_record_id int unsigned NULL COMMENT '最近成功生成的账单id，原账单删除后可替换',
+    recorded_at           datetime NULL COMMENT '最近成功记账时间',
+    create_time           datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time           datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_task_id (task_id),
+    UNIQUE KEY uk_bookkeeping_record_id (bookkeeping_record_id),
+    KEY idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT '任务自动记账快照及最近账单关联';

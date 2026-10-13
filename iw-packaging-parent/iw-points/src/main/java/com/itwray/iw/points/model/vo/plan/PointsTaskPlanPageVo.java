@@ -45,4 +45,5 @@ public class PointsTaskPlanPageVo {
      */
     @JsonFormat(pattern = DateUtils.DATETIME_FORMAT)
     private LocalDateTime createTime;
+    private Boolean bookkeepingEnabled;
 }

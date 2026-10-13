@@ -59,4 +59,6 @@ public class PointsTaskPlanDetailVo implements DetailVo {
     @Schema(title = "创建时间")
     @JsonFormat(pattern = DateUtils.DATETIME_FORMAT)
     private LocalDateTime createTime;
+    private Boolean bookkeepingEnabled;
+    private com.itwray.iw.points.bookkeeping.TaskBookkeepingTemplateDto bookkeepingTemplate;
 }

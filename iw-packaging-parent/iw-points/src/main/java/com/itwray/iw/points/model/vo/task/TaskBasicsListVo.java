@@ -65,4 +65,11 @@ public class TaskBasicsListVo {
     @JsonFormat(pattern = DateUtils.DATE_FORMAT)
     private LocalDateTime createTime;
 
+    private String bookkeepingStatus;
+    private Integer bookkeepingRecordId;
+    private java.math.BigDecimal bookkeepingAmount;
+    private Integer bookkeepingRecordCategory;
+    @Schema(title = "记账模板支出项目或收入来源")
+    private String bookkeepingRecordSource;
+    private String bookkeepingRecordAvailability;
 }

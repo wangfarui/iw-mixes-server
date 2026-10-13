@@ -24,6 +24,8 @@ import java.util.Map;
  */
 public interface BookkeepingRecordsService extends WebService<BookkeepingRecordAddDto, BookkeepingRecordUpdateDto, BookkeepingRecordDetailVo, Integer> {
 
+    Integer addFromTask(BookkeepingRecordAddDto dto, java.time.LocalDateTime completedAt, Integer groupId);
+
     PageVo<BookkeepingRecordPageVo> page(BookkeepingRecordPageDto dto);
 
     List<BookkeepingRecordPageVo> list(BookkeepingRecordListDto dto);

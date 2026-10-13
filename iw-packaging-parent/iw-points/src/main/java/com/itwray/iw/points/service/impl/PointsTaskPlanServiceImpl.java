@@ -1,6 +1,10 @@
 package com.itwray.iw.points.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONUtil;
+import com.itwray.iw.points.bookkeeping.TaskBookkeepingGateway;
+import com.itwray.iw.points.bookkeeping.TaskBookkeepingTemplateDto;
+import com.itwray.iw.web.utils.UserUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itwray.iw.points.dao.PointsTaskPlanDao;
 import com.itwray.iw.points.mapper.PointsTaskPlanMapper;
@@ -33,6 +37,11 @@ import java.time.LocalDate;
 public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao, PointsTaskPlanMapper, PointsTaskPlanEntity,
         PointsTaskPlanAddDto, PointsTaskPlanUpdateDto, PointsTaskPlanDetailVo, Integer>  implements PointsTaskPlanService {
 
+    private TaskBookkeepingGateway taskBookkeepingGateway;
+
+    @Autowired
+    public void setTaskBookkeepingGateway(TaskBookkeepingGateway gateway) { this.taskBookkeepingGateway = gateway; }
+
     @Autowired
     public PointsTaskPlanServiceImpl(PointsTaskPlanDao baseDao) {
         super(baseDao);
@@ -46,6 +55,7 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
         LocalDate nextPlanDate = this.computeNextPlanDate(dto);
         PointsTaskPlanEntity pointsTaskPlanEntity = BeanUtil.copyProperties(dto, PointsTaskPlanEntity.class);
         pointsTaskPlanEntity.setNextPlanDate(nextPlanDate);
+        applyBookkeeping(dto, pointsTaskPlanEntity);
 
         getBaseDao().save(pointsTaskPlanEntity);
 
@@ -56,13 +66,22 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
     @Transactional
     public void update(PointsTaskPlanUpdateDto dto) {
         this.checkAddDto(dto);
-        getBaseDao().queryById(dto.getId());
+        PointsTaskPlanEntity existing = lockPlan(dto.getId());
 
         LocalDate nextPlanDate = this.computeNextPlanDate(dto);
         PointsTaskPlanEntity entity = BeanUtil.copyProperties(dto, PointsTaskPlanEntity.class);
         entity.setNextPlanDate(nextPlanDate);
+        if (dto.getBookkeepingEnabled() != null) { applyBookkeeping(dto, entity); }
+        else {
+            entity.setBookkeepingEnabled(existing.getBookkeepingEnabled());
+            entity.setBookkeepingTemplate(existing.getBookkeepingTemplate());
+        }
 
         getBaseDao().updateById(entity);
+        if (Boolean.FALSE.equals(dto.getBookkeepingEnabled())) {
+            getBaseDao().lambdaUpdate().eq(PointsTaskPlanEntity::getId, dto.getId())
+                    .set(PointsTaskPlanEntity::getBookkeepingTemplate, null).update();
+        }
     }
 
     @Override
@@ -78,11 +97,34 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
     @Override
     @Transactional
     public void updatePlanStatus(PointsTaskPlanUpdateStatusDto dto) {
-        getBaseDao().queryById(dto.getId());
+        lockPlan(dto.getId());
         getBaseDao().lambdaUpdate()
                 .eq(PointsTaskPlanEntity::getId, dto.getId())
                 .set(PointsTaskPlanEntity::getStatus, dto.getStatus())
                 .update();
+    }
+
+    @Override
+    public PointsTaskPlanDetailVo detail(Integer id) {
+        PointsTaskPlanEntity entity = getBaseDao().queryById(id);
+        PointsTaskPlanDetailVo vo = BeanUtil.copyProperties(entity, PointsTaskPlanDetailVo.class, "bookkeepingTemplate");
+        if (entity.getBookkeepingTemplate() != null) {
+            vo.setBookkeepingTemplate(JSONUtil.toBean(entity.getBookkeepingTemplate(), TaskBookkeepingTemplateDto.class));
+        }
+        return vo;
+    }
+
+    private void applyBookkeeping(PointsTaskPlanAddDto dto, PointsTaskPlanEntity entity) {
+        boolean enabled = Boolean.TRUE.equals(dto.getBookkeepingEnabled());
+        entity.setBookkeepingEnabled(enabled);
+        entity.setBookkeepingTemplate(enabled ? JSONUtil.toJsonStr(taskBookkeepingGateway.validateAndBind(dto.getBookkeepingTemplate())) : null);
+    }
+
+    private PointsTaskPlanEntity lockPlan(Integer id) {
+        PointsTaskPlanEntity entity = getBaseDao().lambdaQuery().eq(PointsTaskPlanEntity::getId, id)
+                .eq(PointsTaskPlanEntity::getUserId, UserUtils.getUserId()).last("FOR UPDATE").one();
+        if (entity == null) { throw new BusinessException("任务计划不存在或无权操作"); }
+        return entity;
     }
 
     private LocalDate computeNextPlanDate(PointsTaskPlanAddDto dto) {
@@ -111,8 +153,13 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
      * 数据校验
      */
     private void checkAddDto(PointsTaskPlanAddDto dto) {
+        if (dto.getPlanCycle() == null || dto.getPlanDate() == null) { throw new BusinessException("计划周期和计划日期不能为空"); }
+        if ((dto.getRemindDays() != null && dto.getRemindDays() < 0) || (dto.getDeadlineDays() != null && dto.getDeadlineDays() < 0)
+                || (dto.getRewardPoints() != null && dto.getRewardPoints() < 0) || (dto.getPunishPoints() != null && dto.getPunishPoints() < 0)) {
+            throw new BusinessException("提醒天数、截止天数和积分不能为负数");
+        }
         if (dto.getPlanCycle().equals(TaskPlanCycleEnum.CUSTOM)) {
-            if (dto.getCycleDays() == null || dto.getCycleDays() == 0) {
+            if (dto.getCycleDays() == null || dto.getCycleDays() <= 0) {
                 throw new BusinessException("计划天数不能为空");
             }
         }

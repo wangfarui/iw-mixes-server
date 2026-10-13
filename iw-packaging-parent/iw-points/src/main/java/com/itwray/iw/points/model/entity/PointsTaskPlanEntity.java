@@ -86,4 +86,6 @@ public class PointsTaskPlanEntity extends UserEntity<Integer> {
      * 状态(0禁用 1启用)
      */
     private Integer status;
+    private Boolean bookkeepingEnabled;
+    private String bookkeepingTemplate;
 }
