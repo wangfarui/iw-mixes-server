@@ -9,6 +9,7 @@ import com.itwray.iw.points.model.param.QueryExpiredTaskParam;
 import com.itwray.iw.points.model.param.QueryGroupTaskNumParam;
 import com.itwray.iw.web.annotation.IgnorePermission;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -20,6 +21,11 @@ import java.util.List;
  */
 @Mapper
 public interface PointsTaskBasicsMapper extends BaseMapper<PointsTaskBasicsEntity> {
+
+    // Includes logically deleted tasks so a retry can never recreate the same operation.
+    PointsTaskBasicsEntity queryManualGeneration(@Param("planId") Integer planId,
+                                                 @Param("requestId") String requestId,
+                                                 @Param("userId") Integer userId);
 
     List<PointsTaskBasicsEntity> queryList(TaskBasicsListDto dto);
 

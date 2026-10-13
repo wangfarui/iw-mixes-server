@@ -124,11 +124,14 @@ ALTER TABLE points_task_plan
 ALTER TABLE points_task_basics
     ADD COLUMN source_plan_id int unsigned NULL COMMENT '来源任务计划id，历史及普通任务为空' AFTER done_time,
     ADD COLUMN source_plan_date date NULL COMMENT '生成时的本期计划日期' AFTER source_plan_id,
+    ADD COLUMN source_request_id varchar(64) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT '手动生成请求标识，自动生成为空',
+    ADD COLUMN scheduled_plan_date date GENERATED ALWAYS AS (CASE WHEN source_request_id IS NULL THEN source_plan_date ELSE NULL END) STORED,
     ADD COLUMN completion_reward_points int NOT NULL DEFAULT 0 COMMENT '当前完成实际发放的任务积分' AFTER source_plan_date,
-    ADD UNIQUE KEY uk_source_plan_date (source_plan_id, source_plan_date);
+    ADD UNIQUE KEY uk_task_plan_period (source_plan_id, scheduled_plan_date),
+    ADD UNIQUE KEY uk_task_plan_request (source_plan_id, source_request_id);
 
 -- 不设外键、级联删除或 deleted：保留任务快照；账单删除后允许下次完成时重新记账。
--- uk_source_plan_date 不含 deleted，逻辑删除的任务同样占用该期生成凭据。
+-- 两个生成唯一索引不含 deleted，逻辑删除的任务同样占用生成凭据。
 CREATE TABLE points_task_bookkeeping
 (
     id                    int unsigned AUTO_INCREMENT NOT NULL COMMENT 'id',

@@ -9,14 +9,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itwray.iw.points.dao.PointsTaskPlanDao;
 import com.itwray.iw.points.mapper.PointsTaskPlanMapper;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanAddDto;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanGenerateDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanPageDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateStatusDto;
 import com.itwray.iw.points.model.entity.PointsTaskPlanEntity;
 import com.itwray.iw.points.model.enums.TaskPlanCycleEnum;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanDetailVo;
+import com.itwray.iw.points.model.vo.plan.PointsTaskPlanGenerateVo;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanPageVo;
 import com.itwray.iw.points.service.PointsTaskPlanService;
+import com.itwray.iw.points.service.PointsTaskPlanGenerator;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
 import com.itwray.iw.web.service.impl.WebServiceImpl;
@@ -26,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * 任务计划表 服务实现类
@@ -38,6 +42,10 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
         PointsTaskPlanAddDto, PointsTaskPlanUpdateDto, PointsTaskPlanDetailVo, Integer>  implements PointsTaskPlanService {
 
     private TaskBookkeepingGateway taskBookkeepingGateway;
+    private PointsTaskPlanGenerator taskPlanGenerator;
+
+    @Autowired
+    public void setTaskPlanGenerator(PointsTaskPlanGenerator generator) { this.taskPlanGenerator = generator; }
 
     @Autowired
     public void setTaskBookkeepingGateway(TaskBookkeepingGateway gateway) { this.taskBookkeepingGateway = gateway; }
@@ -112,6 +120,14 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
             vo.setBookkeepingTemplate(JSONUtil.toBean(entity.getBookkeepingTemplate(), TaskBookkeepingTemplateDto.class));
         }
         return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public PointsTaskPlanGenerateVo generateNow(PointsTaskPlanGenerateDto dto) {
+        PointsTaskPlanEntity plan = lockPlan(dto.getId());
+        // Disabling a plan stops its schedule, but does not prevent a manual execution.
+        return taskPlanGenerator.generate(plan, LocalDate.now(ZoneId.of("Asia/Shanghai")), dto.getRequestId());
     }
 
     private void applyBookkeeping(PointsTaskPlanAddDto dto, PointsTaskPlanEntity entity) {

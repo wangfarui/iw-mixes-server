@@ -85,5 +85,7 @@ public class PointsTaskBasicsEntity extends UserEntity<Integer> {
     private LocalDateTime doneTime;
     private Integer sourcePlanId;
     private LocalDate sourcePlanDate;
+    /** 手动生成的幂等请求标识；自动生成及普通任务为空。 */
+    private String sourceRequestId;
     private Integer completionRewardPoints;
 }

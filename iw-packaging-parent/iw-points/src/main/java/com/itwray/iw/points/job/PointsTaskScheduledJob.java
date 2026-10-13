@@ -2,14 +2,10 @@ package com.itwray.iw.points.job;
 
 import com.itwray.iw.common.constants.BoolEnum;
 import com.itwray.iw.points.dao.PointsTaskBasicsDao;
-import com.itwray.iw.points.dao.PointsTaskBookkeepingDao;
-import com.itwray.iw.points.model.entity.PointsTaskBookkeepingEntity;
 import com.itwray.iw.points.dao.PointsTaskPlanDao;
 import com.itwray.iw.points.dao.PointsTaskRelationDao;
 import com.itwray.iw.points.model.bo.ExpiredTaskBo;
 import com.itwray.iw.points.model.dto.PointsRecordsAddDto;
-import com.itwray.iw.points.model.dto.task.PointsTaskRelationAddDto;
-import com.itwray.iw.points.model.dto.task.TaskBasicsAddDto;
 import com.itwray.iw.points.model.entity.PointsTaskBasicsEntity;
 import com.itwray.iw.points.model.entity.PointsTaskPlanEntity;
 import com.itwray.iw.points.model.entity.PointsTaskRelationEntity;
@@ -18,13 +14,10 @@ import com.itwray.iw.points.model.enums.PointsTransactionTypeEnum;
 import com.itwray.iw.points.model.enums.TaskStatusEnum;
 import com.itwray.iw.points.model.param.QueryExpiredTaskParam;
 import com.itwray.iw.points.model.param.QueryPlanTaskParam;
-import com.itwray.iw.points.service.PointsTaskBasicsService;
-import com.itwray.iw.points.service.PointsTaskRelationService;
 import com.itwray.iw.starter.rocketmq.MQProducerHelper;
-import com.itwray.iw.web.constants.WebCommonConstants;
 import com.itwray.iw.web.model.enums.mq.PointsRecordsTopicEnum;
-import com.itwray.iw.web.utils.ApplicationContextHolder;
 import com.itwray.iw.web.utils.UserUtils;
+import com.itwray.iw.points.service.PointsTaskPlanGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -54,10 +47,10 @@ public class PointsTaskScheduledJob {
     private final PointsTaskPlanDao pointsTaskPlanDao;
 
     private TransactionTemplate transactionTemplate;
-    private PointsTaskBookkeepingDao taskBookkeepingDao;
+    private PointsTaskPlanGenerator taskPlanGenerator;
 
     @Autowired
-    public void setTaskBookkeepingDao(PointsTaskBookkeepingDao dao) { this.taskBookkeepingDao = dao; }
+    public void setTaskPlanGenerator(PointsTaskPlanGenerator generator) { this.taskPlanGenerator = generator; }
 
     @Autowired
     public PointsTaskScheduledJob(PointsTaskBasicsDao pointsTaskBasicsDao, PointsTaskRelationDao pointsTaskRelationDao,
@@ -120,8 +113,6 @@ public class PointsTaskScheduledJob {
     /** Each period is generated atomically under a plan lock. Failed plans remain due for the next run. */
     @Scheduled(cron = "0 0 1 * * ?", zone = "Asia/Shanghai")
     public void handlePlanTask() {
-        PointsTaskBasicsService taskBasicsService = ApplicationContextHolder.getBean(PointsTaskBasicsService.class);
-        PointsTaskRelationService taskRelationService = ApplicationContextHolder.getBean(PointsTaskRelationService.class);
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         QueryPlanTaskParam param = new QueryPlanTaskParam();
         param.setNextPlanDate(today);
@@ -140,35 +131,7 @@ public class PointsTaskScheduledJob {
                                 .eq(PointsTaskPlanEntity::getUserId, candidate.getUserId()).last("FOR UPDATE").one();
                         if (plan == null || !BoolEnum.TRUE.getCode().equals(plan.getStatus()) || plan.getNextPlanDate().isAfter(today)) { return false; }
                         LocalDate periodDate = plan.getPlanDate();
-                        // A logically deleted task still keeps its unique source-period key.
-                        TaskBasicsAddDto addDto = new TaskBasicsAddDto();
-                        addDto.setTaskGroupId(WebCommonConstants.DATABASE_DEFAULT_INT_VALUE);
-                        addDto.setTaskName(plan.getTaskName());
-                        addDto.setTaskRemark(plan.getTaskRemark());
-                        addDto.setDeadlineDate(periodDate.plusDays(plan.getDeadlineDays()));
-                        Integer taskId = taskBasicsService.add(addDto);
-                        pointsTaskBasicsDao.lambdaUpdate().eq(PointsTaskBasicsEntity::getId, taskId)
-                                .set(PointsTaskBasicsEntity::getSourcePlanId, plan.getId())
-                                .set(PointsTaskBasicsEntity::getSourcePlanDate, periodDate).update();
-                        if (Boolean.TRUE.equals(plan.getBookkeepingEnabled())) {
-                            PointsTaskBookkeepingEntity snapshot = new PointsTaskBookkeepingEntity();
-                            snapshot.setUserId(plan.getUserId());
-                            snapshot.setTaskId(taskId);
-                            snapshot.setSourcePlanId(plan.getId());
-                            snapshot.setSourcePlanDate(periodDate);
-                            snapshot.setTaskNameSnapshot(plan.getTaskName());
-                            snapshot.setTemplateSnapshot(plan.getBookkeepingTemplate());
-                            snapshot.setCreateTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
-                            snapshot.setUpdateTime(snapshot.getCreateTime());
-                            taskBookkeepingDao.save(snapshot);
-                        }
-                        if (plan.getPunishPoints() > 0 || plan.getRewardPoints() > 0) {
-                            PointsTaskRelationAddDto relation = new PointsTaskRelationAddDto();
-                            relation.setTaskId(taskId);
-                            relation.setRewardPoints(plan.getRewardPoints());
-                            relation.setPunishPoints(plan.getPunishPoints());
-                            taskRelationService.add(relation);
-                        }
+                        taskPlanGenerator.generate(plan, periodDate, null);
                         LocalDate nextPeriod = computePlanDate(plan);
                         pointsTaskPlanDao.lambdaUpdate().eq(PointsTaskPlanEntity::getId, plan.getId())
                                 .set(PointsTaskPlanEntity::getPlanDate, nextPeriod)

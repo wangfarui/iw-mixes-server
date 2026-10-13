@@ -1,6 +1,8 @@
 package com.itwray.iw.points.controller;
 
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanAddDto;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanGenerateDto;
+import com.itwray.iw.points.model.vo.plan.PointsTaskPlanGenerateVo;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanPageDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateStatusDto;
@@ -44,5 +46,11 @@ public class PointsTaskPlanController extends WebController<PointsTaskPlanServic
     @Operation(summary = "更新任务状态")
     public void updatePlanStatus(@RequestBody @Valid PointsTaskPlanUpdateStatusDto dto) {
         getWebService().updatePlanStatus(dto);
+    }
+
+    @PostMapping("/generateNow")
+    @Operation(summary = "按今天的计划日期额外生成待办，不推进原计划")
+    public PointsTaskPlanGenerateVo generateNow(@RequestBody @Valid PointsTaskPlanGenerateDto dto) {
+        return getWebService().generateNow(dto);
     }
 }

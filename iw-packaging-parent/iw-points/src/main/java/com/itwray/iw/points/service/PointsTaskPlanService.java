@@ -8,6 +8,8 @@ import com.itwray.iw.points.model.vo.plan.PointsTaskPlanDetailVo;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanPageVo;
 import com.itwray.iw.web.model.vo.PageVo;
 import com.itwray.iw.web.service.WebService;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanGenerateDto;
+import com.itwray.iw.points.model.vo.plan.PointsTaskPlanGenerateVo;
 
 /**
  * 任务计划表 服务接口
@@ -20,4 +22,6 @@ public interface PointsTaskPlanService extends WebService<PointsTaskPlanAddDto, 
     PageVo<PointsTaskPlanPageVo> page(PointsTaskPlanPageDto dto);
 
     void updatePlanStatus(PointsTaskPlanUpdateStatusDto dto);
+
+    PointsTaskPlanGenerateVo generateNow(PointsTaskPlanGenerateDto dto);
 }

@@ -2,6 +2,13 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.itwray.iw.points.mapper.PointsTaskBasicsMapper">
 
+    <select id="queryManualGeneration" resultType="com.itwray.iw.points.model.entity.PointsTaskBasicsEntity">
+        select id, source_plan_date, deadline_date, deleted
+        from points_task_basics
+        where source_plan_id = #{planId} and source_request_id = #{requestId} and user_id = #{userId}
+        for update
+    </select>
+
     <select id="queryTaskNum" resultType="com.itwray.iw.points.model.bo.QueryTaskNumBo">
         select task_group_id, count(*) as taskNum
         from points_task_basics
