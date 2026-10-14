@@ -11,6 +11,8 @@ import cn.hutool.core.collection.CollectionUtil;
 import com.itwray.iw.starter.rocketmq.config.LocalMessageListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 /**
  * 记账记录-家庭组成员离组消费者
@@ -35,6 +37,7 @@ public class BookkeepingRecordsFamilyGroupConsumerServiceImpl implements RocketM
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void doConsume(FamilyGroupMemberLeaveMqDto dto) {
         if (dto == null || dto.getGroupId() == null || dto.getGroupId() <= 0 || CollectionUtil.isEmpty(dto.getUserIdList())) {
             return;
@@ -43,7 +46,8 @@ public class BookkeepingRecordsFamilyGroupConsumerServiceImpl implements RocketM
             UserUtils.setUserDataPermission(false);
             bookkeepingRecordsDao.lambdaUpdate()
                     .eq(BookkeepingRecordsEntity::getGroupId, dto.getGroupId())
-                    .in(BookkeepingRecordsEntity::getUserId, dto.getUserIdList())
+                    .and(scope -> scope.in(BookkeepingRecordsEntity::getUserId, dto.getUserIdList())
+                            .or().in(BookkeepingRecordsEntity::getExpenseUserId, dto.getUserIdList()))
                     .eq(BookkeepingRecordsEntity::getShareState, ShareStateEnum.SHARED)
                     .set(BookkeepingRecordsEntity::getShareState, ShareStateEnum.LEFT_GROUP)
                     .update();

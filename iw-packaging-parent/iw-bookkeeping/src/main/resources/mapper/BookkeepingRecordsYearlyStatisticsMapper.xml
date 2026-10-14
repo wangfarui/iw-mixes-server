@@ -11,7 +11,7 @@
         FROM (
         SELECT DISTINCT record_date
         FROM bookkeeping_records
-        WHERE deleted = 0
+        WHERE deleted = 0 AND user_id = #{userId}
         <if test="ignoreNotStatistics != null and ignoreNotStatistics == 0">
             AND is_statistics = 1
         </if>
@@ -42,7 +42,7 @@
         SELECT
         COUNT(DISTINCT record_date) AS record_days
         FROM bookkeeping_records
-        WHERE deleted = 0
+        WHERE deleted = 0 AND user_id = #{userId}
         <if test="ignoreNotStatistics != null and ignoreNotStatistics == 0">
             AND is_statistics = 1
         </if>
@@ -55,7 +55,7 @@
         MONTH(record_date) AS peakMonth,
         COUNT(*) AS peakCount
         FROM bookkeeping_records
-        WHERE deleted = 0
+        WHERE deleted = 0 AND user_id = #{userId}
         <if test="ignoreNotStatistics != null and ignoreNotStatistics == 0">
             AND is_statistics = 1
         </if>
@@ -70,7 +70,7 @@
     <select id="statisticsMissingCount" resultType="java.lang.Integer">
         SELECT COUNT(*) AS missing_count
         FROM bookkeeping_records
-        WHERE deleted = 0
+        WHERE deleted = 0 AND user_id = #{userId}
         <if test="ignoreNotStatistics != null and ignoreNotStatistics == 0">
             AND is_statistics = 1
         </if>

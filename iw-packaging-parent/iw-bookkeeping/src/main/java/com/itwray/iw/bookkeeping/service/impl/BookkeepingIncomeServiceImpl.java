@@ -90,6 +90,8 @@ public class BookkeepingIncomeServiceImpl implements BookkeepingIncomeService {
         statisticsDto.setRecordCategory(RecordCategoryEnum.INCOME);
         statisticsDto.setStatisticsType(dto.getStatisticsType());
         statisticsDto.setQueryOnlyMyself(dto.getQueryOnlyMyself());
+        statisticsDto.setIsSearchAll(dto.getIsSearchAll());
+        statisticsDto.setLimit(dto.getLimit());
         return statisticsDto;
     }
 }

@@ -68,6 +68,19 @@ public class UserDataPermissionHandler implements MultiDataPermissionHandler {
         String whereSql = where == null ? null : where.toString();
         SqlCommandType sqlCommandType = this.getSqlCommandType(mappedStatementId);
 
+        // A table-specific read scope must not change explicit maintenance-owner queries.
+        if (SqlCommandType.SELECT.equals(sqlCommandType) && !this.containsUserIdCondition(whereSql)
+                && ApplicationContextHolder.hasApplicationContext()) {
+            UserTableQueryScope scope = ApplicationContextHolder.getBeanProvider(UserTableQueryScope.class)
+                    .orderedStream().filter(candidate -> candidate.supports(table.getName())).findFirst().orElse(null);
+            if (scope != null) {
+                boolean shared = dataPermission.enableShareScopeTable(table.getName())
+                        && UserSharedQueryUtils.getUserSharedQuery()
+                        && !UserSharedQueryUtils.getUserSharedQueryOnlyMyself();
+                return scope.build(table, UserUtils.getUserId(), shared ? this.getCurrentGroupId(UserUtils.getUserId()) : 0, shared);
+            }
+        }
+
         // 共享查询：仅对指定表 + 查询语句 + 共享查询开关开启时生效
         if (SqlCommandType.SELECT.equals(sqlCommandType)
                 && dataPermission.enableShareScopeTable(table.getName())

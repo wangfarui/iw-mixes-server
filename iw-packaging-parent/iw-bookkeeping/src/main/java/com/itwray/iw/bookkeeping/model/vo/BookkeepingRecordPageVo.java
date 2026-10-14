@@ -18,7 +18,10 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class BookkeepingRecordPageVo extends UserOwnerPageVo<Integer> {
+public class BookkeepingRecordPageVo extends UserOwnerPageVo<Integer> implements BookkeepingExpenseAware {
+
+    private Integer expenseUserId;
+    private String expenseUserName;
 
     /**
      * 记录时间

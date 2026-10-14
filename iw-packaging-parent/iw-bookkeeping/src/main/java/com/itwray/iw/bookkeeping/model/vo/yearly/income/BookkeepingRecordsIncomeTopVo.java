@@ -19,6 +19,8 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = true)
 public class BookkeepingRecordsIncomeTopVo extends AbstractUserOwnerVo {
 
+    private Integer id;
+
     /**
      * 分类名称
      */

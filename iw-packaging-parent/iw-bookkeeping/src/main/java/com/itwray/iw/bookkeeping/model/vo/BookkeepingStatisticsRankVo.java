@@ -18,7 +18,11 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class BookkeepingStatisticsRankVo extends AbstractUserOwnerVo {
+public class BookkeepingStatisticsRankVo extends AbstractUserOwnerVo implements BookkeepingExpenseAware {
+
+    private com.itwray.iw.bookkeeping.model.enums.RecordCategoryEnum recordCategory;
+    private Integer expenseUserId;
+    private String expenseUserName;
 
     private Integer id;
 

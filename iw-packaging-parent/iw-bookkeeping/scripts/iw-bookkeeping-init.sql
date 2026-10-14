@@ -151,3 +151,8 @@ create table bookkeeping_voice_parse_log
     primary key (id),
     key idx_user_id (user_id)
 ) comment '语音记账解析日志表';
+
+-- 支出人维度，历史钱包不重复处理
+alter table bookkeeping_records add column expense_user_id int unsigned null comment '实际付款人' after user_id;
+update bookkeeping_records set expense_user_id = user_id where record_category = 1 and expense_user_id is null;
+alter table bookkeeping_records add key idx_expense_user_date (expense_user_id, record_date);

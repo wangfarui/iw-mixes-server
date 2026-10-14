@@ -21,7 +21,10 @@ import java.util.List;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class BookkeepingRecordDetailVo extends UserOwnerDetailVo<Integer> {
+public class BookkeepingRecordDetailVo extends UserOwnerDetailVo<Integer> implements BookkeepingExpenseAware {
+
+    private Integer expenseUserId;
+    private String expenseUserName;
 
     private com.itwray.iw.points.bookkeeping.TaskBookkeepingSourceVo taskSource;
 
@@ -96,4 +99,7 @@ public class BookkeepingRecordDetailVo extends UserOwnerDetailVo<Integer> {
      * 是否共享给家庭
      */
     private Integer shared;
+
+    /** 任务与离组记录不可变更付款归属。 */
+    private Boolean canChangeExpenseUser;
 }

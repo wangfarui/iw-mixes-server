@@ -35,6 +35,9 @@ public class BookkeepingRecordsEntity extends UserEntity<Integer> {
      */
     private String orderNo;
 
+    /** 实际付款人，缺省时新增取本人、编辑保留原值。 */
+    private Integer expenseUserId;
+
     /**
      * 记录日期
      */

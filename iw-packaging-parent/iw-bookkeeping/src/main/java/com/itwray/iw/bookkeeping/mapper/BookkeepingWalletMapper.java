@@ -18,5 +18,9 @@ import java.math.BigDecimal;
 public interface BookkeepingWalletMapper extends BaseMapper<BookkeepingWalletEntity> {
 
     @IgnorePermission
+    @org.apache.ibatis.annotations.Select("SELECT * FROM bookkeeping_wallet WHERE deleted = 0 AND user_id = #{userId} FOR UPDATE")
+    BookkeepingWalletEntity lockWallet(@Param("userId") Integer userId);
+
+    @IgnorePermission
     int updateWalletBalance(@Param("userId") Integer userId, @Param("amount") BigDecimal amount);
 }

@@ -20,7 +20,7 @@ import com.itwray.iw.common.utils.DateUtils;
 import com.itwray.iw.web.constants.WebCommonConstants;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.enums.DictTypeEnum;
-import com.itwray.iw.web.support.UserOwnerFillSupport;
+import com.itwray.iw.bookkeeping.support.BookkeepingExpenseFillSupport;
 import com.itwray.iw.web.utils.UserUtils;
 import cn.hutool.core.collection.CollectionUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,7 +65,7 @@ public class BookkeepingConsumeServiceImpl implements BookkeepingConsumeService 
     public List<BookkeepingStatisticsRankVo> rankStatistics(BookkeepingConsumeStatisticsDto dto) {
         BookkeepingStatisticsDto statisticsDto = this.buildStatisticsDto(dto);
         List<BookkeepingStatisticsRankVo> rankVoList = bookkeepingRecordsDao.getBaseMapper().rankStatistics(statisticsDto);
-        UserOwnerFillSupport.fill(rankVoList);
+        BookkeepingExpenseFillSupport.fill(rankVoList);
         return rankVoList;
     }
 

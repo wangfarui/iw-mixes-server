@@ -35,6 +35,8 @@ public class BookkeepingIncomeStatisticsDto implements SharedQueryRequest {
      */
     private Integer limit = 10;
 
+    private Integer isSearchAll;
+
     /**
      * 是否仅查询本人数据
      * <p>默认为null, 表示查询共享口径</p>

@@ -54,7 +54,8 @@ public class BookkeepingWalletServiceImpl implements BookkeepingWalletService, R
         try {
             UserUtils.setUserId(dto.getUserId());
             // 查询用户钱包
-            BookkeepingWalletEntity walletEntity = bookkeepingWalletDao.queryByUserId(dto.getUserId());
+            BookkeepingWalletEntity walletEntity = bookkeepingWalletDao.getBaseMapper().lockWallet(dto.getUserId());
+            if (walletEntity == null) throw new BusinessException("用户钱包不存在");
             // 更新用户余额
             bookkeepingWalletDao.getBaseMapper().updateWalletBalance(dto.getUserId(), dto.getAmount());
             // 新增余额变动记录
@@ -67,7 +68,8 @@ public class BookkeepingWalletServiceImpl implements BookkeepingWalletService, R
 
     @Override
     public BookkeepingWalletDetailVo getUserWalletDetail() {
-        BookkeepingWalletEntity walletEntity = bookkeepingWalletDao.queryByUserId(UserUtils.getUserId());
+        BookkeepingWalletEntity walletEntity = bookkeepingWalletDao.getBaseMapper().lockWallet(UserUtils.getUserId());
+            if (walletEntity == null) throw new BusinessException("用户钱包不存在");
         return BeanUtil.copyProperties(walletEntity, BookkeepingWalletDetailVo.class);
     }
 
@@ -78,7 +80,8 @@ public class BookkeepingWalletServiceImpl implements BookkeepingWalletService, R
         RedisLockUtil.lock(lockKey);
         try {
             // 查询用户钱包
-            BookkeepingWalletEntity walletEntity = bookkeepingWalletDao.queryByUserId(UserUtils.getUserId());
+            BookkeepingWalletEntity walletEntity = bookkeepingWalletDao.getBaseMapper().lockWallet(UserUtils.getUserId());
+            if (walletEntity == null) throw new BusinessException("用户钱包不存在");
             // 更新用户钱包金额
             bookkeepingWalletDao.lambdaUpdate()
                     .eq(BookkeepingWalletEntity::getUserId, UserUtils.getUserId())

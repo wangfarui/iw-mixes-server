@@ -3,7 +3,6 @@ package com.itwray.iw.bookkeeping.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.idev.excel.FastExcel;
-import com.itwray.iw.auth.client.AuthFamilyGroupClient;
 import com.itwray.iw.auth.client.AuthUserClient;
 import com.itwray.iw.auth.client.BaseDictClient;
 import com.itwray.iw.auth.service.AuthFamilyGroupService;
@@ -11,10 +10,10 @@ import com.itwray.iw.auth.model.enums.ShareStateEnum;
 import com.itwray.iw.auth.model.vo.FamilySharedSavePolicyVo;
 import com.itwray.iw.auth.model.vo.DictListVo;
 import com.itwray.iw.bookkeeping.dao.BookkeepingRecordsDao;
-import com.itwray.iw.bookkeeping.dao.BookkeepingWalletDao;
-import com.itwray.iw.bookkeeping.dao.BookkeepingWalletRecordsDao;
-import com.itwray.iw.bookkeeping.model.entity.BookkeepingWalletEntity;
-import com.itwray.iw.bookkeeping.model.enums.WalletRecordsChangeTypeEnum;
+import com.itwray.iw.bookkeeping.support.BookkeepingExpenseFillSupport;
+import com.itwray.iw.bookkeeping.support.BookkeepingPayerPolicy;
+import com.itwray.iw.bookkeeping.support.BookkeepingWalletLedger;
+import com.itwray.iw.auth.model.vo.FamilySharedQueryPolicyVo;
 import com.itwray.iw.points.service.PointsRecordsService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
@@ -53,11 +52,9 @@ import com.itwray.iw.web.model.enums.BusinessFileTypeEnum;
 import com.itwray.iw.web.model.enums.DictBusinessTypeEnum;
 import com.itwray.iw.web.model.enums.DictTypeEnum;
 import com.itwray.iw.web.model.enums.OrderNoEnum;
-import com.itwray.iw.web.model.enums.mq.BookkeepingRecordsTopicEnum;
 import com.itwray.iw.web.model.enums.mq.PointsRecordsTopicEnum;
 import com.itwray.iw.web.model.vo.FileVo;
 import com.itwray.iw.web.model.vo.PageVo;
-import com.itwray.iw.web.support.UserOwnerFillSupport;
 import com.itwray.iw.web.service.impl.WebServiceImpl;
 import com.itwray.iw.web.utils.OrderNoUtils;
 import com.itwray.iw.web.utils.UserUtils;
@@ -102,12 +99,10 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
 
     private AuthUserClient authUserClient;
 
-    private AuthFamilyGroupClient authFamilyGroupClient;
-
     @Autowired
-    private BookkeepingWalletDao walletDao;
+    private BookkeepingWalletLedger walletLedger;
     @Autowired
-    private BookkeepingWalletRecordsDao walletRecordsDao;
+    private BookkeepingPayerPolicy payerPolicy;
     @Autowired
     private PointsRecordsService pointsRecordsService;
     @Autowired
@@ -127,9 +122,11 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         entity.setGroupId(groupId);
         entity.setShareState(Objects.equals(dto.getShared(), 1) ? ShareStateEnum.SHARED : ShareStateEnum.NOT_SHARED);
         entity.setOrderNo(OrderNoUtils.getAndIncrement(OrderNoEnum.BOOKKEEPING_RECORDS));
+        entity.setUserId(UserUtils.getUserId());
+        entity.setExpenseUserId(RecordCategoryEnum.CONSUME.equals(dto.getRecordCategory()) ? UserUtils.getUserId() : null);
         if (!getBaseDao().save(entity)) throw new BusinessException("记账保存失败，请重试");
         baseDictBusinessRelationDao.saveRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, entity.getId(), dto.getRecordTags());
-        syncWalletBalanceInTransaction(dto.getRecordCategory(), entity.getAmount());
+        walletLedger.apply(null, entity);
         if (RecordCategoryEnum.INCOME.equals(dto.getRecordCategory()) && Objects.equals(dto.getIsExcitationRecord(), 1)) {
             syncExcitationInTransaction(entity.getOrderNo(), 1);
         }
@@ -139,17 +136,6 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     private boolean isTaskRecord(Integer id) {
         Integer count = jdbc.queryForObject("select count(*) from points_task_bookkeeping where bookkeeping_record_id = ?", Integer.class, id);
         return count != null && count > 0;
-    }
-
-    private void syncWalletBalanceInTransaction(RecordCategoryEnum category, BigDecimal amount) {
-        BookkeepingWalletEntity wallet = walletDao.lambdaQuery()
-                .eq(BookkeepingWalletEntity::getUserId, UserUtils.getUserId()).last("FOR UPDATE").one();
-        if (wallet == null) throw new BusinessException("用户钱包不存在，本次操作未保存");
-        BigDecimal delta = RecordCategoryEnum.CONSUME.equals(category) ? amount.negate() : amount;
-        if (walletDao.getBaseMapper().updateWalletBalance(UserUtils.getUserId(), delta) != 1) {
-            throw new BusinessException("钱包更新失败，本次操作未保存");
-        }
-        walletRecordsDao.saveChangeRecord(WalletRecordsChangeTypeEnum.BALANCE, wallet.getWalletBalance(), delta);
     }
 
     private void syncExcitationInTransaction(String orderNo, int points) {
@@ -190,25 +176,22 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         this.authUserClient = authUserClient;
     }
 
-    @Autowired
-    public void setAuthFamilyGroupClient(AuthFamilyGroupClient authFamilyGroupClient) {
-        this.authFamilyGroupClient = authFamilyGroupClient;
-    }
-
     @Override
     @Transactional
     public Integer add(BookkeepingRecordAddDto dto) {
         BookkeepingRecordsEntity bookkeepingRecords = this.buildBookkeepingRecordAddDto(dto);
         Integer userId = UserUtils.getUserId();
-        FamilySharedSavePolicyVo sharedSavePolicy = this.querySharedSavePolicy(userId);
+        FamilySharedSavePolicyVo sharedSavePolicy = familyService.querySharedSavePolicy(userId);
         bookkeepingRecords.setGroupId(sharedSavePolicy.getCurrentGroupId());
         bookkeepingRecords.setShareState(this.resolveRecordShareState(sharedSavePolicy.getCurrentGroupId(), sharedSavePolicy, dto.getShared()));
+
+        payerPolicy.apply(bookkeepingRecords, dto.getExpenseUserId(), null, sharedSavePolicy, false);
 
         // 生成订单号
         bookkeepingRecords.setOrderNo(OrderNoUtils.getAndIncrement(OrderNoEnum.BOOKKEEPING_RECORDS));
 
         // 保存记账记录
-        getBaseDao().save(bookkeepingRecords);
+        if (!getBaseDao().save(bookkeepingRecords)) throw new BusinessException("记账保存失败，请重试");
 
         // 保存标签
         baseDictBusinessRelationDao.saveRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, bookkeepingRecords.getId(), dto.getRecordTags());
@@ -223,7 +206,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         }
 
         // 同步用户钱包余额
-        this.syncWalletBalance(dto.getRecordCategory(), bookkeepingRecords.getAmount());
+        walletLedger.apply(null, bookkeepingRecords);
 
         return bookkeepingRecords.getId();
     }
@@ -257,19 +240,13 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         }
 
         BookkeepingRecordsEntity recordsEntity = this.buildBookkeepingRecordAddDto(dto);
-        FamilySharedSavePolicyVo sharedSavePolicy = taskRecord
-                ? familyService.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId())
-                : this.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId());
+        FamilySharedSavePolicyVo sharedSavePolicy = familyService.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId());
         recordsEntity.setGroupId(bookkeepingRecordsEntity.getGroupId());
         recordsEntity.setShareState(this.resolveRecordShareState(bookkeepingRecordsEntity.getGroupId(), sharedSavePolicy, dto.getShared()));
-        getBaseDao().updateById(recordsEntity);
+        payerPolicy.apply(recordsEntity, dto.getExpenseUserId(), bookkeepingRecordsEntity, sharedSavePolicy, taskRecord);
+        if (!getBaseDao().updateById(recordsEntity)) throw new BusinessException("记账更新失败，请重试");
 
-        // 同步用户钱包余额
-        if (bookkeepingRecordsEntity.getAmount().compareTo(recordsEntity.getAmount()) != 0) {
-            BigDecimal change = recordsEntity.getAmount().subtract(bookkeepingRecordsEntity.getAmount());
-            if (taskRecord) syncWalletBalanceInTransaction(dto.getRecordCategory(), change);
-            else this.syncWalletBalance(dto.getRecordCategory(), change);
-        }
+        walletLedger.apply(bookkeepingRecordsEntity, recordsEntity);
         if (taskRecord && RecordCategoryEnum.INCOME.equals(dto.getRecordCategory())
                 && !Objects.equals(bookkeepingRecordsEntity.getIsExcitationRecord(), dto.getIsExcitationRecord())) {
             syncExcitationInTransaction(bookkeepingRecordsEntity.getOrderNo(), Objects.equals(dto.getIsExcitationRecord(), 1) ? 1 : -1);
@@ -303,6 +280,11 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
             }
         }
 
+        if (bookkeepingRecords.getAmount() == null || bookkeepingRecords.getAmount().signum() <= 0
+                || bookkeepingRecords.getAmount().compareTo(new BigDecimal("999999.99")) > 0
+                || bookkeepingRecords.getAmount().stripTrailingZeros().scale() > 2) {
+            throw new BusinessException("请输入大于0且最多两位小数的有效金额");
+        }
         return bookkeepingRecords;
     }
 
@@ -312,7 +294,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         taskSourceQuery.lockTaskForRecord(id);
         BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryEditableRecord(id, "删除");
         boolean taskRecord = isTaskRecord(id);
-        super.delete(id);
+        if (!getBaseDao().removeById(id)) throw new BusinessException("记账删除失败，请重试");
 
         // 删除标签
         baseDictBusinessRelationDao.removeRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, id);
@@ -321,7 +303,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         baseBusinessFileDao.removeBusinessFile(id, BusinessFileTypeEnum.BOOKKEEPING_RECORDS);
 
         // 同步积分数据
-        if (taskRecord) syncWalletBalanceInTransaction(bookkeepingRecordsEntity.getRecordCategory(), bookkeepingRecordsEntity.getAmount().negate());
+        walletLedger.apply(bookkeepingRecordsEntity, null);
         if (RecordCategoryEnum.INCOME.equals(bookkeepingRecordsEntity.getRecordCategory())
                 && BoolEnum.TRUE.getCode().equals(bookkeepingRecordsEntity.getIsExcitationRecord())) {
             if (taskRecord) syncExcitationInTransaction(bookkeepingRecordsEntity.getOrderNo(), -1);
@@ -329,14 +311,29 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         }
 
         // 同步用户钱包余额
-        if (!taskRecord) this.syncWalletBalance(bookkeepingRecordsEntity.getRecordCategory(), bookkeepingRecordsEntity.getAmount().negate());
+
     }
 
     @Override
     public BookkeepingRecordDetailVo detail(Integer id) {
-        BookkeepingRecordDetailVo vo = super.detail(id);
-        vo.setTaskSource(taskSourceQuery.query(id));
         BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryRecordByIdIgnorePermission(id);
+        Integer userId = UserUtils.getUserId();
+        boolean participant = Objects.equals(userId, bookkeepingRecordsEntity.getUserId())
+                || (RecordCategoryEnum.CONSUME.equals(bookkeepingRecordsEntity.getRecordCategory())
+                    && Objects.equals(userId, bookkeepingRecordsEntity.getExpenseUserId()));
+        if (!participant) {
+            FamilySharedQueryPolicyVo policy = familyService.querySharedQueryPolicy(userId);
+            if (Objects.equals(policy.getForceQueryOnlyMyself(), 1)
+                    || !ShareStateEnum.SHARED.equals(bookkeepingRecordsEntity.getShareState())
+                    || policy.getCurrentGroupId() == null || policy.getCurrentGroupId() <= 0
+                    || !Objects.equals(policy.getCurrentGroupId(), bookkeepingRecordsEntity.getGroupId())) {
+                throw new BusinessException("记账记录不存在或无权查看");
+            }
+        }
+        BookkeepingRecordDetailVo vo = BeanUtil.copyProperties(bookkeepingRecordsEntity, BookkeepingRecordDetailVo.class);
+        vo.setTaskSource(taskSourceQuery.query(id));
+        vo.setCanChangeExpenseUser(vo.getTaskSource() == null
+                && !ShareStateEnum.LEFT_GROUP.equals(bookkeepingRecordsEntity.getShareState()));
 
         // 查询标签
         List<Integer> tagIdList = baseDictBusinessRelationDao.queryDictIdList(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, id);
@@ -348,7 +345,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         if (bookkeepingRecordsEntity != null) {
             vo.setShared(this.resolveSharedCode(bookkeepingRecordsEntity.getShareState()));
         }
-        UserOwnerFillSupport.fill(vo);
+        BookkeepingExpenseFillSupport.fill(Collections.singletonList(vo));
 
         return vo;
     }
@@ -378,7 +375,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 t.setRecordTimeStr(t.getRecordTime().format(oldYearFormatter));
             }
         });
-        UserOwnerFillSupport.fill(pageVo);
+        BookkeepingExpenseFillSupport.fill(pageVo.getRecords());
 
         return pageVo;
     }
@@ -396,7 +393,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 .stream()
                 .map(t -> BeanUtil.copyProperties(t, BookkeepingRecordPageVo.class))
                 .collect(Collectors.toList());
-        UserOwnerFillSupport.fill(recordList);
+        BookkeepingExpenseFillSupport.fill(recordList);
         return recordList;
     }
 
@@ -441,7 +438,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     @Transactional
     public void importRecords(MultipartFile file) {
         Integer userId = UserUtils.getUserId();
-        FamilySharedSavePolicyVo sharedSavePolicy = this.querySharedSavePolicy(userId);
+        FamilySharedSavePolicyVo sharedSavePolicy = familyService.querySharedSavePolicy(userId);
         Integer currentGroupId = sharedSavePolicy.getCurrentGroupId();
         ShareStateEnum defaultShareState = this.resolveRecordShareState(currentGroupId, sharedSavePolicy, null);
         // 查询当前用户的记账-记录分类字典项
@@ -498,6 +495,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
             recordsEntity.setRemark(bo.getRemark().length() < 255 ? bo.getRemark() : bo.getRemark().substring(0, 255));
         }
         recordsEntity.setUserId(bo.getUserId());
+        recordsEntity.setExpenseUserId(RecordCategoryEnum.CONSUME.equals(bo.getRecordCategory()) ? bo.getUserId() : null);
         recordsEntity.setGroupId(Optional.ofNullable(bo.getGroupId()).orElse(0));
         recordsEntity.setShareState(Optional.ofNullable(bo.getShareState()).orElse(ShareStateEnum.NOT_SHARED));
         getBaseDao().save(recordsEntity);
@@ -593,6 +591,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         Integer missingCount = getBaseDao().getStatisticsMapper().statisticsMissingCount(dto);
         habitsVo.setMissingCount(missingCount == null ? 0 : missingCount);
         Long recordingCount = getBaseDao().lambdaQuery()
+                .eq(BookkeepingRecordsEntity::getUserId, UserUtils.getUserId())
                 .between(BookkeepingRecordsEntity::getRecordDate, dto.getStartDate(), dto.getEndDate())
                 .eq(dto.getIgnoreNotStatistics() != null && dto.getIgnoreNotStatistics() == 0, BookkeepingRecordsEntity::getIsStatistics, 1)
                 .count();
@@ -689,17 +688,20 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         statisticsDto.setQueryOnlyMyself(dto.getQueryOnlyMyself());
         List<BookkeepingStatisticsRankVo> rankVoList = getBaseDao().getBaseMapper().rankStatistics(statisticsDto);
         if (CollectionUtil.isNotEmpty(rankVoList)) {
-            UserOwnerFillSupport.fill(rankVoList);
+            BookkeepingExpenseFillSupport.fill(rankVoList);
             // 查询记账分类字典值
             List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
             Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
             List<BookkeepingRecordsConsumeTopVo> topConsumeList = new ArrayList<>();
             for (BookkeepingStatisticsRankVo rankVo : rankVoList) {
                 BookkeepingRecordsConsumeTopVo topVo = new BookkeepingRecordsConsumeTopVo();
+                topVo.setExpenseUserId(rankVo.getExpenseUserId());
+                topVo.setExpenseUserName(rankVo.getExpenseUserName());
                 topVo.setCategory(dictMap.get(rankVo.getRecordType()));
                 topVo.setDescription(rankVo.getRecordSource());
                 topVo.setDate(rankVo.getRecordDate());
                 topVo.setAmount(rankVo.getAmount());
+                topVo.setId(rankVo.getId());
                 topVo.setUserId(rankVo.getUserId());
                 topVo.setUserName(rankVo.getUserName());
                 topVo.setCanEdit(rankVo.getCanEdit());
@@ -802,7 +804,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         statisticsDto.setQueryOnlyMyself(dto.getQueryOnlyMyself());
         List<BookkeepingStatisticsRankVo> rankVoList = getBaseDao().getBaseMapper().rankStatistics(statisticsDto);
         if (CollectionUtil.isNotEmpty(rankVoList)) {
-            UserOwnerFillSupport.fill(rankVoList);
+            BookkeepingExpenseFillSupport.fill(rankVoList);
             // 查询记账分类字典值
             List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
             Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
@@ -813,6 +815,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 topVo.setDescription(rankVo.getRecordSource());
                 topVo.setDate(rankVo.getRecordDate());
                 topVo.setAmount(rankVo.getAmount());
+                topVo.setId(rankVo.getId());
                 topVo.setUserId(rankVo.getUserId());
                 topVo.setUserName(rankVo.getUserName());
                 topVo.setCanEdit(rankVo.getCanEdit());
@@ -861,36 +864,6 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         LocalDate endStatisticsDate = DateUtils.endDateOfYear(startStatisticsDate);
         dto.setStartDate(startStatisticsDate);
         dto.setEndDate(endStatisticsDate);
-    }
-
-    private FamilySharedSavePolicyVo querySharedSavePolicy(Integer userId) {
-        try {
-            FamilySharedSavePolicyVo policyVo = authFamilyGroupClient.querySharedSavePolicy(userId);
-            if (policyVo == null) {
-                return this.buildDefaultSharedSavePolicy();
-            }
-            if (policyVo.getCurrentGroupId() == null) {
-                policyVo.setCurrentGroupId(0);
-            }
-            if (policyVo.getDefaultShared() == null) {
-                policyVo.setDefaultShared(BoolEnum.FALSE.getCode());
-            }
-            if (policyVo.getForceShared() == null) {
-                policyVo.setForceShared(BoolEnum.FALSE.getCode());
-            }
-            return policyVo;
-        } catch (Exception e) {
-            log.error("查询用户共享保存策略失败, userId: {}", userId, e);
-            return this.buildDefaultSharedSavePolicy();
-        }
-    }
-
-    private FamilySharedSavePolicyVo buildDefaultSharedSavePolicy() {
-        FamilySharedSavePolicyVo policyVo = new FamilySharedSavePolicyVo();
-        policyVo.setCurrentGroupId(0);
-        policyVo.setDefaultShared(BoolEnum.FALSE.getCode());
-        policyVo.setForceShared(BoolEnum.FALSE.getCode());
-        return policyVo;
     }
 
     private ShareStateEnum resolveRecordShareState(Integer recordGroupId, FamilySharedSavePolicyVo sharedSavePolicy, Integer requestShared) {
@@ -953,10 +926,4 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         MQProducerHelper.send(PointsRecordsTopicEnum.BOOKKEEPING_SERVICE, pointsRecordsAddDto);
     }
 
-    private void syncWalletBalance(RecordCategoryEnum recordCategory, BigDecimal amount) {
-        BookkeepingRecordsWalletBalanceDto dto = new BookkeepingRecordsWalletBalanceDto();
-        dto.setAmount(RecordCategoryEnum.CONSUME.equals(recordCategory) ? amount.negate() : amount);
-        dto.setUserId(UserUtils.getUserId());
-        MQProducerHelper.send(BookkeepingRecordsTopicEnum.WALLET_AMOUNT, dto);
-    }
 }

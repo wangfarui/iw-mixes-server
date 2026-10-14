@@ -235,7 +235,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
         BookkeepingVoiceParseLogEntity logEntity = bookkeepingVoiceParseLogDao.lambdaQuery()
                 .eq(BookkeepingVoiceParseLogEntity::getId, dto.getLogId())
                 .eq(BookkeepingVoiceParseLogEntity::getUserId, UserUtils.getUserId())
-                .one();
+                .last("FOR UPDATE").one();
         if (logEntity == null) {
             throw new IwWebException("语音解析日志不存在");
         }

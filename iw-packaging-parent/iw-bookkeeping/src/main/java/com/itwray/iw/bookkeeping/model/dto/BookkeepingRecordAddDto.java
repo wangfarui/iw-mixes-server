@@ -44,6 +44,7 @@ public class BookkeepingRecordAddDto implements AddDto {
      * 金额
      */
     @NotNull(message = "记账金额不能为空")
+    @jakarta.validation.constraints.DecimalMin(value = "0.01", message = "记账金额必须大于0")
     private BigDecimal amount;
 
     /**
@@ -89,4 +90,7 @@ public class BookkeepingRecordAddDto implements AddDto {
      */
     @Schema(title = "是否共享给家庭(0否 1是)")
     private Integer shared;
+
+    /** 实际付款人，缺省时新增取本人、编辑保留原值。 */
+    private Integer expenseUserId;
 }

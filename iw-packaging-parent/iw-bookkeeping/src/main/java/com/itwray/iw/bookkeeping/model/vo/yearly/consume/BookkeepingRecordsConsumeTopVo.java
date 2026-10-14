@@ -1,6 +1,7 @@
 package com.itwray.iw.bookkeeping.model.vo.yearly.consume;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.itwray.iw.bookkeeping.model.vo.BookkeepingExpenseAware;
 import com.itwray.iw.common.utils.DateUtils;
 import com.itwray.iw.web.model.vo.AbstractUserOwnerVo;
 import lombok.Data;
@@ -17,7 +18,12 @@ import java.time.LocalDate;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class BookkeepingRecordsConsumeTopVo extends AbstractUserOwnerVo {
+public class BookkeepingRecordsConsumeTopVo extends AbstractUserOwnerVo implements BookkeepingExpenseAware {
+
+    private Integer id;
+
+    private Integer expenseUserId;
+    private String expenseUserName;
 
     /**
      * 分类名称

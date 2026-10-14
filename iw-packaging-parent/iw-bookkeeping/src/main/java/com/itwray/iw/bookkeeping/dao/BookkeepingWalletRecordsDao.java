@@ -26,13 +26,18 @@ public class BookkeepingWalletRecordsDao extends BaseDao<BookkeepingWalletRecord
      * @param changeAmount   变动金额
      */
     public void saveChangeRecord(WalletRecordsChangeTypeEnum changeTypeEnum, BigDecimal beforeAmount, BigDecimal changeAmount) {
+        saveChangeRecord(UserUtils.getUserId(), changeTypeEnum, beforeAmount, changeAmount);
+    }
+
+    public void saveChangeRecord(Integer userId, WalletRecordsChangeTypeEnum changeTypeEnum,
+                                 BigDecimal beforeAmount, BigDecimal changeAmount) {
         BookkeepingWalletRecordsEntity entity = new BookkeepingWalletRecordsEntity();
         entity.setChangeType(changeTypeEnum);
         entity.setBeforeAmount(beforeAmount);
         entity.setAfterAmount(beforeAmount.add(changeAmount));
         entity.setChangeAmount(changeAmount);
-        entity.setUserId(UserUtils.getUserId());
+        entity.setUserId(userId);
 
-        this.save(entity);
+        if (!this.save(entity)) throw new com.itwray.iw.web.exception.BusinessException("钱包流水保存失败");
     }
 }

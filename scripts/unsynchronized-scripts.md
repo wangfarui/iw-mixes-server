@@ -23,3 +23,11 @@
 - 来源文件：`iw-packaging-parent/iw-auth/scripts/20260716-auth-user-account-cancellation.sql`
 - 执行内容：为 `auth_user` 增加可空的 `cancelled_time` 字段，用于记录账号注销时间。
 - 执行说明：发布包含账号安全注销流程的新版本前执行完整增量脚本。
+
+## 2026-10-14 记账支出人迁移
+
+- 模块：`iw-bookkeeping`
+- 类型：MySQL 增量脚本
+- 来源文件：`iw-packaging-parent/iw-bookkeeping/scripts/iw-bookkeeping-migrate-20261014-expense-user.sql`
+- 执行内容：新增 `expense_user_id` 与付款人/日期索引，将历史支出的付款人回填为原用户；脚本可重复执行，不改钱包余额和流水。
+- 执行说明：在部署新后端前执行完整增量脚本；不要重跑整个初始化文件。验证通过后再上线支持支出人的小程序。

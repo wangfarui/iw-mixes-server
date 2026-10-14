@@ -113,6 +113,7 @@ public class BookkeepingRecordsDao extends BaseDao<BookkeepingRecordsMapper, Boo
         statisticsDto.setCurrentStartMonth(dto.getStartDate());
         statisticsDto.setCurrentEndMonth(dto.getEndDate());
         statisticsDto.setIsSearchAll(dto.getIgnoreNotStatistics());
+        statisticsDto.setQueryOnlyMyself(dto.getQueryOnlyMyself());
         return statisticsDto;
     }
 }
