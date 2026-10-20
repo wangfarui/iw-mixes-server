@@ -1,0 +1,18 @@
+[
+  {
+    "file": "r1019a.json",
+    "originalSha256": "cfaee08b7e0d6df88aa25c6a27558d681d8111805bbd894f9c28cf2fc7a26ac5"
+  },
+  {
+    "file": "r1019a-import-voice.json",
+    "originalSha256": "953bdbc38164c9cd64b51299b995271fdf7e48d4db625dbccfd238e9b2dfb7e2"
+  },
+  {
+    "file": "r1019a-extended.json",
+    "originalSha256": "b3206cdce46012f55591939d9114eab95cd47edea5d76500d953d54b3e06b12c"
+  },
+  {
+    "file": "r1019a-isolated.json",
+    "originalSha256": "a2f2a751d21d2526216ef36dea08e39211a4cffb3f1a04ecf6b2837343bebc34"
+  }
+]

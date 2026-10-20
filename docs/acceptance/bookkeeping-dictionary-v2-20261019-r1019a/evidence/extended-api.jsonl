@@ -1,0 +1,49 @@
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"X-MG-WRITES","status":"PASS","time":"2026-10-19T07:30:09.022Z"}
+{"scene":"X-NAMES","status":"PASS","time":"2026-10-19T07:30:09.293Z"}
+{"scene":"X-STATUS-COPY","status":"PASS","time":"2026-10-19T07:30:09.389Z"}
+{"scene":"X-ORDER","status":"PASS","time":"2026-10-19T07:30:09.526Z"}
+{"scene":"X-CONCURRENT-RENAME","status":"PASS","time":"2026-10-19T07:30:09.575Z"}
+{"scene":"X-SETUP-SNAPSHOTS","status":"PASS","time":"2026-10-19T07:30:09.878Z"}
+{"scene":"X-PRIVACY","status":"FAIL","detail":"Hidden category leaked through filters","time":"2026-10-19T07:30:10.062Z"}
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"X-MG-WRITES","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-NAMES","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-STATUS-COPY","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-ORDER","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-CONCURRENT-RENAME","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-SETUP-SNAPSHOTS","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-PRIVACY","status":"PASS","time":"2026-10-19T07:34:41.598Z"}
+{"scene":"X-FORGED-AND-OLD-CLIENT","status":"PASS","time":"2026-10-19T07:34:42.188Z"}
+{"scene":"X-HISTORICAL-FILTER","status":"PASS","time":"2026-10-19T07:34:42.373Z"}
+{"scene":"X-PARTIAL-UPDATE","status":"PASS","time":"2026-10-19T07:34:43.075Z"}
+{"scene":"X-TAG-ALLOCATION","status":"PASS","time":"2026-10-19T07:34:43.264Z"}
+{"scene":"X-QUICK-SUCCESSORS","status":"PASS","time":"2026-10-19T07:34:43.620Z"}
+{"scene":"X-DELETE-HISTORY","status":"FAIL","detail":"API A DELETE /bookkeeping-service/bookkeeping/dictionaries/items/4689 HTTP=200 code=500 reason=选项版本已变化，请刷新后重试","time":"2026-10-19T07:34:43.642Z"}
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"X-MG-WRITES","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-NAMES","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-STATUS-COPY","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-ORDER","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-CONCURRENT-RENAME","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-SETUP-SNAPSHOTS","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-PRIVACY","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-FORGED-AND-OLD-CLIENT","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-HISTORICAL-FILTER","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-PARTIAL-UPDATE","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-TAG-ALLOCATION","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-QUICK-SUCCESSORS","status":"SKIPPED_PREVIOUS"}
+{"scene":"X-DELETE-HISTORY","status":"PASS","time":"2026-10-19T07:35:04.935Z"}
+{"status":"COMPLETE","detail":"Only executed assertions passed; lifecycle, suppliers, task and budget settlement require separate coverage","stateFile":"/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/logs/local/dictionary-v2-functional-r1019a/r1019a-extended.json"}

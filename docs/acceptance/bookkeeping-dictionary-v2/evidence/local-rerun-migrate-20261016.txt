@@ -1,0 +1,25 @@
+Note (Code 1305): PROCEDURE iw_mixes.iw_dict_v2_schema does not exist
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Note (Code 1305): PROCEDURE iw_mixes.iw_dict_v2_add_column does not exist
+Note (Code 1305): PROCEDURE iw_mixes.iw_dict_v2_add_index does not exist
+Note (Code 1050): Table 'bookkeeping_record_tag_snapshot' already exists
+Note (Code 1050): Table 'bookkeeping_family_dict_state' already exists
+Note (Code 1050): Table 'bookkeeping_dictionary_migration_baseline' already exists
+metric	row_count	amount	fingerprint	captured_at
+other_dict	1480	NULL	1629881291	2026-10-16 09:14:56
+records	150	25719.64	2814016182	2026-10-16 09:55:29
+relations	69	NULL	2103842976	2026-10-16 09:14:56
+wallet	16	-10756.85	2687893658	2026-10-16 09:14:56
+Note (Code 1305): PROCEDURE iw_mixes.iw_dict_v2_apply does not exist
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+result	records_migrated_this_run	templates_upgraded_this_run	families_initialized_this_run
+MIGRATION_PASS	0	0	0

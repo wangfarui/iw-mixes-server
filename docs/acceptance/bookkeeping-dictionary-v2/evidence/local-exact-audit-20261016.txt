@@ -1,0 +1,3 @@
+PASS all 13 exact data hashes match; archived 20 rows equal originals; all retained business data unchanged
+PASS all 13 exact data hashes match; archived 20 rows equal originals; all retained business data unchanged
+PASS all 13 exact data hashes match; archived 20 rows equal originals; all retained business data unchanged

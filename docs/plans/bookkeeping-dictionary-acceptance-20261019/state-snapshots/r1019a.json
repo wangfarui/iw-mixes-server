@@ -1,0 +1,173 @@
+{
+  "binding": {
+    "baseUrl": "http://127.0.0.1:18000",
+    "environment": "local",
+    "runId": "r1019a",
+    "month": "2032-04"
+  },
+  "fixtures": {
+    "users": {
+      "A": 43,
+      "B": 42,
+      "C": 8,
+      "D": 44,
+      "E": 45
+    },
+    "groupId": 2,
+    "categoryA": {
+      "id": 4681,
+      "name": "验收餐饮-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "categoryB": {
+      "id": 4682,
+      "name": "验收餐饮-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "categoryG": {
+      "id": 4683,
+      "name": "验收餐饮-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "parentWrite": {
+      "id": 4684,
+      "name": "家长-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "tagA": {
+      "id": 4685,
+      "name": "验收外卖-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "R1": 193,
+    "R2": 194,
+    "R3": 195,
+    "R4": 196,
+    "R5": 197,
+    "renamedCategory": {
+      "id": 4686,
+      "name": "验收用餐-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "renamedTag": {
+      "id": 4687,
+      "name": "验收新标签-r1019a",
+      "enabled": true,
+      "sort": 8,
+      "revision": 0
+    },
+    "R6": 198
+  },
+  "completed": {
+    "PRE-EMPTY": "2026-10-19T07:23:23.593Z",
+    "MG-01": "2026-10-19T07:23:24.194Z",
+    "MG-02": "2026-10-19T07:23:24.275Z",
+    "OP-01": "2026-10-19T07:23:24.337Z",
+    "MG-07": "2026-10-19T07:23:24.389Z",
+    "FIX-R1-R5": "2026-10-19T07:23:24.874Z",
+    "ST-01": "2026-10-19T07:23:25.026Z",
+    "MG-03": "2026-10-19T07:23:25.086Z",
+    "HS-01": "2026-10-19T07:23:25.564Z",
+    "HS-02": "2026-10-19T07:23:25.654Z",
+    "HS-02-SHARING": "2026-10-19T07:34:25.512Z",
+    "ST-02": "2026-10-19T07:34:25.824Z"
+  },
+  "results": [
+    {
+      "scene": "PRE-EMPTY",
+      "status": "PASS",
+      "detail": "Empty baseline month checked",
+      "time": "2026-10-19T07:23:23.593Z"
+    },
+    {
+      "scene": "MG-01",
+      "status": "PASS",
+      "detail": "Owner/parent allowed; member/child/no-family denied",
+      "time": "2026-10-19T07:23:24.194Z"
+    },
+    {
+      "scene": "MG-02",
+      "status": "PASS",
+      "detail": "Same-scope duplicate denied, cross-scope duplicate allowed",
+      "time": "2026-10-19T07:23:24.275Z"
+    },
+    {
+      "scene": "OP-01",
+      "status": "PASS",
+      "detail": "Merged current options prefer own personal source",
+      "time": "2026-10-19T07:23:24.337Z"
+    },
+    {
+      "scene": "MG-07",
+      "status": "PASS",
+      "detail": "Old generic write endpoints reject migrated types",
+      "time": "2026-10-19T07:23:24.389Z"
+    },
+    {
+      "scene": "FIX-R1-R5",
+      "status": "PASS",
+      "detail": "Five payment-owner fixtures created/recovered",
+      "time": "2026-10-19T07:23:24.874Z"
+    },
+    {
+      "scene": "ST-01",
+      "status": "PASS",
+      "detail": "Personal/family totals preserve payment-owner visibility",
+      "time": "2026-10-19T07:23:25.026Z"
+    },
+    {
+      "scene": "MG-03",
+      "status": "PASS",
+      "detail": "Rename creates one successor; old revision rejected",
+      "time": "2026-10-19T07:23:25.086Z"
+    },
+    {
+      "scene": "HS-01",
+      "status": "PASS",
+      "detail": "Existing category and tag snapshots survive source rename",
+      "time": "2026-10-19T07:23:25.564Z"
+    },
+    {
+      "scene": "HS-02",
+      "status": "PASS",
+      "detail": "Non-dictionary edit preserves invalid-source snapshots",
+      "time": "2026-10-19T07:23:25.654Z"
+    },
+    {
+      "scene": "ST-02",
+      "status": "FAIL",
+      "detail": "Post-rename total B/false",
+      "time": "2026-10-19T07:23:25.740Z"
+    },
+    {
+      "scene": "ST-02",
+      "status": "FAIL",
+      "detail": "Post-rename total B/false expected=650 actual=750",
+      "time": "2026-10-19T07:23:59.809Z"
+    },
+    {
+      "scene": "HS-02-SHARING",
+      "status": "PASS",
+      "detail": "Omitted sharing flag preserves the existing private fixture",
+      "time": "2026-10-19T07:34:25.512Z"
+    },
+    {
+      "scene": "ST-02",
+      "status": "PASS",
+      "detail": "New name stays separate from historical category",
+      "time": "2026-10-19T07:34:25.824Z"
+    }
+  ]
+}

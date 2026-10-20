@@ -1,0 +1,6 @@
+{"role": "A", "userId": 43, "familyId": 7, "actualRole": 3}
+{"role": "B", "userId": 42, "familyId": 7, "actualRole": 3}
+{"role": "C", "userId": 8, "familyId": null, "actualRole": null}
+{"role": "D", "userId": 44, "familyId": null, "actualRole": null}
+{"role": "E", "userId": 45, "familyId": 7, "actualRole": 1}
+{"scene":"IMPORT-PRIORITY","status":"FAIL","detail":"API /bookkeeping-service/bookkeeping/records/import HTTP=500 code=500 reason=系统异常","time":"2026-10-19T07:48:41.762Z"}

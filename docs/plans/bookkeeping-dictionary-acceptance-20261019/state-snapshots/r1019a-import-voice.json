@@ -1,0 +1,28 @@
+{
+  "fixtures": {
+    "importCat": {
+      "id": 4725,
+      "name": "IMPORT-r1019a",
+      "enabled": true,
+      "sort": 18,
+      "revision": 0
+    },
+    "importFamilyCat": {
+      "id": 4726,
+      "name": "IMPORT-r1019a",
+      "enabled": true,
+      "sort": 1,
+      "revision": 0
+    },
+    "importBalance": -4889.02
+  },
+  "completed": [],
+  "results": [
+    {
+      "scene": "IMPORT-PRIORITY",
+      "status": "FAIL",
+      "detail": "API /bookkeeping-service/bookkeeping/records/import HTTP=500 code=500 reason=系统异常",
+      "time": "2026-10-19T07:48:41.762Z"
+    }
+  ]
+}

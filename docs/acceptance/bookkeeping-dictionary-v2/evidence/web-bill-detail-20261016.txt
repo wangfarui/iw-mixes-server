@@ -1,0 +1,94 @@
+- complementary:
+  - button "二万":
+    - generic: 二万
+  - menubar:
+    - menuitem "首页":
+      - text: 首页
+    - menuitem "餐饮管理":
+      - generic: 餐饮管理
+    - menuitem "财务管理":
+      - generic: 财务管理
+    - menuitem "任务管理":
+      - generic: 任务管理
+    - menuitem "积分管理":
+      - generic: 积分管理
+    - menuitem "基础设置":
+      - generic: 基础设置
+    - menuitem "工具箱":
+      - text: 工具箱
+- main:
+  - button "刷新":
+    - generic: 刷新
+  - button "导入":
+    - button "导入":
+      - generic: 导入
+  - textbox "搜索记录来源": SELF-f10161031
+  - combobox
+  - generic: 记录类型
+  - combobox
+  - generic: 记录分类
+  - generic: 自验新标签-f10161031
+  - button "关闭此标签":
+  - combobox
+  - combobox "开始日期"
+  - generic: 至
+  - combobox "结束日期"
+  - table:
+    - rowgroup:
+      - row "记录时间 记录类型 记录来源 金额 记录分类 标签":
+        - columnheader "记录时间":
+          - generic: 记录时间
+        - columnheader "记录类型":
+          - generic: 记录类型
+        - columnheader "记录来源":
+          - generic: 记录来源
+        - columnheader "金额":
+          - generic: 金额
+        - columnheader "记录分类":
+          - generic: 记录分类
+        - columnheader "标签":
+          - generic: 标签
+  - table:
+    - rowgroup:
+      - row "2031-03-01 10:32:07 支出 SELF-f10161031 2.02 自验新分类-f10161031 自验新标签-f10161031":
+        - cell "2031-03-01 10:32:07":
+          - generic: 2031-03-01 10:32:07
+        - cell "支出":
+          - generic: 支出
+        - cell "SELF-f10161031":
+          - generic: SELF-f10161031
+        - cell "2.02":
+          - generic: "2.02"
+        - cell "自验新分类-f10161031":
+          - generic: 自验新分类-f10161031
+        - cell "自验新标签-f10161031":
+          - generic: 自验新标签-f10161031
+  - combobox
+  - generic: 10条/页
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - dialog "账单详情":
+    - heading "账单详情" [level=2]
+    - button "关闭此对话框":
+    - table:
+      - rowgroup:
+        - row "记录时间 2031-03-01":
+          - cell "记录时间"
+          - cell "2031-03-01"
+        - row "来源 SELF-f10161031":
+          - cell "来源"
+          - cell "SELF-f10161031"
+        - row "金额 2.02":
+          - cell "金额"
+          - cell "2.02"
+        - row "分类 自验新分类-f10161031":
+          - cell "分类"
+          - cell "自验新分类-f10161031"
+        - row "标签 自验新标签-f10161031":
+          - cell "标签"
+          - cell "自验新标签-f10161031"
+        - row "备注 SELF-f10161031:bill2":
+          - cell "备注"
+          - cell "SELF-f10161031:bill2"

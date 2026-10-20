@@ -1,0 +1,8 @@
+Note (Code 1305): PROCEDURE iw_mixes.iw_dict_v2_local_guard does not exist
+Note (Code 1305): PROCEDURE iw_mixes.iw_dict_v2_local_cleanup does not exist
+result	removed_this_run	quarantined_amount
+LOCAL_TEST_QUARANTINE_PASS	20	1149.23
+archived_records	archived_amount
+20	1149.23
+remaining_records	remaining_amount
+150	25719.64

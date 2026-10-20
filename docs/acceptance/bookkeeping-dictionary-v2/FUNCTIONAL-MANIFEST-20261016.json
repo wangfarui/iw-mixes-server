@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-10-16T10:52:38.670532+08:00",
+  "scope": "Local functional follow-up; no production execution; no commit/push",
+  "coverage": "Single owner API plus existing parent simulator session; not complete five-role acceptance",
+  "files": [
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryService.java",
+      "sha256": "eb0a589f3da418cacb64ccfdd29892c49e085dd55b1433105aec05ff66ab4721"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingActionsServiceImpl.java",
+      "sha256": "ee4d692a7077ef5929ab09b2dad8e04408646f338c210b6445aaa8396b8933c2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingBudgetServiceImpl.java",
+      "sha256": "cd28387bae6d411d731bfa2b5b8a107f9f2761e6908b1f3b2994de020734f235"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsMapper.xml",
+      "sha256": "83b2bb66cf0dadbfabdf5538b62c55711cb0a9f06e24ad2aa47850fc1c5e524d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsYearlyStatisticsMapper.xml",
+      "sha256": "c436154b7227dffb7ec4e7cf9845af40a0e702e245539f409b0176c7ab171042"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java",
+      "sha256": "7524382296eff259bf5ecc75a52c0298ff2f5c2bb7634f428ae5fcf20fb4b982"
+    },
+    {
+      "path": "scripts/acceptance/bookkeeping-dictionary-v2/run-local-account.py",
+      "sha256": "b0e28ebc56d106221f528ea7e2e6c3468d10f4c6fd0c3924bbcb234f33daa0ad"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/FUNCTIONAL-REPORT-20261016.md",
+      "sha256": "7ed0cb9d5e3e4205b1acf51f19a912414637b05621b18eeff67bd08f08019ec6"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/RESULTS.md",
+      "sha256": "a33ea11252c5aa94291d6165fb7748303d6268bd75457682a467b7962a9e02d8"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/functional-checks-20261016.txt",
+      "sha256": "ed8cc6c3bd439d679bf0619ba2ad2a220592583733cc1a0fb830cd3b558c2328"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-api-functional-20261016.txt",
+      "sha256": "8bde623729c55b04011cbdf2732544cfd2799752682f8c6e3c8c5bcc2509520c"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/web-bill-detail-20261016.png",
+      "sha256": "ac8f4c7507f231e5d79be7280ee31e035e6ce60643a094014c0605bc47de3380"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/web-bill-detail-20261016.txt",
+      "sha256": "417f150546056309f4abc2d11130d790a8ddbcf0aaa0100b65997ded6f336594"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/wx-bookkeeping-options-20261016.png",
+      "sha256": "6321741dbafca619a4c5a2cc9928b4326e79e4dd02a735f2c560f8bf1d2a8539"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/wx-family-categories-20261016.png",
+      "sha256": "65fff09c4e4c7079a00ddb3cd57bda3b268a03e4c1cb5f1a6641eb06b3ffa760"
+    }
+  ],
+  "coreJar": {
+    "path": "iw-packaging-parent/iw-core/target/iw-core-0.2.1.jar",
+    "sha256": "11e30af0c1c530895ae5f6007f6482b16e86771a016a70d0581f9e5361fa8436"
+  }
+}

@@ -1,0 +1,14 @@
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"ISO-PREFLIGHT","status":"PASS","time":"2026-10-19T07:42:25.442Z"}
+{"scene":"ISO-BUDGET-PAYER","status":"PASS","time":"2026-10-19T07:42:25.849Z"}
+{"scene":"ISO-TASK-IDEMPOTENCY","status":"PASS","time":"2026-10-19T07:42:26.285Z"}
+{"scene":"ISO-TASK-REBUILD","status":"PASS","time":"2026-10-19T07:42:26.481Z"}
+{"scene":"ISO-ROLE-DOWNGRADE","status":"PASS","time":"2026-10-19T07:42:26.572Z"}
+{"scene":"ISO-FAMILY-INITIALIZE","status":"PASS","time":"2026-10-19T07:42:26.987Z"}
+{"scene":"ISO-LEAVE-JOIN","status":"PASS","time":"2026-10-19T07:42:27.221Z"}
+{"scene":"ISO-TRANSFER-DISSOLVE","status":"PASS","time":"2026-10-19T07:42:27.364Z"}
+{"status":"COMPLETE","environment":"private-database-and-private-redis","stateFile":"/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/logs/local/dictionary-v2-functional-r1019a/r1019a-isolated.json"}

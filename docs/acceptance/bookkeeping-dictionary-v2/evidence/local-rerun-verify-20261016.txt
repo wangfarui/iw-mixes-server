@@ -1,0 +1,41 @@
+check_name	exception_count	result
+bill_category	0	PASS
+unresolved_bills	0	PASS
+category_snapshot_pair	0	PASS
+tag_snapshot	0	PASS
+duplicate_dict_name	0	PASS
+dict_name_owner	0	PASS
+duplicate_successor	0	PASS
+rename_lineage	0	PASS
+budget_category	0	PASS
+total_budget_category	0	PASS
+duplicate_budget	0	PASS
+action_category_missing	0	PASS
+action_tags	0	PASS
+action_category	0	PASS
+action_tag_list	0	PASS
+plan_schema	0	PASS
+task_schema	0	PASS
+template_category	0	PASS
+template_tags	0	PASS
+family_marker	0	PASS
+baseline_changed	0	PASS
+baseline_missing	0	PASS
+schema_columns	0	PASS
+schema_indexes	0	PASS
+OVERALL	0	PASS
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+total_bills	complete_bills	bill_amount
+150	150	25719.64
+metric	expected_rows	actual_rows	expected_amount	actual_amount	expected_fingerprint	actual_fingerprint	unchanged
+other_dict	1480	1480	NULL	NULL	1629881291	1629881291	1
+records	150	150	25719.64	25719.64	2814016182	2814016182	1
+relations	69	69	NULL	NULL	2103842976	2103842976	1
+wallet	16	16	-10756.85	-10756.85	2687893658	2687893658	1

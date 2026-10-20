@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-19T08:16:16.359451+00:00",
+  "repos": {
+    "iw-mixes-app-wx": {
+      "head": "cd997144a41b129ff4e886802c64c6a5ce4034b9",
+      "branch": "main"
+    },
+    "iw-mixes-server": {
+      "head": "eac7fd9666a3744008dfdc0e38be00994c0f82c5",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "b91c2acc8324525a36aafccf409eb9a569e48e71",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "22864d75d1f92977fcfcb45477dff620070ee3043c1699ebe983e08ef39d9269",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-app-wx/AGENTS.md",
+      "sha256": "edc385cea5c3e7d00ca330aa330d12ea210029156a78bf712c6201e61a380a75",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/api/bookkeeping.js",
+      "sha256": "05c3128818d75ecdaf394438ca898532d13d302cc40641c6f64f97c261ced9d7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/docs/acceptance/bookkeeping-settings-ui-20261019-a1019/RESULTS.md",
+      "sha256": "bf79603a05c9ca84b6c2de076b69cb774806720f88955e6d5061427f801bfab0",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-app-wx/docs/acceptance/copy-selection-fix-20261019/RESULTS.md",
+      "sha256": "03b8027e22f1b62ee23f4bebb39e19916fcb5e004f8af18ca5dec1938e82233c",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.js",
+      "sha256": "db5aded9e2546d45c45f6712f6edbde6cbd08f60eaf708eb9ca5b79e911d4124",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-app-wx/utils/bookkeeping-settings.js",
+      "sha256": "391d830eae027094c612712b2743eb90bdc153ab38b8acf00dc2729ad593cdd1",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/AGENTS.md",
+      "sha256": "90cff9a99988347de3f01e7d85c9814bb199ba7393095ebae492866ea82af62f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/SCENARIOS.md",
+      "sha256": "16bc4afa6c1696c909ed724784e74bc52fd762a41ee93509428804c4429702bc",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/cases.json",
+      "sha256": "0d21e83f32f65bae337fd99c7efcdc030900d13156e69831cb6d5d5c16bedad5",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/MATRIX.json",
+      "sha256": "9c325fd7f51f3653730064a7089716b69bcf7de31d8962d55fc3e93859e4b751",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/MATRIX.md",
+      "sha256": "613710a52ceae3f081cbc9a30be10f912be760966396f79254c37433496ca33d",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/PROMPT.md",
+      "sha256": "f2fbad6dad3d96ab837660e715772bb5cfddd43622efc3fdf9841824ffbb96d2",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/README.md",
+      "sha256": "df8eaf79f3cb6e22d341ed3972d41a81fb659308f7e9ee4a3521b4551acded3f",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/RESUME.md",
+      "sha256": "de22db5ce5256901c1c5d0c7d29a071531c84c0d563943b924ce3ead37c523a6",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/assets/bad.xlsx",
+      "sha256": "49f1cea7883bddd79d617048dacb0c618ae5b326afa0f81b21b71a6ffbe0eb92",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/assets/expense.wav",
+      "sha256": "666e4ede4ff45be7710d5a6fac5a8c0549afc42cd508b3f66ce3ddf2bdda33e5",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/docs/plans/bookkeeping-dictionary-acceptance-20261019/assets/good.xlsx",
+      "sha256": "3c55ccea56f16940a7fbaa0db6eb0684c40d1392dfb0229ebe5281189207a7e3",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/bo/BookkeepingRecordsImportBo.java",
+      "sha256": "fbcf7d7d20096d7ab530028966174b0c9378ef2c6fe56bec621f9ae34364a34a",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingRecordsServiceImpl.java",
+      "sha256": "2d84022b0d8fb1345e0692b25f49ba823a6a5e356d4919bc538b81a6bee7a5c4",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingImportFormatTest.java",
+      "sha256": "bb0312f0c70f1002aca073502bb0ab29007ce1e0eb387c768f6d04d6a9cdc760",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/core/aop/SharedQueryScopeAspect.java",
+      "sha256": "85abc1107785edbb500fca6324c46183d3e8e072269faf6338de2145561119a1",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/scripts/acceptance/bookkeeping-dictionary-v2/run-import-voice.mjs",
+      "sha256": "7a5312d2d9476fc1e169ece31a9a776bef8cdd436dca7c18d24ed5eda53991cf",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/scripts/acceptance/bookkeeping-dictionary-v2/with-local-test-login.py",
+      "sha256": "053602eeb7d1510e40ebdf36ffec1fc4383c34b4bb8c36146d0d997f3f93fee5",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/scripts/local-backend.sh",
+      "sha256": "da5b5ab38f4975618df6a716e92f11fcdc008c757bfdb200e1b5563a2286f8fa",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/AGENTS.md",
+      "sha256": "b7611beddd999c4c3e46389a1f0bd0ba80b1d9bd0f063a813a2b935b387324e5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/api/bookkeeping.ts",
+      "sha256": "0ef28281d33d6418e980b3d4c571ab8a8739fdbf15fb46afe96621b70a7f48d9",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/types/bookkeeping.ts",
+      "sha256": "37f18b996b657ae8869949a65e2113fec74b21f64880f547586fb98ec2f7749c",
+      "tracked": true
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "run": "r1019a",
+  "fixtures": {
+    "users": {
+      "A": 43,
+      "B": 42,
+      "C": 8,
+      "D": 44,
+      "E": 45
+    },
+    "groupG": 2,
+    "budgetA": {
+      "id": 4711,
+      "name": "ISO-r1019a-budgetA",
+      "enabled": true,
+      "sort": 16,
+      "revision": 0
+    },
+    "budgetB": {
+      "id": 4712,
+      "name": "ISO-r1019a-budgetB",
+      "enabled": true,
+      "sort": 10,
+      "revision": 0
+    },
+    "budgetAId": 20,
+    "budgetBId": 21,
+    "ownBudget": 202,
+    "delegateCat": {
+      "id": 4713,
+      "name": "ISO-r1019a-budgetB",
+      "enabled": true,
+      "sort": 16,
+      "revision": 0
+    },
+    "delegatedBudget": 203,
+    "taskCat": {
+      "id": 4714,
+      "name": "ISO-r1019a-taskCat",
+      "enabled": true,
+      "sort": 17,
+      "revision": 0
+    },
+    "taskTag": {
+      "id": 4715,
+      "name": "ISO-r1019a-taskTag",
+      "enabled": true,
+      "sort": 13,
+      "revision": 0
+    },
+    "plan": 6,
+    "generated": {
+      "taskId": 97,
+      "planDate": "2026-10-19",
+      "deadlineDate": "2026-10-19",
+      "taskDeleted": false
+    },
+    "done": {
+      "id": 97,
+      "taskStatus": 1,
+      "bookkeepingAction": "CREATED",
+      "bookkeepingRecordId": 204,
+      "recordedAmount": 0.03,
+      "recordedDate": "2026-10-19"
+    },
+    "taskCatNext": {
+      "id": 4716,
+      "name": "ISO-r1019a-taskCatNext",
+      "enabled": true,
+      "sort": 17,
+      "revision": 0
+    },
+    "taskBillDeleted": true,
+    "rebuilt": {
+      "id": 97,
+      "taskStatus": 1,
+      "bookkeepingAction": "CREATED",
+      "bookkeepingRecordId": 205,
+      "recordedAmount": 0.03,
+      "recordedDate": "2026-10-19"
+    },
+    "family": {
+      "id": 4717,
+      "name": "ISO-r1019a-family",
+      "enabled": true,
+      "sort": 10,
+      "revision": 0
+    },
+    "personalEBefore": [
+      {
+        "id": 1540,
+        "name": "餐饮美食"
+      },
+      {
+        "id": 1541,
+        "name": "日用百货"
+      },
+      {
+        "id": 1542,
+        "name": "交通出行"
+      },
+      {
+        "id": 1543,
+        "name": "充值缴费"
+      },
+      {
+        "id": 1544,
+        "name": "生活服务"
+      },
+      {
+        "id": 1545,
+        "name": "其他"
+      },
+      {
+        "id": 4693,
+        "name": "X-r1019a-personalE"
+      }
+    ],
+    "groupH": 7,
+    "defaultsH": [
+      {
+        "id": 4718,
+        "name": "餐饮美食",
+        "enabled": true,
+        "sort": 1,
+        "revision": 0
+      },
+      {
+        "id": 4719,
+        "name": "日用百货",
+        "enabled": true,
+        "sort": 2,
+        "revision": 0
+      },
+      {
+        "id": 4720,
+        "name": "交通出行",
+        "enabled": true,
+        "sort": 3,
+        "revision": 0
+      },
+      {
+        "id": 4721,
+        "name": "充值缴费",
+        "enabled": true,
+        "sort": 4,
+        "revision": 0
+      },
+      {
+        "id": 4722,
+        "name": "生活服务",
+        "enabled": true,
+        "sort": 5,
+        "revision": 0
+      },
+      {
+        "id": 4723,
+        "name": "其他",
+        "enabled": true,
+        "sort": 6,
+        "revision": 0
+      }
+    ],
+    "familyBillB": 206,
+    "familyNext": {
+      "id": 4724,
+      "name": "ISO-r1019a-familyNext",
+      "enabled": true,
+      "sort": 10,
+      "revision": 0
+    }
+  },
+  "completed": [
+    "ISO-PREFLIGHT",
+    "ISO-BUDGET-PAYER",
+    "ISO-TASK-IDEMPOTENCY",
+    "ISO-TASK-REBUILD",
+    "ISO-ROLE-DOWNGRADE",
+    "ISO-FAMILY-INITIALIZE",
+    "ISO-LEAVE-JOIN",
+    "ISO-TRANSFER-DISSOLVE"
+  ],
+  "results": [
+    {
+      "scene": "ISO-PREFLIGHT",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:25.442Z"
+    },
+    {
+      "scene": "ISO-BUDGET-PAYER",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:25.849Z"
+    },
+    {
+      "scene": "ISO-TASK-IDEMPOTENCY",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:26.285Z"
+    },
+    {
+      "scene": "ISO-TASK-REBUILD",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:26.481Z"
+    },
+    {
+      "scene": "ISO-ROLE-DOWNGRADE",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:26.572Z"
+    },
+    {
+      "scene": "ISO-FAMILY-INITIALIZE",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:26.987Z"
+    },
+    {
+      "scene": "ISO-LEAVE-JOIN",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:27.221Z"
+    },
+    {
+      "scene": "ISO-TRANSFER-DISSOLVE",
+      "status": "PASS",
+      "time": "2026-10-19T07:42:27.364Z"
+    }
+  ]
+}

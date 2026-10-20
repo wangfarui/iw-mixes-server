@@ -1,0 +1,50 @@
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"PRE-EMPTY","status":"PASS","detail":"Empty baseline month checked","time":"2026-10-19T07:23:23.593Z"}
+{"scene":"MG-01","status":"PASS","detail":"Owner/parent allowed; member/child/no-family denied","time":"2026-10-19T07:23:24.194Z"}
+{"scene":"MG-02","status":"PASS","detail":"Same-scope duplicate denied, cross-scope duplicate allowed","time":"2026-10-19T07:23:24.275Z"}
+{"scene":"OP-01","status":"PASS","detail":"Merged current options prefer own personal source","time":"2026-10-19T07:23:24.337Z"}
+{"scene":"MG-07","status":"PASS","detail":"Old generic write endpoints reject migrated types","time":"2026-10-19T07:23:24.389Z"}
+{"scene":"FIX-R1-R5","status":"PASS","detail":"Five payment-owner fixtures created/recovered","time":"2026-10-19T07:23:24.874Z"}
+{"scene":"ST-01","status":"PASS","detail":"Personal/family totals preserve payment-owner visibility","time":"2026-10-19T07:23:25.026Z"}
+{"scene":"MG-03","status":"PASS","detail":"Rename creates one successor; old revision rejected","time":"2026-10-19T07:23:25.086Z"}
+{"scene":"HS-01","status":"PASS","detail":"Existing category and tag snapshots survive source rename","time":"2026-10-19T07:23:25.564Z"}
+{"scene":"HS-02","status":"PASS","detail":"Non-dictionary edit preserves invalid-source snapshots","time":"2026-10-19T07:23:25.654Z"}
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"PRE-EMPTY","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-02","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"OP-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-07","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"FIX-R1-R5","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"ST-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-03","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"HS-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"HS-02","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"ST-02","status":"FAIL","detail":"Post-rename total B/false expected=650 actual=750","time":"2026-10-19T07:23:59.809Z"}
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"PRE-EMPTY","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-02","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"OP-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-07","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"FIX-R1-R5","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"ST-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"MG-03","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"HS-01","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"HS-02","status":"SKIPPED_PREVIOUS","detail":"Previously completed fixture stage; not revalidated this invocation"}
+{"scene":"HS-02-SHARING","status":"PASS","detail":"Omitted sharing flag preserves the existing private fixture","time":"2026-10-19T07:34:25.512Z"}
+{"scene":"ST-02","status":"PASS","detail":"New name stays separate from historical category","time":"2026-10-19T07:34:25.824Z"}
+{"status":"NOT_EXECUTED","method":"MANUAL_OR_SEPARATE_TOOL","scenes":["UI-01..UI-06","MG-05","MG-06","HS-03..HS-06","FG-01..FG-07","ST-03..ST-08","BU-01..BU-04","EN-01..EN-12","WB-01","DB-01..DB-06"],"detail":"Includes task idempotency, lifecycle/concurrency, imports/voice, SQL and all UI. Listed core stages cover only their explicit assertions."}
+{"status":"COMPLETE","stateFile":"/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/logs/local/dictionary-v2-functional-r1019a/r1019a.json","detail":"No cleanup performed; PASS applies only to stages executed by this invocation."}

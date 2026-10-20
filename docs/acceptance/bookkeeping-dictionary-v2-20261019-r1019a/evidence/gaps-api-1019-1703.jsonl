@@ -1,0 +1,13 @@
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"G-MG04-SAVE-STATUS","status":"SKIPPED_PREVIOUS"}
+{"scene":"G-MG05-CONCURRENCY","status":"SKIPPED_PREVIOUS"}
+{"scene":"G-OP02-FALLBACK","status":"SKIPPED_PREVIOUS"}
+{"scene":"G-OP04-FORGED","status":"SKIPPED_PREVIOUS"}
+{"scene":"G-ST04-SAME-NAME-TAGS","status":"SKIPPED_PREVIOUS"}
+{"scene":"G-ST06-NAME-VARIANTS","status":"PASS","detail":"5 variants stored distinctly (trim applied), statistics names=3"}
+{"scene":"G-MG02-DISABLED-NAME","status":"PASS","detail":"disabled item still occupies its name (code=500)"}
+{"status":"COMPLETE","detail":"Only executed assertions passed","stateFile":"/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/logs/local/dictionary-v2-functional-r1019a/r1019a-gaps.json"}

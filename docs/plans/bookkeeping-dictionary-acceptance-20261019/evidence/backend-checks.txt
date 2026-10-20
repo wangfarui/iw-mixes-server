@@ -1,0 +1,44 @@
+# 历史构建日志的白名单摘要；交接本轮未运行 Maven。
+
+第三处修复前 package：auth 10，bookkeeping 22（含1跳过），实际通过31；导入修复后只执行新增单项测试通过。
+
+SOURCE share-red.log
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.715 s <<< FAILURE! -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerIntegrationTest
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE
+
+SOURCE share-fixed.log
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.000 s -- in com.itwray.iw.auth.test.AuthFamilyGroupAccountDeletionTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.629 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerPolicyTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.294 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[WARNING] Tests run: 11, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 1.534 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerIntegrationTest
+[WARNING] Tests run: 21, Failures: 0, Errors: 0, Skipped: 1
+[INFO] BUILD SUCCESS
+
+SOURCE child-red.log
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.019 s <<< FAILURE! -- in com.itwray.iw.bookkeeping.support.SharedQueryAuthenticationTest
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE
+
+SOURCE fixed-package.log
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.083 s -- in com.itwray.iw.auth.test.AuthFamilyGroupAccountDeletionTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.043 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerPolicyTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.388 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.216 s -- in com.itwray.iw.bookkeeping.support.SharedQueryAuthenticationTest
+[WARNING] Tests run: 11, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 2.067 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerIntegrationTest
+[WARNING] Tests run: 22, Failures: 0, Errors: 0, Skipped: 1
+[INFO] BUILD SUCCESS
+
+SOURCE import-red-headless.log
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 1.566 s <<< FAILURE! -- in com.itwray.iw.bookkeeping.support.BookkeepingImportFormatTest
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0
+[INFO] BUILD FAILURE
+
+SOURCE import-fixed.log
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.175 s -- in com.itwray.iw.bookkeeping.support.BookkeepingImportFormatTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS

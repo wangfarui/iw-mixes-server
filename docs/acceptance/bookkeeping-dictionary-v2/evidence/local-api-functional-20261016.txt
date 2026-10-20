@@ -1,0 +1,44 @@
+{"scene": "LOGIN", "status": "PASS", "userId": 43, "familyId": 2}
+{"scene": "PRE-EMPTY", "status": "PASS", "detail": "Dedicated test month has no personal expenses"}
+{"scene": "MANAGE", "status": "PASS", "detail": "Parent can manage personal/family; duplicate rejected; personal option preferred"}
+{"scene": "RECORD", "status": "PASS", "detail": "Bill snapshots, personal amount, quick config and exact-name budget duplicate"}
+{"scene": "RENAME", "status": "PASS", "detail": "New IDs; historical bill/budget snapshots unchanged; quick config follows successors; stale revision rejected"}
+{"scene": "STATISTICS", "status": "PASS", "detail": "Historical/new category and tag filters and pie groups retain exact amounts"}
+{"scene": "INVALID", "status": "FAIL", "detail": "Expected business denial: /bookkeeping-service/bookkeeping/records/add"}
+{"scene": "LOGIN", "status": "PASS", "userId": 43, "familyId": 2}
+{"scene": "PRE-EMPTY", "status": "SKIPPED_PREVIOUS"}
+{"scene": "MANAGE", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RECORD", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RENAME", "status": "SKIPPED_PREVIOUS"}
+{"scene": "STATISTICS", "status": "SKIPPED_PREVIOUS"}
+{"scene": "INVALID", "status": "FAIL", "detail": "Expected business denial: /bookkeeping-service/bookkeeping/records/add code=500 reason=选项已失效或无权使用，请重新选择"}
+{"scene": "LOGIN", "status": "PASS", "userId": 43, "familyId": 2}
+{"scene": "PRE-EMPTY", "status": "SKIPPED_PREVIOUS"}
+{"scene": "MANAGE", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RECORD", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RENAME", "status": "SKIPPED_PREVIOUS"}
+{"scene": "STATISTICS", "status": "SKIPPED_PREVIOUS"}
+{"scene": "INVALID", "status": "PASS", "detail": "Wrong tag type and old code-only client are rejected without adding a bill"}
+{"scene": "CLEAR", "status": "PASS", "detail": "Explicit category/tag clearing persists; uncategorized filter is accurate"}
+{"scene": "STATUS", "status": "FAIL", "detail": "HTTPError"}
+{"scene": "LOGIN", "status": "PASS", "userId": 43, "familyId": 2}
+{"scene": "PRE-EMPTY", "status": "SKIPPED_PREVIOUS"}
+{"scene": "MANAGE", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RECORD", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RENAME", "status": "SKIPPED_PREVIOUS"}
+{"scene": "STATISTICS", "status": "SKIPPED_PREVIOUS"}
+{"scene": "INVALID", "status": "SKIPPED_PREVIOUS"}
+{"scene": "CLEAR", "status": "SKIPPED_PREVIOUS"}
+{"scene": "STATUS", "status": "PASS", "detail": "Disabled source blocks future quick action but preserves old bill; enable restores it"}
+{"status": "COMPLETE", "stateFile": "logs/local/dictionary-v2-functional/f10161031.json", "expenseFixtures": 2, "expenseAmount": "3.03", "fixturesRetained": true}
+{"scene": "LOGIN", "status": "PASS", "userId": 43, "familyId": 2}
+{"scene": "PRE-EMPTY", "status": "SKIPPED_PREVIOUS"}
+{"scene": "MANAGE", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RECORD", "status": "SKIPPED_PREVIOUS"}
+{"scene": "RENAME", "status": "SKIPPED_PREVIOUS"}
+{"scene": "STATISTICS", "status": "SKIPPED_PREVIOUS"}
+{"scene": "INVALID", "status": "SKIPPED_PREVIOUS"}
+{"scene": "CLEAR", "status": "SKIPPED_PREVIOUS"}
+{"scene": "STATUS", "status": "SKIPPED_PREVIOUS"}
+{"scene": "FINAL-READ", "status": "PASS", "detail": "Fresh read of final totals, filters, snapshots, quick config and budget after restart"}
+{"status": "COMPLETE", "stateFile": "logs/local/dictionary-v2-functional/f10161031.json", "expenseFixtures": 2, "expenseAmount": "3.03", "fixturesRetained": true}

@@ -1,0 +1,347 @@
+{
+  "run": "r1019a",
+  "month": "2032-05",
+  "fixtures": {
+    "users": {
+      "A": 43,
+      "B": 42,
+      "C": 8,
+      "D": 44,
+      "E": 45
+    },
+    "family": {
+      "id": 4688,
+      "name": "X-r1019a-family",
+      "enabled": true,
+      "sort": 9,
+      "revision": 0
+    },
+    "personalA": {
+      "id": 4689,
+      "name": "X-r1019a-personalA",
+      "enabled": true,
+      "sort": 9,
+      "revision": 0
+    },
+    "personalB": {
+      "id": 4690,
+      "name": "X-r1019a-personalB",
+      "enabled": true,
+      "sort": 9,
+      "revision": 0
+    },
+    "personalC": {
+      "id": 4691,
+      "name": "X-r1019a-personalC",
+      "enabled": true,
+      "sort": 7,
+      "revision": 0
+    },
+    "personalD": {
+      "id": 4692,
+      "name": "X-r1019a-personalD",
+      "enabled": true,
+      "sort": 7,
+      "revision": 0
+    },
+    "personalE": {
+      "id": 4693,
+      "name": "X-r1019a-personalE",
+      "enabled": true,
+      "sort": 7,
+      "revision": 0
+    },
+    "unicode": {
+      "id": 4694,
+      "name": "X-r1019a-中文😀",
+      "enabled": true,
+      "sort": 10,
+      "revision": 0
+    },
+    "length32": {
+      "id": 4695,
+      "name": "X-r1019a-😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "enabled": true,
+      "sort": 11,
+      "revision": 0
+    },
+    "Case": {
+      "id": 4696,
+      "name": "X-r1019a-Case",
+      "enabled": true,
+      "sort": 12,
+      "revision": 0
+    },
+    "case": {
+      "id": 4697,
+      "name": "X-r1019a-case",
+      "enabled": true,
+      "sort": 13,
+      "revision": 0
+    },
+    "copy": {
+      "id": 4698,
+      "name": "X-r1019a-copy",
+      "enabled": true,
+      "sort": 9,
+      "revision": 0
+    },
+    "copied": {
+      "created": [
+        {
+          "id": 4699,
+          "name": "X-r1019a-copy",
+          "enabled": true,
+          "sort": 9,
+          "revision": 0
+        }
+      ],
+      "skipped": []
+    },
+    "copyOff": {
+      "id": 4698,
+      "name": "X-r1019a-copy",
+      "enabled": false,
+      "sort": 9,
+      "revision": 1
+    },
+    "orderBefore": {
+      "items": [
+        {
+          "id": 1311
+        },
+        {
+          "id": 1312
+        },
+        {
+          "id": 1313
+        },
+        {
+          "id": 1314
+        },
+        {
+          "id": 1315
+        },
+        {
+          "id": 1323
+        },
+        {
+          "id": 4661
+        },
+        {
+          "id": 4686
+        },
+        {
+          "id": 4689
+        },
+        {
+          "id": 4694
+        },
+        {
+          "id": 4695
+        },
+        {
+          "id": 4696
+        },
+        {
+          "id": 4697
+        }
+      ],
+      "canManage": true,
+      "scopeVersion": "30c90372925cb694b0e77fca761f4576ccc398be195e50f5b4ea754f698aa370",
+      "familyGroupId": 2
+    },
+    "orderWrite": true,
+    "race": {
+      "id": 4700,
+      "name": "X-r1019a-race",
+      "enabled": true,
+      "sort": 14,
+      "revision": 0
+    },
+    "raceNew": {
+      "id": 4701,
+      "name": "X-r1019a-race二",
+      "enabled": true,
+      "sort": 14,
+      "revision": 0
+    },
+    "oldCategory": {
+      "id": 4702,
+      "name": "X-r1019a-oldCategory",
+      "enabled": true,
+      "sort": 15,
+      "revision": 0
+    },
+    "oldTag": {
+      "id": 4703,
+      "name": "X-r1019a-oldTag",
+      "enabled": true,
+      "sort": 10,
+      "revision": 0
+    },
+    "tagTwo": {
+      "id": 4704,
+      "name": "X-r1019a-tagTwo",
+      "enabled": true,
+      "sort": 11,
+      "revision": 0
+    },
+    "incomeTag": {
+      "id": 4705,
+      "name": "X-r1019a-incomeTag",
+      "enabled": true,
+      "sort": 6,
+      "revision": 0
+    },
+    "historical": 199,
+    "private": 200,
+    "renamedCategory": {
+      "id": 4706,
+      "name": "X-r1019a-newCategory",
+      "enabled": true,
+      "sort": 15,
+      "revision": 0
+    },
+    "renamedTag": {
+      "id": 4707,
+      "name": "X-r1019a-newTag",
+      "enabled": true,
+      "sort": 10,
+      "revision": 0
+    },
+    "multiTag": 201,
+    "quickCat": {
+      "id": 4708,
+      "name": "X-r1019a-quickCat",
+      "enabled": true,
+      "sort": 16,
+      "revision": 0
+    },
+    "quickTag": {
+      "id": 4709,
+      "name": "X-r1019a-quickTag",
+      "enabled": true,
+      "sort": 12,
+      "revision": 0
+    },
+    "quick": 112,
+    "quickNext": {
+      "id": 4710,
+      "name": "X-r1019a-quickNext",
+      "enabled": true,
+      "sort": 16,
+      "revision": 0
+    },
+    "quickOff": {
+      "id": 4709,
+      "name": "X-r1019a-quickTag",
+      "enabled": false,
+      "sort": 12,
+      "revision": 1
+    },
+    "quickOn": {
+      "id": 4709,
+      "name": "X-r1019a-quickTag",
+      "enabled": true,
+      "sort": 12,
+      "revision": 2
+    },
+    "quickDeleted": true,
+    "sourceDeleted": true
+  },
+  "completed": [
+    "X-MG-WRITES",
+    "X-NAMES",
+    "X-STATUS-COPY",
+    "X-ORDER",
+    "X-CONCURRENT-RENAME",
+    "X-SETUP-SNAPSHOTS",
+    "X-PRIVACY",
+    "X-FORGED-AND-OLD-CLIENT",
+    "X-HISTORICAL-FILTER",
+    "X-PARTIAL-UPDATE",
+    "X-TAG-ALLOCATION",
+    "X-QUICK-SUCCESSORS",
+    "X-DELETE-HISTORY"
+  ],
+  "results": [
+    {
+      "scene": "X-MG-WRITES",
+      "status": "PASS",
+      "time": "2026-10-19T07:30:09.022Z"
+    },
+    {
+      "scene": "X-NAMES",
+      "status": "PASS",
+      "time": "2026-10-19T07:30:09.293Z"
+    },
+    {
+      "scene": "X-STATUS-COPY",
+      "status": "PASS",
+      "time": "2026-10-19T07:30:09.389Z"
+    },
+    {
+      "scene": "X-ORDER",
+      "status": "PASS",
+      "time": "2026-10-19T07:30:09.526Z"
+    },
+    {
+      "scene": "X-CONCURRENT-RENAME",
+      "status": "PASS",
+      "time": "2026-10-19T07:30:09.575Z"
+    },
+    {
+      "scene": "X-SETUP-SNAPSHOTS",
+      "status": "PASS",
+      "time": "2026-10-19T07:30:09.878Z"
+    },
+    {
+      "scene": "X-PRIVACY",
+      "status": "FAIL",
+      "detail": "Hidden category leaked through filters",
+      "time": "2026-10-19T07:30:10.062Z"
+    },
+    {
+      "scene": "X-PRIVACY",
+      "status": "PASS",
+      "time": "2026-10-19T07:34:41.598Z"
+    },
+    {
+      "scene": "X-FORGED-AND-OLD-CLIENT",
+      "status": "PASS",
+      "time": "2026-10-19T07:34:42.188Z"
+    },
+    {
+      "scene": "X-HISTORICAL-FILTER",
+      "status": "PASS",
+      "time": "2026-10-19T07:34:42.373Z"
+    },
+    {
+      "scene": "X-PARTIAL-UPDATE",
+      "status": "PASS",
+      "time": "2026-10-19T07:34:43.075Z"
+    },
+    {
+      "scene": "X-TAG-ALLOCATION",
+      "status": "PASS",
+      "time": "2026-10-19T07:34:43.264Z"
+    },
+    {
+      "scene": "X-QUICK-SUCCESSORS",
+      "status": "PASS",
+      "time": "2026-10-19T07:34:43.620Z"
+    },
+    {
+      "scene": "X-DELETE-HISTORY",
+      "status": "FAIL",
+      "detail": "API A DELETE /bookkeeping-service/bookkeeping/dictionaries/items/4689 HTTP=200 code=500 reason=选项版本已变化，请刷新后重试",
+      "time": "2026-10-19T07:34:43.642Z"
+    },
+    {
+      "scene": "X-DELETE-HISTORY",
+      "status": "PASS",
+      "time": "2026-10-19T07:35:04.935Z"
+    }
+  ]
+}

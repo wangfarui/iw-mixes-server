@@ -1,0 +1,37 @@
+2026-10-16 local functional verification; no credentials or raw application logs.
+
+SOURCE functional-tests-mysql.log
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.368 s -- in com.itwray.iw.auth.test.AuthFamilyGroupAccountDeletionTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.060 s -- in com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.270 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.647 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerIntegrationTest
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Finished at: 2026-10-16T10:18:22+08:00
+
+SOURCE unavailable-transaction-fixed.log
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.684 s -- in com.itwray.iw.auth.test.AuthFamilyGroupAccountDeletionTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.077 s -- in com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.487 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[WARNING] Tests run: 11, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 1.886 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerIntegrationTest
+[WARNING] Tests run: 17, Failures: 0, Errors: 0, Skipped: 1
+[INFO] BUILD SUCCESS
+[INFO] Finished at: 2026-10-16T10:37:45+08:00
+
+SOURCE functional-package.log
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.169 s -- in com.itwray.iw.auth.test.AuthFamilyGroupAccountDeletionTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s -- in com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.121 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[WARNING] Tests run: 10, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 2.051 s -- in com.itwray.iw.bookkeeping.support.BookkeepingPayerIntegrationTest
+[WARNING] Tests run: 16, Failures: 0, Errors: 0, Skipped: 1
+[INFO] BUILD SUCCESS
+[INFO] Finished at: 2026-10-16T10:24:35+08:00
+
+WX check:routes PASS (72 pages)
+WX test:bookkeeping-payer PASS
+WX test:task-plan-generation PASS
+API live STATUS PASS after latest core restart
+API live FINAL-READ PASS after latest core restart

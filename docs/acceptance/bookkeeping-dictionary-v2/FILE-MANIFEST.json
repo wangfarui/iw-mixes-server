@@ -1,0 +1,1097 @@
+{
+  "generatedAt": "2026-10-15T20:31:33.842270+08:00",
+  "purpose": "Current uncommitted delivery hashes, not runtime acceptance proof",
+  "selfExcluded": true,
+  "repositories": [
+    {
+      "name": "iw-mixes-server",
+      "root": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server",
+      "branch": "main",
+      "head": "eac7fd9666a3744008dfdc0e38be00994c0f82c5",
+      "stagedPaths": [],
+      "statusPorcelain": [
+        " M iw-packaging-parent/iw-auth/scripts/iw-auth-init.sql",
+        " M iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthFamilyGroupServiceImpl.java",
+        " M iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java",
+        " M iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/test/AuthFamilyGroupAccountDeletionTest.java",
+        " M iw-packaging-parent/iw-bookkeeping/scripts/iw-bookkeeping-init.sql",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingRecordsController.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingRecordsMapper.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingActionsAddDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetAddDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetUpdateDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingConsumeStatisticsDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingIncomeStatisticsDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordAddDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordPageDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordUpdateDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingStatisticsDto.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingActionsEntity.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingBudgetEntity.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingRecordsEntity.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingActionsDetailVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingAssistantExpenseDraftVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetDetailVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetStatisticsVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingConsumeStatisticsCategoryVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordDetailVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordPageVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingStatisticsRankVo.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingRecordsService.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingActionsServiceImpl.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingBudgetServiceImpl.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingConsumeServiceImpl.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingIncomeServiceImpl.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingRecordsServiceImpl.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/TaskBookkeepingAdapter.java",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsMapper.xml",
+        " M iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsYearlyStatisticsMapper.xml",
+        " M iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java",
+        " M iw-packaging-parent/iw-points/src/main/java/com/itwray/iw/points/bookkeeping/TaskBookkeepingTemplateDto.java",
+        " M iw-web/scripts/iw-web-init.sql",
+        " M iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseDictEntity.java",
+        " M scripts/unsynchronized-scripts.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/COMPILE-REPORT.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/IMPLEMENTATION-HANDOFF.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/MIGRATION-RUNBOOK.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/RESULTS.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/SCENARIOS.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/START-ACCEPTANCE.md",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/cases.json",
+        "?? docs/acceptance/bookkeeping-dictionary-v2/evidence/maven-settings.xml",
+        "?? iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BookkeepingDictionaryController.java",
+        "?? iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BookkeepingDictionaryMapper.java",
+        "?? iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryService.java",
+        "?? iw-packaging-parent/iw-auth/src/main/resources/mapper/BookkeepingDictionaryMapper.xml",
+        "?? iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryServiceTest.java",
+        "?? iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/00-preflight.sql",
+        "?? iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/01-schema.sql",
+        "?? iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/02-backfill.sql",
+        "?? iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/03-family-initialize.sql",
+        "?? iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/04-verify.sql",
+        "?? iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/README.md",
+        "?? iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingDictionaryChangesDto.java",
+        "?? iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingCategoryFilter.java",
+        "?? iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshots.java",
+        "?? iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshotsTest.java",
+        "?? iw-web/src/main/java/com/itwray/iw/web/bookkeeping/BookkeepingDictionaryAccess.java",
+        "?? iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryNames.java",
+        "?? iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryTagSnapshot.java",
+        "?? scripts/acceptance/bookkeeping-dictionary-v2/.gitignore",
+        "?? scripts/acceptance/bookkeeping-dictionary-v2/README.md",
+        "?? scripts/acceptance/bookkeeping-dictionary-v2/check-static.py",
+        "?? scripts/acceptance/bookkeeping-dictionary-v2/run.mjs"
+      ],
+      "files": [
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/COMPILE-REPORT.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/COMPILE-REPORT.md",
+          "attribution": "this-task",
+          "sha256": "2373ebd86aa420a2366ee8f2eec89172a4347bb3172fdcd341d4ed330e4a4895"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/IMPLEMENTATION-HANDOFF.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/IMPLEMENTATION-HANDOFF.md",
+          "attribution": "this-task",
+          "sha256": "2ae61545a18b9a0bf12c40a03c1d567392f41f6da4393e3e4d35545942a9eca3"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/MIGRATION-RUNBOOK.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/MIGRATION-RUNBOOK.md",
+          "attribution": "this-task",
+          "sha256": "d49da3fe4b16bcaf1e595526007a7450193322296f96c96c43df2a0b893decf0"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/RESULTS.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/RESULTS.md",
+          "attribution": "this-task",
+          "sha256": "f3eed4e839ccb98e10e1b22e840901c2cef8f0c52e1ceb2997c440b3076a2755"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/SCENARIOS.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/SCENARIOS.md",
+          "attribution": "this-task",
+          "sha256": "16bc4afa6c1696c909ed724784e74bc52fd762a41ee93509428804c4429702bc"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/START-ACCEPTANCE.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/START-ACCEPTANCE.md",
+          "attribution": "this-task",
+          "sha256": "aa682e5ad1beecb4c00fab5f395f5b4293789be02211d10e9f4b29732f0c7b67"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/cases.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/cases.json",
+          "attribution": "this-task",
+          "sha256": "0d21e83f32f65bae337fd99c7efcdc030900d13156e69831cb6d5d5c16bedad5"
+        },
+        {
+          "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/maven-settings.xml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/docs/acceptance/bookkeeping-dictionary-v2/evidence/maven-settings.xml",
+          "attribution": "this-task",
+          "sha256": "a904dea81a826e08ed0412469cd667284f8a59891ac41d918bad887e86007f33"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/scripts/iw-auth-init.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/scripts/iw-auth-init.sql",
+          "attribution": "this-task",
+          "sha256": "d2ff439b7a2e184f4137c6cd5ccc4547d73afd53686e302f8125bf723e748298"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BookkeepingDictionaryController.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BookkeepingDictionaryController.java",
+          "attribution": "this-task",
+          "sha256": "d59f6dba48d9e5229bb6bf6871036943607f37a94c1b360c5370ff88d5d3aad1"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BookkeepingDictionaryMapper.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BookkeepingDictionaryMapper.java",
+          "attribution": "this-task",
+          "sha256": "bbf8a0ea9ca7dda0471d5adc8148781b1f21a0f998bbf74f36cf8acb93f8b62c"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthFamilyGroupServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthFamilyGroupServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "f5c8a00503f85368fbf8d57fd39e3a687ec69b554381d3e21d18a60c19a463fa"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "389521a8a14c8d897163429d44ce27278102ec87c958a08e1b74a670f36975ad"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryService.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryService.java",
+          "attribution": "this-task",
+          "sha256": "3bf51a3e4e62c1d275ec0c148af4e35a15e50be9cbab93063f11514d38a444eb"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/main/resources/mapper/BookkeepingDictionaryMapper.xml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/resources/mapper/BookkeepingDictionaryMapper.xml",
+          "attribution": "this-task",
+          "sha256": "9ddd2a792b17b6d35455b4b36949ab7dd53999753a2ed2c16990aed394ca2633"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryServiceTest.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryServiceTest.java",
+          "attribution": "this-task",
+          "sha256": "97356c184ab71df18b4dc44bfff3a59a573f265c20282bfe261e6a721b694a72"
+        },
+        {
+          "path": "iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/test/AuthFamilyGroupAccountDeletionTest.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/test/AuthFamilyGroupAccountDeletionTest.java",
+          "attribution": "this-task",
+          "sha256": "17a01830a18f7eaf9b596cff89b98b7017e2572a1ef7f437b9a9fe2f67fcdf41"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/00-preflight.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/00-preflight.sql",
+          "attribution": "this-task",
+          "sha256": "a8c3b22884d12679958ec04dd2a3caf31866397f1158d0fff1745e95267a010e"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/01-schema.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/01-schema.sql",
+          "attribution": "this-task",
+          "sha256": "7dd7165d42ce1aab1f2e226c9403188bced8aaa0a2ea8fdc82d96c6207e55a07"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/02-backfill.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/02-backfill.sql",
+          "attribution": "this-task",
+          "sha256": "6bcf1427dfb393bacb7fde4e9613b6df933059e1fc1bb475f148676915a99872"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/03-family-initialize.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/03-family-initialize.sql",
+          "attribution": "this-task",
+          "sha256": "9d1ee659f3271d9d4db2b0747fafff4eb27f38fd47b1aa2f3d398aa2fd16567b"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/04-verify.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/04-verify.sql",
+          "attribution": "this-task",
+          "sha256": "647b1afd5a175fa40002939813c032a2dcd553aaf93880dc16286d3277292a92"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/README.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/README.md",
+          "attribution": "this-task",
+          "sha256": "db88879f10c36ed08fcf3ae7edbbfbcf0a11313b781c93dde725dfec73d8a255"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/scripts/iw-bookkeeping-init.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/scripts/iw-bookkeeping-init.sql",
+          "attribution": "this-task",
+          "sha256": "b55b43ca4eb7c0db36e30fe5876d8c2938ccaac4b9a48f4e6ad49ac1d9b0106b"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingRecordsController.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingRecordsController.java",
+          "attribution": "this-task",
+          "sha256": "6e566bd38674cae1d982b1657758ffc383655d8dd7e708900695fb5493a53db3"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingRecordsMapper.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingRecordsMapper.java",
+          "attribution": "this-task",
+          "sha256": "6ee7c7f58e792ebefeb27c5b288da6f3f4a168e79e90dccbd5a018273b50133e"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingActionsAddDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingActionsAddDto.java",
+          "attribution": "this-task",
+          "sha256": "1a90b3eec6c9451f5b3e32623bf5614b5939eb906f96f6051d376abe8ad076f7"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetAddDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetAddDto.java",
+          "attribution": "this-task",
+          "sha256": "8d24294ff3fdaab59ff86200200fd20e80e22f08d4ab54d909346d01e723298a"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetUpdateDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetUpdateDto.java",
+          "attribution": "this-task",
+          "sha256": "249628194ff5d24805045d3662564a84d142d50d29077a85383b3e31501114bb"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingConsumeStatisticsDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingConsumeStatisticsDto.java",
+          "attribution": "this-task",
+          "sha256": "3899b46a61eca39f5ade2663a8300acbfd5c42bb90c8436f4677c9bcc970a3fd"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingDictionaryChangesDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingDictionaryChangesDto.java",
+          "attribution": "this-task",
+          "sha256": "7b43604facd10d98c4f02c68a8e72d147521eb7cf3b3223f139f68b347c042b8"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingIncomeStatisticsDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingIncomeStatisticsDto.java",
+          "attribution": "this-task",
+          "sha256": "27214bec6315fdc05f6c8ef4e4ad9cbe77fcd8b15dd7b96df868e710972c464c"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordAddDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordAddDto.java",
+          "attribution": "this-task",
+          "sha256": "af7568126e4d07adf175faf321543d1e2400de7106df5cd91794514ef2cd18cc"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordPageDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordPageDto.java",
+          "attribution": "this-task",
+          "sha256": "cedd0f524aa339438caa6418fc7e34c1292cdbc66cb9b378448c6ca4f6f5218b"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordUpdateDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordUpdateDto.java",
+          "attribution": "this-task",
+          "sha256": "1cc53d52d83f7ebc1184c0cfec005df0df92fc1f47b0f707de5f336076410eec"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingStatisticsDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingStatisticsDto.java",
+          "attribution": "this-task",
+          "sha256": "a1de0d750042b9ceb809ff4106aef399c973299f3e8e45a8fe5652911b74a60a"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingActionsEntity.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingActionsEntity.java",
+          "attribution": "this-task",
+          "sha256": "635e5facb0cb4952e284b67388c038036ab82f33b4572bd5b6d446090d6d1302"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingBudgetEntity.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingBudgetEntity.java",
+          "attribution": "this-task",
+          "sha256": "76a91c9ec1b6bf8b945280e4053171a25865ab60e17ee19945b44f93e84aece5"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingRecordsEntity.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingRecordsEntity.java",
+          "attribution": "this-task",
+          "sha256": "2c6f1962628c331ab402856f63146803a8ed4f6e45202a1e0351403c8c25af9d"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingActionsDetailVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingActionsDetailVo.java",
+          "attribution": "this-task",
+          "sha256": "8948b613cc03b9f78997e00ed137026829a45e6aeb0c0b4e011b61723a1deeb5"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingAssistantExpenseDraftVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingAssistantExpenseDraftVo.java",
+          "attribution": "this-task",
+          "sha256": "c205edb21fb512e4aaa0b2c2b32e3d53a5577c7889c424561f27ed15d752e899"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetDetailVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetDetailVo.java",
+          "attribution": "this-task",
+          "sha256": "750c10368702fdac586ce242b63fed340c827997be530cda4cfeb2d4e9522537"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetStatisticsVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetStatisticsVo.java",
+          "attribution": "this-task",
+          "sha256": "b776230f584c74c0456e5e73328a277cb8a394b9d249579c292e39bc86c8eb1c"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingConsumeStatisticsCategoryVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingConsumeStatisticsCategoryVo.java",
+          "attribution": "this-task",
+          "sha256": "6790ab49d17d690570393cee7c672f519334754866423572ff8a3e36a1461355"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordDetailVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordDetailVo.java",
+          "attribution": "this-task",
+          "sha256": "e834262b45e148a5d3072dbcfd11253003bda42ce89e38fa18a498b432cfb046"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordPageVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordPageVo.java",
+          "attribution": "this-task",
+          "sha256": "9c5cf4385b3741adda51b54f116fda429040f44cc3a9b0f7b015387764008fd9"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingStatisticsRankVo.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingStatisticsRankVo.java",
+          "attribution": "this-task",
+          "sha256": "62b8bf6c5bfb25fde128f1c1c4ed55ea83119ad83f6d6743661072fea3896c24"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingRecordsService.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingRecordsService.java",
+          "attribution": "this-task",
+          "sha256": "6c8fd7846575a3ee6e13153637d864e2a8bebc1ab88c5af950d41c8b88fcbb6e"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingActionsServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingActionsServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "b79aa576e72fe830370b3f3cbcc73340c76e30d44165f4177f43f06596a6a5f0"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "9b3b7bcc156c00b3b4c18f16c0601b66d7c74fa472d0e79668e231575de9f544"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingBudgetServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingBudgetServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "78bd0a82c5642ec69e633a354e0cf35a164607cc168eb863be43e36b06c52967"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingConsumeServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingConsumeServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "5e3b2977f0056580a8485605c505220606827988f705168d64c1433e38cc8fe1"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingIncomeServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingIncomeServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "5b2119f17e5fa3beaa3f7cc8ebe9cae735b418fa10594790bbb6e4fe52011f60"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingRecordsServiceImpl.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingRecordsServiceImpl.java",
+          "attribution": "this-task",
+          "sha256": "cff61eea7678026bb762f53b6fabd41a5080f06a1db647afd05a6839a200bb1a"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/TaskBookkeepingAdapter.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/TaskBookkeepingAdapter.java",
+          "attribution": "this-task",
+          "sha256": "780331411478d50b74ae2dcccef0539d126cdffb4af0c57312787ede6ca89017"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingCategoryFilter.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingCategoryFilter.java",
+          "attribution": "this-task",
+          "sha256": "ef9eb77780fe2010818a4257cc1fab2d8887a3720e346fb264f2b5bc6ad3a1ee"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshots.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshots.java",
+          "attribution": "this-task",
+          "sha256": "ee5cf92788b7dcaace448c09b33931372f60b92d99c9b20df94c54e29e27c305"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsMapper.xml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsMapper.xml",
+          "attribution": "this-task",
+          "sha256": "c533cb49c5450ed6ac8ec969a33ca83fd85cad97676f45da4d4f37829f3114f9"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsYearlyStatisticsMapper.xml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsYearlyStatisticsMapper.xml",
+          "attribution": "this-task",
+          "sha256": "f219d1b32d8de63ad91e8bc487cbc1cfbe7e8ca9c0516e3777c7124293fdf5f5"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshotsTest.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshotsTest.java",
+          "attribution": "this-task",
+          "sha256": "ce0fab226a0e3eae7856eee2156301f480342bee79db639ef1277a8c4573712b"
+        },
+        {
+          "path": "iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java",
+          "attribution": "this-task",
+          "sha256": "20aa935eee700a7335eac21b13f27414891961a00ab3866bdc44d8d9f64d8c8c"
+        },
+        {
+          "path": "iw-packaging-parent/iw-points/src/main/java/com/itwray/iw/points/bookkeeping/TaskBookkeepingTemplateDto.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-points/src/main/java/com/itwray/iw/points/bookkeeping/TaskBookkeepingTemplateDto.java",
+          "attribution": "this-task",
+          "sha256": "f13995ea27dae908a6d71c706ba2cdf3c78012603866a04c4ae7afa503aa3122"
+        },
+        {
+          "path": "iw-web/scripts/iw-web-init.sql",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-web/scripts/iw-web-init.sql",
+          "attribution": "this-task",
+          "sha256": "90a2e2deda1117216bd5a6b333eb8f51b15abdc571f410bfaab8e83e362f3f2f"
+        },
+        {
+          "path": "iw-web/src/main/java/com/itwray/iw/web/bookkeeping/BookkeepingDictionaryAccess.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/bookkeeping/BookkeepingDictionaryAccess.java",
+          "attribution": "this-task",
+          "sha256": "0ee2f13e5fe12488f7f529132305aaa338af434d876d368d1cce4ceaf8cf9922"
+        },
+        {
+          "path": "iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryNames.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryNames.java",
+          "attribution": "this-task",
+          "sha256": "08c1a105192f040a26f075a782acb333330285c959efa3d92a50f14e09d313fa"
+        },
+        {
+          "path": "iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryTagSnapshot.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryTagSnapshot.java",
+          "attribution": "this-task",
+          "sha256": "264c80ad8904304e72d8fb961876107e124799564a6065dfacb7219c3f7920f7"
+        },
+        {
+          "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseDictEntity.java",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseDictEntity.java",
+          "attribution": "this-task",
+          "sha256": "2e82f869d530e2cdb63862f6402c93746f6093226728cff87edbf04e9046e777"
+        },
+        {
+          "path": "scripts/acceptance/bookkeeping-dictionary-v2/.gitignore",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/scripts/acceptance/bookkeeping-dictionary-v2/.gitignore",
+          "attribution": "this-task",
+          "sha256": "416c368351d655294bc29cfb669584917dfdbdc1f6166378117900ce07135c08"
+        },
+        {
+          "path": "scripts/acceptance/bookkeeping-dictionary-v2/README.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/scripts/acceptance/bookkeeping-dictionary-v2/README.md",
+          "attribution": "this-task",
+          "sha256": "66800c354746e1b4965b05f26b94f524bb942a620c23785d88e8c19e17ead1cf"
+        },
+        {
+          "path": "scripts/acceptance/bookkeeping-dictionary-v2/check-static.py",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/scripts/acceptance/bookkeeping-dictionary-v2/check-static.py",
+          "attribution": "this-task",
+          "sha256": "433e0926eac0b096ea9ec7d93fbea5ca88ed522a0cf63a3800be22bae00ec160"
+        },
+        {
+          "path": "scripts/acceptance/bookkeeping-dictionary-v2/run.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/scripts/acceptance/bookkeeping-dictionary-v2/run.mjs",
+          "attribution": "this-task",
+          "sha256": "b8cf8465d18b0fee99602f2e010cba4a3bd92b228a5c002789b7c746e2eec059"
+        },
+        {
+          "path": "scripts/unsynchronized-scripts.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/scripts/unsynchronized-scripts.md",
+          "attribution": "this-task",
+          "sha256": "8c1a3a759cf7cbc3ef024139aff18ae6a2032f43a803bb9a5cdf8711ee48bf84"
+        }
+      ]
+    },
+    {
+      "name": "iw-mixes-app-wx",
+      "root": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx",
+      "branch": "main",
+      "head": "cd997144a41b129ff4e886802c64c6a5ce4034b9",
+      "stagedPaths": [],
+      "statusPorcelain": [
+        " M api/bookkeeping.js",
+        " M api/request.js",
+        " M app.json",
+        " M pages/bill/index.js",
+        " M pages/menu.js",
+        " M pagesBase/base/dict-detail.js",
+        " M pagesBase/base/dict-detail.wxml",
+        " M pagesBase/base/dict-manage.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-edit.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-edit.wxml",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-edit.wxss",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-setting.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-setting.json",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-setting.wxml",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action-setting.wxss",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-action.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-budget.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-consume-statistics.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-consume-statistics.wxml",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-detail.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-income-statistics.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-quick.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-quick.wxml",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-records.js",
+        " M pagesBookkeeping/bookkeeping/bookkeeping-records.wxml",
+        " M pagesBookkeeping/bookkeeping/yearly-statistics-helper.js",
+        " M pagesPoints/points/task-plan-add.js",
+        " M stores/family.js",
+        " M stores/session.js",
+        " M utils/bookkeeping.js",
+        " M utils/task-bookkeeping.js",
+        "?? api/bookkeeping-dictionaries.js",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-category-settings.js",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-category-settings.json",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-category-settings.wxml",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-category-settings.wxss",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.js",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.json",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.wxml",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.wxss",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.js",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.json",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.wxml",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.wxss",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-settings.js",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-settings.json",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-settings.wxml",
+        "?? pagesBookkeeping/bookkeeping/bookkeeping-settings.wxss",
+        "?? pagesBookkeeping/bookkeeping/dictionary-management.js",
+        "?? pagesBookkeeping/bookkeeping/dictionary-management.wxml",
+        "?? pagesBookkeeping/bookkeeping/dictionary-management.wxss",
+        "?? stores/bookkeeping-options.js"
+      ],
+      "files": [
+        {
+          "path": "api/bookkeeping-dictionaries.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/api/bookkeeping-dictionaries.js",
+          "attribution": "this-task",
+          "sha256": "b672269abe521aa41bca1574fd83526715c8bdf46a95663d300825f2c9bd4afa"
+        },
+        {
+          "path": "api/bookkeeping.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/api/bookkeeping.js",
+          "attribution": "this-task",
+          "sha256": "05c3128818d75ecdaf394438ca898532d13d302cc40641c6f64f97c261ced9d7"
+        },
+        {
+          "path": "api/request.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/api/request.js",
+          "attribution": "this-task",
+          "sha256": "2598891bc10fc717481320eebf05ef876fc7fc7e50ad0d60bb91dc03170ff092"
+        },
+        {
+          "path": "app.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/app.json",
+          "attribution": "this-task",
+          "sha256": "0b6363c6fb1a48b4077e5a04f744e438bb32f0d36f168ca2dfaa77ff4c71f5c8"
+        },
+        {
+          "path": "pages/bill/index.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pages/bill/index.js",
+          "attribution": "this-task",
+          "sha256": "41cf36f5114d695ab1d5b6c1f1e64ed63f73b860c776a74b33b3f634288f2fd0"
+        },
+        {
+          "path": "pages/menu.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pages/menu.js",
+          "attribution": "this-task",
+          "sha256": "53dfd8816dbc2af830318813e4d2e8dceb55e1f07c449ee9ba19d3561678babb"
+        },
+        {
+          "path": "pagesBase/base/dict-detail.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBase/base/dict-detail.js",
+          "attribution": "this-task",
+          "sha256": "9c9914ac8c5898f76c9e9aa85f6aa55eabd0aa91ef60fa74d4afda7b9eb40886"
+        },
+        {
+          "path": "pagesBase/base/dict-detail.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBase/base/dict-detail.wxml",
+          "attribution": "this-task",
+          "sha256": "ac3df4a120c1ac2f97c4d0d8c2f90d8b427f3d5bc6246a801bee10e81f9d0ca1"
+        },
+        {
+          "path": "pagesBase/base/dict-manage.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBase/base/dict-manage.js",
+          "attribution": "this-task",
+          "sha256": "3ce1454e686c9a3e3bede91e924782ce958a3b87c5953611bb673faeb1ff9574"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-edit.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-edit.js",
+          "attribution": "this-task",
+          "sha256": "7b72c5b021652dc7d6db943a926cdcc82af01267a8bedce0370b879e76bb8510"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-edit.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-edit.wxml",
+          "attribution": "this-task",
+          "sha256": "043882c9986c1150a34c7da4778a3cd910e08d70c8b45b99b38e5fa56ba55121"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-edit.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-edit.wxss",
+          "attribution": "this-task",
+          "sha256": "9ae87d6603bcc37c60e9aa6e9525b2f5e586a1d8e6d83c82f4a17ea6e0502c7a"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-setting.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-setting.js",
+          "attribution": "this-task",
+          "sha256": "47e482ed4f4b41f0489a74d73303fbe9a28f1bc9e24ec60bcbba859ee21d13ff"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-setting.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-setting.json",
+          "attribution": "this-task",
+          "sha256": "adcd1f13dacc4ccfbea3f6d567eedae5aa27a09ad989d03097fb82e4470e6c55"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-setting.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-setting.wxml",
+          "attribution": "this-task",
+          "sha256": "3fd8b4a3a1995322a0b77c3fa6126d0d92ab4f48de99886deb3ab3c522ab3956"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action-setting.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action-setting.wxss",
+          "attribution": "this-task",
+          "sha256": "fdf53417898e9237e71ab19bbfd637f3f3dad9e7819d9ef812a3346fad5286f4"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-action.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-action.js",
+          "attribution": "this-task",
+          "sha256": "e64963392b32c8a8118a85cbd8e880e83a152dbdad3a9acba7347b331221d05d"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-budget.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-budget.js",
+          "attribution": "this-task",
+          "sha256": "6090d869159d6d20b475321d1d67189f060e89fa3149de2b733607ea37785bd6"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-category-settings.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-category-settings.js",
+          "attribution": "this-task",
+          "sha256": "24ca939110b58037ce59c36274dedc7a1d9c8dd2a1787897393604cf2925e1a1"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-category-settings.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-category-settings.json",
+          "attribution": "this-task",
+          "sha256": "3c88dd145f6f237ed39bbb90613445da75ccca45c4834e3094221c2e0498c32a"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-category-settings.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-category-settings.wxml",
+          "attribution": "this-task",
+          "sha256": "ca91182971a0250d5f8ade229e93e8c309d40c78e0f12b0325963eca35830728"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-category-settings.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-category-settings.wxss",
+          "attribution": "this-task",
+          "sha256": "6e8c98838fa8794073e84b171e1c1545ce2df24c23ad77b0edef886af0da237e"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-consume-statistics.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-consume-statistics.js",
+          "attribution": "this-task",
+          "sha256": "4ca25a276141285ba8e8a8594b709003bb2251b128dce7e4640ac1638b45412a"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-consume-statistics.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-consume-statistics.wxml",
+          "attribution": "this-task",
+          "sha256": "492cfb3eccab88410b5a7904d867ac49c0324e9ea82d4b1668ea0e1466e41889"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.js",
+          "attribution": "this-task",
+          "sha256": "2caad4ace9824796361032a06065eb17020951a0a70324babf9573a63badadf5"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.json",
+          "attribution": "this-task",
+          "sha256": "0ffed42318e849ff98aee57500bceff333db2f7b41b530a6d4b07af5730fafe6"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.wxml",
+          "attribution": "this-task",
+          "sha256": "ca91182971a0250d5f8ade229e93e8c309d40c78e0f12b0325963eca35830728"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-consume-tag-settings.wxss",
+          "attribution": "this-task",
+          "sha256": "6e8c98838fa8794073e84b171e1c1545ce2df24c23ad77b0edef886af0da237e"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-detail.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-detail.js",
+          "attribution": "this-task",
+          "sha256": "6c037e2f2b960dcc4a636f541ca077023bb28cd5612ea862f5d89410f2977c94"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-income-statistics.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-income-statistics.js",
+          "attribution": "this-task",
+          "sha256": "f0d7e0c1c9a15f22c8bb6d24e76c6bffa5b01db5f2fb8dabb3f0999bfbb422a4"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.js",
+          "attribution": "this-task",
+          "sha256": "8214971cb5a61e1c2ca7b71305a786c5676992b5f7dc3cfe145e33efbcbfa668"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.json",
+          "attribution": "this-task",
+          "sha256": "7105fe5954896df80931c1a7ceac28f23841dac05a074d43b77fcb63a8c9f6e2"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.wxml",
+          "attribution": "this-task",
+          "sha256": "ca91182971a0250d5f8ade229e93e8c309d40c78e0f12b0325963eca35830728"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-income-tag-settings.wxss",
+          "attribution": "this-task",
+          "sha256": "6e8c98838fa8794073e84b171e1c1545ce2df24c23ad77b0edef886af0da237e"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-quick.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-quick.js",
+          "attribution": "this-task",
+          "sha256": "6816db7493a812e3797c7c18f29bc6c18334d5b904e5e0ec0b55d4b2dfdefffe"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-quick.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-quick.wxml",
+          "attribution": "this-task",
+          "sha256": "b66cc8195aef0a1ef6a7b75b482016f2e7e2f5f51d73b836ca493f12804a3401"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-records.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-records.js",
+          "attribution": "this-task",
+          "sha256": "9cd3c1dcd1341ecc05376a8a0614f24fb3c330604611ae82fd4793680ef77a81"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-records.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-records.wxml",
+          "attribution": "this-task",
+          "sha256": "1bdaabddb37c1861813504667251b230a119349d67225daa6fd12fbd15bb4382"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-settings.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-settings.js",
+          "attribution": "this-task",
+          "sha256": "d6f0160683c4be55457460e6932546d4207f47fa1a0aa9cc726b247de66c7aab"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-settings.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-settings.json",
+          "attribution": "this-task",
+          "sha256": "daf6076e0cb358be3fd2ffe06eeaa36ad42bd46b0f1bea54c9f07adeb8adae76"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-settings.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-settings.wxml",
+          "attribution": "this-task",
+          "sha256": "d2e0d63693e046722f3e8b7f9f9ca138dc6b5fb97ff38938fcdd1dd3a08b843f"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/bookkeeping-settings.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-settings.wxss",
+          "attribution": "this-task",
+          "sha256": "bfcaa0edde0a18d7864cdb0f8ce2458124bc2ce8446bb5f2352674ebf093fc01"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/dictionary-management.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.js",
+          "attribution": "this-task",
+          "sha256": "0c916026a261567164a0f9bcad76a9f2b5770fd3f86fff9baea72b7dc812cf45"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/dictionary-management.wxml",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.wxml",
+          "attribution": "this-task",
+          "sha256": "c06a555bb59dd8b67a25eab418b34241944ae0c173f1125c5feacf45533ac42e"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/dictionary-management.wxss",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.wxss",
+          "attribution": "this-task",
+          "sha256": "ad9fe04a50d9fb1c4401ff4bd72d178695fea6292945ab72530b4d0ae92719fb"
+        },
+        {
+          "path": "pagesBookkeeping/bookkeeping/yearly-statistics-helper.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesBookkeeping/bookkeeping/yearly-statistics-helper.js",
+          "attribution": "this-task",
+          "sha256": "fb991989022ee6ab6c5c869eead49af98308ea90cdb738b7601650780e14b523"
+        },
+        {
+          "path": "pagesPoints/points/task-plan-add.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/pagesPoints/points/task-plan-add.js",
+          "attribution": "this-task",
+          "sha256": "d3df2b108e6d70b7e9223651dffefefbd40cc37a492b14ca05cf18ea96e6c7d2"
+        },
+        {
+          "path": "stores/bookkeeping-options.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/stores/bookkeeping-options.js",
+          "attribution": "this-task",
+          "sha256": "1480b2c99434462c203d96b9fbe3b31fdf8d13b44e9b404aa36b97aceccf68a7"
+        },
+        {
+          "path": "stores/family.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/stores/family.js",
+          "attribution": "this-task",
+          "sha256": "b9bd8cd5da653b240d28031b5654557ad2f37f53706fbf1733d8c599954b140b"
+        },
+        {
+          "path": "stores/session.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/stores/session.js",
+          "attribution": "this-task",
+          "sha256": "2edbcdb346573ad4b07cca1690891cba48f8b03b9ba67f5c6cf365957593793a"
+        },
+        {
+          "path": "utils/bookkeeping.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/utils/bookkeeping.js",
+          "attribution": "this-task",
+          "sha256": "84213b4ba5de2abd62601f8f9106fa6549299ea5d69943e5182b47cf54013fa7"
+        },
+        {
+          "path": "utils/task-bookkeeping.js",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-app-wx/utils/task-bookkeeping.js",
+          "attribution": "this-task",
+          "sha256": "df321c2dc1fe8265c53aaa4bb9946bcd1b0515c9ae90864f35ca01d2126a4614"
+        }
+      ]
+    },
+    {
+      "name": "iw-mixes-web-platform",
+      "root": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform",
+      "branch": "dev",
+      "head": "2937e893c648799d12eb7c9aaeb946760dd184f7",
+      "stagedPaths": [],
+      "statusPorcelain": [
+        " M local-ai-launcher/constants.mjs",
+        " M local-ai-launcher/server.mjs",
+        " M package.json",
+        " M scripts/aiLauncher.mjs",
+        " M src/api/bookkeeping.ts",
+        " M src/router/toolCatalog.ts",
+        " M src/types/bookkeeping.ts",
+        " M src/views/bookkeeping/components/BookkeepingTable.vue",
+        " M src/views/dict/components/DictForm.vue",
+        " M src/views/dict/components/DictManagementTable.vue",
+        "?? docs/tools/skill-workbench.md",
+        "?? local-ai-launcher/skills/directoryBrowser.mjs",
+        "?? local-ai-launcher/skills/directoryPicker.mjs",
+        "?? local-ai-launcher/skills/openFile.mjs",
+        "?? local-ai-launcher/skills/scanner.mjs",
+        "?? local-ai-launcher/windowsInstallation.mjs",
+        "?? scripts/aiLauncher.ps1",
+        "?? scripts/testSkillWorkbench.mjs",
+        "?? src/services/skillWorkbenchClient.ts",
+        "?? src/types/skillWorkbench.ts",
+        "?? src/utils/skillWorkbench/core.ts",
+        "?? src/utils/skillWorkbench/navigation.ts",
+        "?? src/utils/skillWorkbench/storage.ts",
+        "?? src/views/skill-workbench/SkillWorkbenchTool.vue",
+        "?? src/views/skill-workbench/components/DirectoryBrowser.vue",
+        "?? src/views/skill-workbench/components/SkillDetail.vue",
+        "?? src/workers/skillWorkbench.worker.ts"
+      ],
+      "files": [
+        {
+          "path": "docs/tools/skill-workbench.md",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/docs/tools/skill-workbench.md",
+          "attribution": "pre-existing-user-work",
+          "sha256": "811218e4afc86d2e91d2eeae9aa5b46960b54bb1b38d553d9c081f6a681750e8"
+        },
+        {
+          "path": "local-ai-launcher/constants.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/constants.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "a06b805e0d9231e84609ec8cc2119c2691a31a26b1a6a1cfce0f18841a9ba20d"
+        },
+        {
+          "path": "local-ai-launcher/server.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/server.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "211336199d9a65094e94bbf8161eadc74c916719455c96b40d37843b180a6d86"
+        },
+        {
+          "path": "local-ai-launcher/skills/directoryBrowser.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/skills/directoryBrowser.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "a20f4a9651cec82cd2fe21a7a4c76c716f7e0a9641987b99f1ddc3e52c67899c"
+        },
+        {
+          "path": "local-ai-launcher/skills/directoryPicker.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/skills/directoryPicker.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "2cae29ae76318bc4e78b272e8584ec6f340173500c593e5b50ecb5ded60a8c05"
+        },
+        {
+          "path": "local-ai-launcher/skills/openFile.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/skills/openFile.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "1d7ae6cf02fd55d9b9ea3a69d57edc39152ad3149c2906353687cea542b3e385"
+        },
+        {
+          "path": "local-ai-launcher/skills/scanner.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/skills/scanner.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "5dafe0809aae14285d5563f360f0761ac132a401e7f668f9db71bc02211ff9f7"
+        },
+        {
+          "path": "local-ai-launcher/windowsInstallation.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/local-ai-launcher/windowsInstallation.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "625b6087de883a68f2d3156c1d8f48eaafc32039680e69cf47f80f7efa10868a"
+        },
+        {
+          "path": "package.json",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/package.json",
+          "attribution": "pre-existing-user-work",
+          "sha256": "e79a77a0345f4859117f80dc5a3c02aa63b4c01b91b54c6575ab78ac44d8a5d9"
+        },
+        {
+          "path": "scripts/aiLauncher.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/scripts/aiLauncher.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "8466cccd9687238d318aa45b09ab6be15f75519f2fea1256169793f76772d861"
+        },
+        {
+          "path": "scripts/aiLauncher.ps1",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/scripts/aiLauncher.ps1",
+          "attribution": "pre-existing-user-work",
+          "sha256": "f2742a0a5d8498d1058934f355185ce3b4686bf35b066914d234252a71a3416b"
+        },
+        {
+          "path": "scripts/testSkillWorkbench.mjs",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/scripts/testSkillWorkbench.mjs",
+          "attribution": "pre-existing-user-work",
+          "sha256": "ac5b18800b1040dd3489aa995833243be5ff754910ac1d4de278978d94733849"
+        },
+        {
+          "path": "src/api/bookkeeping.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/api/bookkeeping.ts",
+          "attribution": "this-task",
+          "sha256": "0ef28281d33d6418e980b3d4c571ab8a8739fdbf15fb46afe96621b70a7f48d9"
+        },
+        {
+          "path": "src/router/toolCatalog.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/router/toolCatalog.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "6c92d523a28befff0d15574a15dc0ba6a337ddb9d21d99d209a6a74b13f63011"
+        },
+        {
+          "path": "src/services/skillWorkbenchClient.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/services/skillWorkbenchClient.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "3844975cdd374a6428d42ad83ae131905aa3201d12b41625d88eb89eab30b603"
+        },
+        {
+          "path": "src/types/bookkeeping.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/types/bookkeeping.ts",
+          "attribution": "this-task",
+          "sha256": "37f18b996b657ae8869949a65e2113fec74b21f64880f547586fb98ec2f7749c"
+        },
+        {
+          "path": "src/types/skillWorkbench.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/types/skillWorkbench.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "0977e43d77a8347dfd2a689c695920671aefd370ba719d4db3639ab2cf566d30"
+        },
+        {
+          "path": "src/utils/skillWorkbench/core.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/utils/skillWorkbench/core.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "7653c166c99f72dd096afee41dd68a836aa0c26cc5d1bb0cb21b3db6fd482ee3"
+        },
+        {
+          "path": "src/utils/skillWorkbench/navigation.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/utils/skillWorkbench/navigation.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "e365278059736700ea63567d4180e5b506319a3865d25aced80a58e5216ab042"
+        },
+        {
+          "path": "src/utils/skillWorkbench/storage.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/utils/skillWorkbench/storage.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "4af06570f6cbea12920548cafa274bbec1ad1a2742142003cb484c97604e62a1"
+        },
+        {
+          "path": "src/views/bookkeeping/components/BookkeepingTable.vue",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/views/bookkeeping/components/BookkeepingTable.vue",
+          "attribution": "this-task",
+          "sha256": "47cee632b9a9ff3e0f663408871a492b7f82de62788eaa527ddcd9a0fc492972"
+        },
+        {
+          "path": "src/views/dict/components/DictForm.vue",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/views/dict/components/DictForm.vue",
+          "attribution": "this-task",
+          "sha256": "acb50798e49d0e65196f96a9df94cfc425ecfa2a07e28470f74f53bb632cd2c2"
+        },
+        {
+          "path": "src/views/dict/components/DictManagementTable.vue",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/views/dict/components/DictManagementTable.vue",
+          "attribution": "this-task",
+          "sha256": "2a53c86839989567a81ec66b851edd4c7224e3ebb698df7c8aa2cffb6ddb7e7c"
+        },
+        {
+          "path": "src/views/skill-workbench/SkillWorkbenchTool.vue",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/views/skill-workbench/SkillWorkbenchTool.vue",
+          "attribution": "pre-existing-user-work",
+          "sha256": "3bb32b4f565bb5e590b9bf09a5c567e35830af6ac4640f60c6180615c90754f5"
+        },
+        {
+          "path": "src/views/skill-workbench/components/DirectoryBrowser.vue",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/views/skill-workbench/components/DirectoryBrowser.vue",
+          "attribution": "pre-existing-user-work",
+          "sha256": "b19c425bd03cd18ac17351a35e3aeab427de268ae2cb2f6efedf8359ee9b7d4e"
+        },
+        {
+          "path": "src/views/skill-workbench/components/SkillDetail.vue",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/views/skill-workbench/components/SkillDetail.vue",
+          "attribution": "pre-existing-user-work",
+          "sha256": "01435eb32fceb2534ffb58f8fbed58c354d62cf7655b280b9be00fa54b95df35"
+        },
+        {
+          "path": "src/workers/skillWorkbench.worker.ts",
+          "absolutePath": "/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform/src/workers/skillWorkbench.worker.ts",
+          "attribution": "pre-existing-user-work",
+          "sha256": "08648d5c3903913044759988bbf333541d1ee7a94655550cf9adf03cfe117e05"
+        }
+      ]
+    }
+  ]
+}

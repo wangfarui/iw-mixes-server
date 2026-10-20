@@ -1,0 +1,10 @@
+{"role": "A", "userId": 43, "familyId": 7, "actualRole": 3}
+{"role": "B", "userId": 42, "familyId": 7, "actualRole": 3}
+{"role": "C", "userId": 8, "familyId": null, "actualRole": null}
+{"role": "D", "userId": 44, "familyId": null, "actualRole": null}
+{"role": "E", "userId": 45, "familyId": 7, "actualRole": 1}
+{"scene":"IMPORT-PRIORITY","status":"PASS","time":"2026-10-19T08:50:41.776Z"}
+{"scene":"IMPORT-ATOMIC-FAILURE","status":"PASS","time":"2026-10-19T08:50:41.964Z"}
+{"scene":"VOICE-ASSET","durationMs":3096}
+{"scene":"VOICE-PROVIDER","status":"RECOGNIZED","parseStatus":"NEED_CONFIRM","autoSaveEligible":false}
+{"scene":"VOICE-CONFIRM-REPLAY","status":"FAIL","detail":"Expected rejection /bookkeeping-service/bookkeeping/assistant/expense/confirm code=500","time":"2026-10-19T08:50:44.218Z"}

@@ -1,0 +1,7 @@
+交接时只读核查 2026-10-19T16:02:30.963333+08:00
+目标端口18000/18001/18006无监听；其余监听如下。状态可能变化。
+COMMAND     PID      USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+node      30227 wangfarui   21u  IPv6 0x1b01cef4cc8590a3      0t0  TCP [::1]:5173 (LISTEN)
+node      32633 wangfarui   21u  IPv4 0xe783f18288f1877d      0t0  TCP 127.0.0.1:5173 (LISTEN)
+mysqld    36905 wangfarui   17u  IPv4 0x7f5dffd46e2e4493      0t0  TCP 127.0.0.1:13317 (LISTEN)
+redis-ser 36915 wangfarui    6u  IPv4 0x84eb16eea988d01f      0t0  TCP 127.0.0.1:16379 (LISTEN)

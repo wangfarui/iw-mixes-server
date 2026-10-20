@@ -1,0 +1,30 @@
+mysql_version	selected_database	sql_mode
+8.0.31	iw_mixes	ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE	CHARACTER_SET_NAME	COLLATION_NAME
+base_dict	dict_code	smallint unsigned	NULL	NULL
+base_dict	dict_name	varchar(32)	utf8mb4	utf8mb4_0900_ai_ci
+base_dict	user_id	int unsigned	NULL	NULL
+bookkeeping_actions	record_type	tinyint	NULL	NULL
+bookkeeping_budget	record_type	tinyint	NULL	NULL
+bookkeeping_records	record_type	tinyint	NULL	NULL
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning (Code 1287): 'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+source	id	user_id	schema_version	old_code
+plan	4	42	2	NULL
+plan	5	42	2	NULL
+source	id	user_id	schema_version	old_code
+task	1	42	2	NULL
+task	2	42	2	NULL
+task	3	42	2	NULL
+task	4	42	2	NULL
+task	5	42	2	NULL
+task	6	42	2	NULL
+task	7	42	2	NULL
+task	8	42	2	NULL
+task	9	42	2	NULL
+record_count	record_amount
+150	25719.64
+wallet_count	wallet_balance	wallet_assets
+16	-10756.85	5685.00
+historical_relation_count
+69

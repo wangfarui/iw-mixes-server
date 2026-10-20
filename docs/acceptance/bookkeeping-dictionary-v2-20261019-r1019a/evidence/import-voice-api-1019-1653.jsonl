@@ -1,0 +1,17 @@
+{"role": "A", "userId": 43, "familyId": 7, "actualRole": 3}
+{"role": "B", "userId": 42, "familyId": 7, "actualRole": 3}
+{"role": "C", "userId": 8, "familyId": null, "actualRole": null}
+{"role": "D", "userId": 44, "familyId": null, "actualRole": null}
+{"role": "E", "userId": 45, "familyId": 7, "actualRole": 1}
+{"scene":"IMPORT-PRIORITY","status":"SKIPPED_PREVIOUS"}
+{"scene":"IMPORT-ATOMIC-FAILURE","status":"SKIPPED_PREVIOUS"}
+{"scene":"VOICE-PROVIDER","status":"RECOGNIZED","parseStatus":"NEED_CONFIRM","autoSaveEligible":false}
+{"scene":"VOICE-CROSS-USER","result":"REJECTED","code":500,"bRows":0}
+{"scene":"VOICE-CONFIRM-REPLAY","status":"PASS","time":"2026-10-19T08:53:00.007Z"}
+{"scene":"VOICE-ASSET","durationMs":3096}
+{"scene":"VOICE-STALE-OBSERVED","code":500}
+{"scene":"VOICE-STALE-SOURCE","status":"PASS","time":"2026-10-19T08:53:01.397Z"}
+{"scene":"VOICE-ASSET","durationMs":3096}
+{"scene":"VOICE-AUTO-OBSERVED","autoSaved":false,"autoSaveEligible":false,"status":"NEED_CONFIRM"}
+{"scene":"VOICE-AUTO-SAVE","status":"PASS","time":"2026-10-19T08:53:02.247Z"}
+{"status":"COMPLETE","scope":"private clone import and voice; inspect supplier observation separately"}

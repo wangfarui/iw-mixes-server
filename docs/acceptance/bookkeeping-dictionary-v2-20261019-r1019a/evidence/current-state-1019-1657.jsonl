@@ -1,0 +1,13 @@
+{"role": "A", "userId": 43, "familyId": 2, "actualRole": 1}
+{"role": "B", "userId": 42, "familyId": 2, "actualRole": 2}
+{"role": "C", "userId": 8, "familyId": 2, "actualRole": 3}
+{"role": "D", "userId": 44, "familyId": 2, "actualRole": 4}
+{"role": "E", "userId": 45, "familyId": null, "actualRole": null}
+{"scene":"CUR-IDENTITY","status":"PASS","detail":"{\"A\":{\"userId\":43,\"familyId\":2,\"role\":1},\"B\":{\"userId\":42,\"familyId\":2,\"role\":2},\"C\":{\"userId\":8,\"familyId\":2,\"role\":3},\"D\":{\"userId\":44,\"familyId\":2,\"role\":4},\"E\":{\"userId\":45,\"familyId\":null,\"role\":null}}","time":"2026-10-19T08:56:59.255Z"}
+{"scene":"CUR-SNAPSHOTS","status":"PASS","detail":"6 bills, amounts 100/200/80/300/50/20, old name 验收餐饮-r1019a, new name 验收用餐-r1019a","time":"2026-10-19T08:56:59.406Z"}
+{"scene":"CUR-TAG-SNAPSHOT","status":"PASS","detail":"R1 tag snapshot id=4685 name=验收外卖-r1019a","time":"2026-10-19T08:56:59.429Z"}
+{"scene":"CUR-TOTALS","status":"PASS","detail":"A 320/700, B 430/650, C family 600","time":"2026-10-19T08:56:59.503Z"}
+{"scene":"CUR-EXTENDED","status":"PASS","detail":"3 bills, total 113 for X-r1019a-","time":"2026-10-19T08:56:59.537Z"}
+{"scene":"CUR-SCOPE-NOTE","status":"PASS","detail":"import/voice fixtures live in the private copy; they are asserted by the 18001 runner, not on this database","time":"2026-10-19T08:56:59.537Z"}
+{"scene":"CUR-PRIVACY","status":"PASS","detail":"D/E filter options exclude adult fixture names; C cannot select A private tag","time":"2026-10-19T08:56:59.684Z"}
+{"status":"COMPLETE","mode":"READ_ONLY","base":"http://127.0.0.1:18000","run":"r1019a","month":"2032-04","scenes":7}

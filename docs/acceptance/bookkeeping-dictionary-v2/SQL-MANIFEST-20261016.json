@@ -1,0 +1,120 @@
+{
+  "generatedAt": "2026-10-16T10:01:23.325572+08:00",
+  "scope": "Database follow-up only; initial implementation manifest remains historical",
+  "productionExecuted": false,
+  "localValidation": "PASS",
+  "files": [
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/DATABASE-REPORT-20261016.md",
+      "sha256": "7e0d8e5407add9111d40b42a7002336953c0eaae069ae155b57fd244167cdb5f"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/IMPLEMENTATION-HANDOFF.md",
+      "sha256": "8995ac7de2988fddcba31a9a2ca150a5ad9c073048aba8744318615e42f16d9d"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/MIGRATION-RUNBOOK.md",
+      "sha256": "9ba285daff9e66b731bf58a858de856c6c2aebaf4620dedec0217b9e5b7c32a9"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/START-ACCEPTANCE.md",
+      "sha256": "4930a513358d82e85ef5e0e9ee0dd47b94c4210497c91cef18616ab4e7dcb80f"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-cleanup-20261016.txt",
+      "sha256": "ad688e77cc3a3fb46289afce4653e859bd0dc2cfec8b252bc678c0390f3d216c"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-exact-audit-20261016.txt",
+      "sha256": "daf40f9077dbbf5858d97d382ca928e44c1831dffd4564b88f9faf1c6ba9c9e4"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-final-migrate-20261016.txt",
+      "sha256": "89a2d8f3fe8c6549b668c2c8d92a9792e9679bbd3e2d11b76002078780d66b67"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-final-verify-20261016.txt",
+      "sha256": "aef36ab1788be45d52e0dc735b1b601d1728148ae347c8b2c1921efdee024dca"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-migrate-20261016.txt",
+      "sha256": "89a2d8f3fe8c6549b668c2c8d92a9792e9679bbd3e2d11b76002078780d66b67"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-preflight-20261016.txt",
+      "sha256": "fccfbb798e1177a58ed29399f9103756cf1c3b8f5a96a83e1c708def58b8aea6"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-rerun-migrate-20261016.txt",
+      "sha256": "89a2d8f3fe8c6549b668c2c8d92a9792e9679bbd3e2d11b76002078780d66b67"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-rerun-verify-20261016.txt",
+      "sha256": "aef36ab1788be45d52e0dc735b1b601d1728148ae347c8b2c1921efdee024dca"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/local-verify-20261016.txt",
+      "sha256": "aef36ab1788be45d52e0dc735b1b601d1728148ae347c8b2c1921efdee024dca"
+    },
+    {
+      "path": "docs/acceptance/bookkeeping-dictionary-v2/evidence/mysql-regression-20261016.txt",
+      "sha256": "8060ce40c423ebe123ec7b5ffede807db45ca9028329179fdaa52187d59610f0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/00-preflight.sql",
+      "sha256": "7c0a0398bf6c09a2c19a8183fed92e9764bd4c2c210e4a786da757866d6dadf4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/01-schema.sql",
+      "sha256": "bc35f83d2ecfd091d81643c29c3995ff8a57510362ad6d82ad81c709e2b5b4d3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/02-backfill.sql",
+      "sha256": "0d59d451d1f9cb68358b0ced121b708948bc64bd52b13ca9dbefddae5a381a40"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/03-family-initialize.sql",
+      "sha256": "d048d7b21c41d6cca0892475c8e6e4cf75480edf39bd7e4baf8d88fd3dd95d7c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/04-verify.sql",
+      "sha256": "e673dea2ba83da3ac018f25eff171b166c83ebc8e4a9d4a8e893b19f2db3cbe0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/README.md",
+      "sha256": "a2246289befec164ac191499a03d1c2a935920636d12cd479e87a27bf2750690"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/local-only/01-quarantine-test-records.sql",
+      "sha256": "e24cda61e2bfc1d48020b65a7aaf2510f3f631c3d1a7c7a93b7a6641d5fbeb3b"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/production/01-migrate.sql",
+      "sha256": "511e31abe75834abe8102d713476c28d80697c78f6ca3dd66390252f556bb996"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/production/02-verify.sql",
+      "sha256": "297b0cdf85e39a7a2777ade9acff5c8be8459b83e5ea3100bb3255271368d186"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/scripts/dictionary-snapshot-v2/production/README.md",
+      "sha256": "718033c95a7d7c288b4ddfeff5fffbc0b82b3dbe25a774ce30d592c2b52c7cef"
+    },
+    {
+      "path": "scripts/acceptance/bookkeeping-dictionary-v2/README.md",
+      "sha256": "d03554b10c83a962a1f7b0af9275b69e9b323a7eff884f552e7ae41c0b0e026f"
+    },
+    {
+      "path": "scripts/acceptance/bookkeeping-dictionary-v2/build-production-sql.py",
+      "sha256": "707b301b72393951baffb7c4cb6af1885203219ada94e05d0d6f8581de8b9698"
+    },
+    {
+      "path": "scripts/acceptance/bookkeeping-dictionary-v2/test-migration.py",
+      "sha256": "5e4f7c08653ce2578d27f2f29d76341b9d9fcef8982156a880f436a40fdff87c"
+    },
+    {
+      "path": "scripts/unsynchronized-scripts.md",
+      "sha256": "a4d5f9af198c231807342b4cdc32bd3f2d88d83bd2b151e1d1e9b01e58961c83"
+    }
+  ]
+}
