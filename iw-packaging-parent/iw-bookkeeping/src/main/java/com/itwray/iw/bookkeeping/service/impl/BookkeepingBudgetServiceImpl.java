@@ -40,6 +40,8 @@ public class BookkeepingBudgetServiceImpl extends WebServiceImpl<BookkeepingBudg
         BookkeepingBudgetAddDto, BookkeepingBudgetUpdateDto, BookkeepingBudgetDetailVo, Integer> implements BookkeepingBudgetService {
 
     private final BookkeepingRecordsDao bookkeepingRecordsDao;
+    @Autowired private com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshots snapshots;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Autowired
     public BookkeepingBudgetServiceImpl(BookkeepingBudgetDao baseDao, BookkeepingRecordsDao bookkeepingRecordsDao) {
@@ -48,40 +50,46 @@ public class BookkeepingBudgetServiceImpl extends WebServiceImpl<BookkeepingBudg
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public Integer add(BookkeepingBudgetAddDto dto) {
-        boolean isTotalBudgetType = dto.getBudgetType().isTotalBudgetType();
-        if (!isTotalBudgetType && dto.getRecordType() == null) {
-            throw new BusinessException("分类预算的记录分类不能为空");
-        }
-        if (dto.getPunishPoints() != null) {
-            dto.setPunishPoints(-dto.getPunishPoints());
-        }
-
-        boolean isMonthBudgetType = dto.getBudgetType().isMonthBudgetType();
-
-        // 新增前先查询用户是否已经添加过相同类型的预算
-        Long count = getBaseDao().lambdaQuery()
-                .eq(BookkeepingBudgetEntity::getBudgetType, dto.getBudgetType())
-                .eq(isMonthBudgetType, BookkeepingBudgetEntity::getBudgetMonth, DateUtils.startDateOfNowMonth())
-                .eq(!isMonthBudgetType, BookkeepingBudgetEntity::getBudgetYear, LocalDate.now().getYear())
-                .eq(!isTotalBudgetType, BookkeepingBudgetEntity::getRecordType, dto.getRecordType())
-                .count();
-        if (count > 0) {
-            throw new BusinessException("已经存在相同类型的预算, 请勿重复添加");
-        }
-
-        // 初始化预算年份和月份
-        dto.setBudgetYear(!isMonthBudgetType ? LocalDate.now().getYear() : null);
-        dto.setBudgetMonth(isMonthBudgetType ? DateUtils.startDateOfNowMonth() : null);
-
+        if(dto.getRecordType()!=null)throw new BusinessException("请更新客户端后重试：预算分类须使用来源ID");
+        boolean total=dto.getBudgetType().isTotalBudgetType();
+        if(!total&&dto.getRecordTypeId()==null)throw new BusinessException("分类预算的分类不能为空");
+        dto.setRecordTypeName(total?null:snapshots.lock(dto.getRecordTypeId(),List.of(),4001).get(dto.getRecordTypeId()).getDictName());
+        if(total)dto.setRecordTypeId(null);
+        dto.setBudgetYear(dto.getBudgetType().isMonthBudgetType()?null:LocalDate.now().getYear());
+        dto.setBudgetMonth(dto.getBudgetType().isMonthBudgetType()?DateUtils.startDateOfNowMonth():null);
+        lockOwner();
+        checkDuplicate(dto,null);
+        if(dto.getPunishPoints()!=null)dto.setPunishPoints(-Math.abs(dto.getPunishPoints()));
+        dto.setRecordType(0);
         return super.add(dto);
     }
-
+    private void lockOwner(){jdbc.queryForList("select id from auth_user where id=? for update",com.itwray.iw.web.utils.UserUtils.getUserId());}
+    private void checkDuplicate(BookkeepingBudgetAddDto dto,Integer excluded){
+        var query=getBaseDao().lambdaQuery().eq(BookkeepingBudgetEntity::getBudgetType,dto.getBudgetType())
+            .eq(dto.getBudgetMonth()!=null,BookkeepingBudgetEntity::getBudgetMonth,dto.getBudgetMonth())
+            .eq(dto.getBudgetYear()!=null,BookkeepingBudgetEntity::getBudgetYear,dto.getBudgetYear())
+            .ne(excluded!=null,BookkeepingBudgetEntity::getId,excluded);
+        if(!dto.getBudgetType().isTotalBudgetType())query.apply("CAST(record_type_name AS BINARY) = CAST({0} AS BINARY)",dto.getRecordTypeName());
+        if(query.count()>0)throw new BusinessException("已经存在同期同名预算，请勿重复添加");
+    }
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void update(BookkeepingBudgetUpdateDto dto) {
-        if (dto.getPunishPoints() != null) {
-            dto.setPunishPoints(-dto.getPunishPoints());
-        }
+        if(dto.isRecordTypeIdPresent() && dto.getRecordTypeId()!=null)snapshots.lock(dto.getRecordTypeId(),List.of(),4001);
+        lockOwner();
+        var original=getBaseDao().lambdaQuery().eq(BookkeepingBudgetEntity::getId,dto.getId()).last("FOR UPDATE").one();
+        if(original==null)throw new BusinessException("预算不存在或无权修改");
+        if(dto.getRecordType()!=null)throw new BusinessException("请更新客户端后重试：预算分类须使用来源ID");
+        dto.setBudgetType(original.getBudgetType());dto.setBudgetYear(original.getBudgetYear());dto.setBudgetMonth(original.getBudgetMonth());
+        dto.setRecordTypeName(original.getRecordTypeName());
+        if(dto.isRecordTypeIdPresent()&&!original.getBudgetType().isTotalBudgetType()){
+            if(dto.getRecordTypeId()==null)throw new BusinessException("分类预算的分类不能为空");
+            dto.setRecordTypeName(snapshots.lock(dto.getRecordTypeId(),List.of(),4001).get(dto.getRecordTypeId()).getDictName());
+        }else dto.setRecordTypeId(original.getRecordTypeId());
+        checkDuplicate(dto,dto.getId());
+        if(dto.getPunishPoints()!=null)dto.setPunishPoints(-Math.abs(dto.getPunishPoints()));
         super.update(dto);
     }
 
@@ -122,6 +130,7 @@ public class BookkeepingBudgetServiceImpl extends WebServiceImpl<BookkeepingBudg
         // 查询总支出金额
         BookkeepingStatisticsDto dto = new BookkeepingStatisticsDto();
         dto.setRecordCategory(RecordCategoryEnum.CONSUME);
+        dto.setQueryOnlyMyself(1);
         dto.setCurrentStartMonth(budgetType.equals(BudgetTypeEnum.MONTH) ? DateUtils.startDateOfNowMonth() : DateUtils.startDateOfNowYear());
         dto.setCurrentEndMonth(budgetType.equals(BudgetTypeEnum.MONTH) ? DateUtils.endDateOfNowMonth() : DateUtils.endDateOfNowYear());
         BookkeepingStatisticsTotalVo statisticsTotalVo = bookkeepingRecordsDao.getBaseMapper().totalStatistics(dto);
@@ -161,21 +170,24 @@ public class BookkeepingBudgetServiceImpl extends WebServiceImpl<BookkeepingBudg
 
         BookkeepingConsumeCategoryStatisticsDto dto = new BookkeepingConsumeCategoryStatisticsDto();
         dto.setRecordCategory(RecordCategoryEnum.CONSUME);
+        dto.setQueryOnlyMyself(1);
         dto.setCurrentStartMonth(budgetType.equals(BudgetTypeEnum.MONTH_CATEGORY) ? DateUtils.startDateOfNowMonth() : DateUtils.startDateOfNowYear());
         dto.setCurrentEndMonth(budgetType.equals(BudgetTypeEnum.MONTH_CATEGORY) ? DateUtils.endDateOfNowMonth() : DateUtils.endDateOfNowYear());
-        dto.setRecordTypeList(budgetEntityList.stream().map(BookkeepingBudgetEntity::getRecordType).toList());
-        Map<Integer, BigDecimal> recordTypeMap = bookkeepingRecordsDao.getBaseMapper().categoryStatistics(dto)
+        dto.setCategoryNames(budgetEntityList.stream().map(BookkeepingBudgetEntity::getRecordTypeName).filter(java.util.Objects::nonNull).toList());
+        dto.setQueryOnlyMyself(1);
+        Map<String, BigDecimal> recordTypeMap = bookkeepingRecordsDao.getBaseMapper().categoryStatistics(dto)
                 .stream()
-                .collect(Collectors.toMap(BookkeepingConsumeStatisticsCategoryVo::getRecordType, BookkeepingConsumeStatisticsCategoryVo::getAmount));
+                .collect(Collectors.toMap(v -> java.util.Objects.toString(v.getRecordTypeName(), ""), BookkeepingConsumeStatisticsCategoryVo::getAmount));
 
         List<BookkeepingBudgetStatisticsVo> voList = new ArrayList<>();
         for (BookkeepingBudgetEntity budgetEntity : budgetEntityList) {
             BookkeepingBudgetStatisticsVo vo = new BookkeepingBudgetStatisticsVo();
             vo.setBudgetType(budgetType);
             vo.setId(budgetEntity.getId());
-            vo.setRecordType(budgetEntity.getRecordType());
+            vo.setRecordTypeId(budgetEntity.getRecordTypeId());
+            vo.setRecordTypeName(budgetEntity.getRecordTypeName());
             vo.setBudgetAmount(budgetEntity.getBudgetAmount());
-            vo.setUsedAmount(recordTypeMap.getOrDefault(budgetEntity.getRecordType(), BigDecimal.ZERO));
+            vo.setUsedAmount(recordTypeMap.getOrDefault(budgetEntity.getRecordTypeName(), BigDecimal.ZERO));
             vo.setRemainingAmount(budgetEntity.getBudgetAmount().subtract(vo.getUsedAmount()));
             vo.setUsedRatio(vo.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0
                     ? new BigDecimal("100")

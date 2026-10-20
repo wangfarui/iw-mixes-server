@@ -53,6 +53,12 @@ public class BookkeepingRecordPageVo extends UserOwnerPageVo<Integer> implements
      * 记录分类
      */
     private Integer recordType;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer recordTypeId;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String recordTypeName;
+    private Integer dictionarySnapshotStatus;
+    private java.util.List<com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot> recordTagSnapshots;
 
     /**
      * 记录图标

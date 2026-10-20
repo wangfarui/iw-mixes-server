@@ -37,6 +37,10 @@ import java.util.List;
 public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingActionsDao, BookkeepingActionsMapper, BookkeepingActionsEntity,
         BookkeepingActionsAddDto, BookkeepingActionsUpdateDto, BookkeepingActionsDetailVo, Integer> implements BookkeepingActionsService, RocketMQClientListener<UserAddBo> {
 
+    @Autowired private com.itwray.iw.web.bookkeeping.BookkeepingDictionaryAccess dictionaries;
+    @Autowired private com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshots snapshots;
+    @Autowired private com.itwray.iw.web.dao.BaseDictDao dictDao;
+
     @Autowired
     public BookkeepingActionsServiceImpl(BookkeepingActionsDao baseDao) {
         super(baseDao);
@@ -45,6 +49,7 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
     @Override
     @Transactional
     public Integer add(BookkeepingActionsAddDto dto) {
+        validate(dto);
         // 查询当前用户记账行为中排序最大值
         BookkeepingActionsEntity entity = getBaseDao().lambdaQuery()
                 .eq(BookkeepingActionsEntity::getUserId, UserUtils.getUserId())
@@ -65,6 +70,7 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
     @Override
     @Transactional
     public void update(BookkeepingActionsUpdateDto dto) {
+        validate(dto);
         BookkeepingRedisKeyEnum.ACTION_LIST.delete(UserUtils.getUserId(), dto.getRecordCategory());
         super.update(dto);
     }
@@ -78,14 +84,9 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
     }
 
     @Override
+    @Transactional
     public List<BookkeepingActionsDetailVo> list(Integer recordCategory) {
         Integer userId = UserUtils.getUserId();
-
-        @SuppressWarnings("unchecked")
-        List<BookkeepingActionsDetailVo> cache = BookkeepingRedisKeyEnum.ACTION_LIST.getStringValue(List.class, userId, recordCategory);
-        if (cache != null) {
-            return cache;
-        }
 
         List<BookkeepingActionsDetailVo> voList = getBaseDao().lambdaQuery()
                 .eq(BookkeepingActionsEntity::getUserId, userId)
@@ -97,10 +98,35 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
                 .map(t -> BeanUtil.copyProperties(t, BookkeepingActionsDetailVo.class))
                 .toList();
 
-        BookkeepingRedisKeyEnum.ACTION_LIST.setStringValue(voList, userId, recordCategory);
+        for(var vo:voList)resolve(vo);
+        // Future configurations refresh source validity on every read; cached IDs are never facts.
 
         return voList;
     }
+
+    private List<Integer> tags(String value){
+        if(value==null||value.isBlank())return List.of();
+        try{return java.util.Arrays.stream(value.split(",")).map(String::trim).filter(v->!v.isEmpty()).map(Integer::valueOf).distinct().toList();}
+        catch(NumberFormatException e){throw new com.itwray.iw.web.exception.BusinessException("标签参数不正确");}
+    }
+    private void validate(BookkeepingActionsAddDto dto){
+        if(dto.getRecordType()!=null)throw new com.itwray.iw.web.exception.BusinessException("请更新客户端后重试：快捷分类须使用来源ID");
+        if(!java.util.Objects.equals(dto.getRecordCategory(),1)&&!java.util.Objects.equals(dto.getRecordCategory(),2))throw new com.itwray.iw.web.exception.BusinessException("收支类型不正确");
+        snapshots.lock(dto.getRecordTypeId(),tags(dto.getRecordTags()),dto.getRecordCategory()==1?4001:4011);dto.setRecordType(0);
+    }
+    private void resolve(BookkeepingActionsDetailVo vo){
+        try{
+            if(vo.getRecordTypeId()==null&&vo.getRecordType()!=null&&vo.getRecordType()!=0)throw new com.itwray.iw.web.exception.BusinessException("请重新保存快捷配置");
+            if(vo.getRecordTypeId()!=null){var current=dictionaries.resolveSuccessor(UserUtils.getUserId(),4002,vo.getRecordTypeId());vo.setRecordTypeId(current.getId());vo.setRecordTypeName(current.getDictName());}
+            var tagSnapshots=new java.util.ArrayList<com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot>();
+            int type=vo.getRecordCategory()==1?4001:4011;
+            for(Integer id:tags(vo.getRecordTags())){var current=dictionaries.resolveSuccessor(UserUtils.getUserId(),type,id);tagSnapshots.add(new com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot(current.getId(),type,current.getDictName()));}
+            vo.setRecordTags(tagSnapshots.stream().map(t->t.getId().toString()).collect(java.util.stream.Collectors.joining(",")));vo.setRecordTagSnapshots(tagSnapshots);vo.setAvailable(true);
+        }catch(com.itwray.iw.web.exception.BusinessException ex){vo.setAvailable(false);vo.setUnavailableReason("请重新配置快捷记账："+ex.getMessage());}
+    }
+    @Override
+    @Transactional
+    public BookkeepingActionsDetailVo detail(Integer id){var vo=super.detail(id);resolve(vo);return vo;}
 
     @Override
     public Class<UserAddBo> getGenericClass() {
@@ -135,6 +161,35 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
             BookkeepingActionsEntity newAction = BeanUtil.copyProperties(action, BookkeepingActionsEntity.class);
             newAction.setId(null);  // id重置为空，采用数据库自增id
             newAction.setUserId(bo.getUserId()); // 使用新用户id
+            var category=dictDao.lambdaQuery().eq(com.itwray.iw.web.model.entity.BaseDictEntity::getUserId,bo.getUserId())
+                .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getScopeType,0)
+                .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getFamilyGroupId,0)
+                .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getDictType,4002)
+                .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getDictCode,action.getRecordType()).list();
+            if(action.getRecordTypeId()!=null){
+                var templates=dictDao.lambdaQuery().eq(com.itwray.iw.web.model.entity.BaseDictEntity::getId,action.getRecordTypeId()).eq(com.itwray.iw.web.model.entity.BaseDictEntity::getScopeType,0).eq(com.itwray.iw.web.model.entity.BaseDictEntity::getUserId,0).list();
+                if(!templates.isEmpty())category=dictDao.lambdaQuery().eq(com.itwray.iw.web.model.entity.BaseDictEntity::getUserId,bo.getUserId())
+                    .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getScopeType,0).eq(com.itwray.iw.web.model.entity.BaseDictEntity::getDictType,4002)
+                    .apply("CAST(dict_name AS BINARY) = CAST({0} AS BINARY)",templates.get(0).getDictName()).list();
+            }
+            if(category.size()!=1 && !(category.isEmpty() && (action.getRecordType()==null || action.getRecordType()==0) && action.getRecordTypeId()==null)){
+                log.warn("用户默认快捷配置分类无法唯一映射，已跳过；用户ID {}",bo.getUserId());continue;
+            }
+            newAction.setRecordTypeId(category.isEmpty()?null:category.get(0).getId());newAction.setRecordType(0);
+            List<Integer> mappedTags=new java.util.ArrayList<>();boolean invalidTags=false;
+            int type=action.getRecordCategory()==1?4001:4011;
+            for(Integer templateId:tags(action.getRecordTags())){
+                var templates=dictDao.lambdaQuery().eq(com.itwray.iw.web.model.entity.BaseDictEntity::getId,templateId)
+                    .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getUserId,0).eq(com.itwray.iw.web.model.entity.BaseDictEntity::getScopeType,0)
+                    .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getFamilyGroupId,0).eq(com.itwray.iw.web.model.entity.BaseDictEntity::getDictType,type).list();
+                if(templates.size()!=1){invalidTags=true;break;}
+                var personal=dictDao.lambdaQuery().eq(com.itwray.iw.web.model.entity.BaseDictEntity::getUserId,bo.getUserId())
+                    .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getScopeType,0).eq(com.itwray.iw.web.model.entity.BaseDictEntity::getFamilyGroupId,0)
+                    .eq(com.itwray.iw.web.model.entity.BaseDictEntity::getDictType,type).apply("CAST(dict_name AS BINARY) = CAST({0} AS BINARY)",templates.get(0).getDictName()).list();
+                if(personal.size()!=1){invalidTags=true;break;}mappedTags.add(personal.get(0).getId());
+            }
+            if(invalidTags){log.warn("用户默认快捷配置标签无法唯一映射，已跳过；用户ID {}",bo.getUserId());continue;}
+            newAction.setRecordTags(mappedTags.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));
             getBaseDao().save(newAction);
         }
 

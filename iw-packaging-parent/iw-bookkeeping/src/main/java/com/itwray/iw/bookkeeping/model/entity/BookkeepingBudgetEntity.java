@@ -38,6 +38,8 @@ public class BookkeepingBudgetEntity extends UserEntity<Integer> {
      * <p>对应 {@link BookkeepingRecordsEntity#getRecordType()} 字段</p>
      */
     private Integer recordType;
+    private Integer recordTypeId;
+    private String recordTypeName;
 
     /**
      * 预算金额

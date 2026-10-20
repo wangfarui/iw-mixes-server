@@ -34,6 +34,8 @@ public class BookkeepingAssistantExpenseDraftVo {
 
     @Schema(title = "记录分类")
     private Integer recordType;
+    private Integer recordTypeId;
+    private String recordTypeName;
 
     @Schema(title = "记录标签")
     private List<Integer> recordTags;

@@ -51,6 +51,7 @@ public class BookkeepingRecordAddDto implements AddDto {
      * 记录分类
      */
     private Integer recordType;
+    private Integer recordTypeId;
 
     /**
      * 备注

@@ -102,3 +102,9 @@ create table auth_family_invite
     index idx_invite_code (invite_code),
     index idx_group_id (group_id)
 ) comment '家庭邀请表';
+
+-- Bookkeeping business dictionary initialization marker (managed by auth, even if empty).
+CREATE TABLE bookkeeping_family_dict_state (
+ family_group_id INT UNSIGNED PRIMARY KEY,
+ initialized_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;

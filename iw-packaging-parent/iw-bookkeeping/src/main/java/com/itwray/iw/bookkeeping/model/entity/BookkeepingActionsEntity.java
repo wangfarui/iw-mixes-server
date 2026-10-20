@@ -40,6 +40,8 @@ public class BookkeepingActionsEntity extends UserEntity<Integer> {
      * 记录分类
      */
     private Integer recordType;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer recordTypeId;
 
     /**
      * 记录图标

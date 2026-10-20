@@ -12,6 +12,11 @@ public class TaskBookkeepingTemplateDto {
     private String recordSource;
     private BigDecimal amount;
     private Integer recordType;
+    private Integer recordTypeId;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String recordTypeName;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private List<com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot> recordTagSnapshots;
     private String remark;
     private List<Integer> recordTags;
     private String recordIcon;

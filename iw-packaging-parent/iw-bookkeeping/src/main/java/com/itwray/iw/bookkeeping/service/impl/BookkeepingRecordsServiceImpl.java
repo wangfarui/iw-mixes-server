@@ -24,7 +24,6 @@ import com.itwray.iw.bookkeeping.model.bo.RecordsStatisticsBo;
 import com.itwray.iw.bookkeeping.model.dto.*;
 import com.itwray.iw.bookkeeping.model.entity.BookkeepingBudgetEntity;
 import com.itwray.iw.bookkeeping.model.entity.BookkeepingRecordsEntity;
-import com.itwray.iw.bookkeeping.model.enums.BookkeepingRecordTypeDefaultEnum;
 import com.itwray.iw.bookkeeping.model.enums.RecordCategoryEnum;
 import com.itwray.iw.bookkeeping.model.vo.*;
 import com.itwray.iw.bookkeeping.model.vo.yearly.consume.*;
@@ -88,6 +87,8 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         BookkeepingRecordAddDto, BookkeepingRecordUpdateDto, BookkeepingRecordDetailVo, Integer> implements BookkeepingRecordsService {
 
     private final BaseDictBusinessRelationDao baseDictBusinessRelationDao;
+    @Autowired private com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshots snapshots;
+    @Autowired private com.itwray.iw.web.bookkeeping.BookkeepingDictionaryAccess dictionaries;
 
     private final BaseBusinessFileDao baseBusinessFileDao;
 
@@ -117,6 +118,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     @Transactional(propagation = Propagation.MANDATORY)
     public Integer addFromTask(BookkeepingRecordAddDto dto, LocalDateTime completedAt, Integer groupId) {
         BookkeepingRecordsEntity entity = this.buildBookkeepingRecordAddDto(dto);
+        var tagSnapshots = snapshots.prepareNew(entity, dto);
         entity.setRecordDate(completedAt.toLocalDate());
         entity.setRecordTime(completedAt);
         entity.setGroupId(groupId);
@@ -125,7 +127,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         entity.setUserId(UserUtils.getUserId());
         entity.setExpenseUserId(RecordCategoryEnum.CONSUME.equals(dto.getRecordCategory()) ? UserUtils.getUserId() : null);
         if (!getBaseDao().save(entity)) throw new BusinessException("记账保存失败，请重试");
-        baseDictBusinessRelationDao.saveRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, entity.getId(), dto.getRecordTags());
+        snapshots.replace(entity.getId(), tagSnapshots);
         walletLedger.apply(null, entity);
         if (RecordCategoryEnum.INCOME.equals(dto.getRecordCategory()) && Objects.equals(dto.getIsExcitationRecord(), 1)) {
             syncExcitationInTransaction(entity.getOrderNo(), 1);
@@ -180,6 +182,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     @Transactional
     public Integer add(BookkeepingRecordAddDto dto) {
         BookkeepingRecordsEntity bookkeepingRecords = this.buildBookkeepingRecordAddDto(dto);
+        var tagSnapshots = snapshots.prepareNew(bookkeepingRecords, dto);
         Integer userId = UserUtils.getUserId();
         FamilySharedSavePolicyVo sharedSavePolicy = familyService.querySharedSavePolicy(userId);
         bookkeepingRecords.setGroupId(sharedSavePolicy.getCurrentGroupId());
@@ -194,7 +197,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         if (!getBaseDao().save(bookkeepingRecords)) throw new BusinessException("记账保存失败，请重试");
 
         // 保存标签
-        baseDictBusinessRelationDao.saveRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, bookkeepingRecords.getId(), dto.getRecordTags());
+        snapshots.replace(bookkeepingRecords.getId(), tagSnapshots);
 
         // 保存记账附件
         baseBusinessFileDao.saveBusinessFile(bookkeepingRecords.getId(), BusinessFileTypeEnum.BOOKKEEPING_RECORDS, dto.getFileList());
@@ -222,7 +225,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         }
 
         // 修改标签
-        baseDictBusinessRelationDao.saveRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, dto.getId(), dto.getRecordTags());
+
 
         // 保存记账附件
         baseBusinessFileDao.saveBusinessFile(dto.getId(), BusinessFileTypeEnum.BOOKKEEPING_RECORDS, dto.getFileList());
@@ -240,12 +243,16 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         }
 
         BookkeepingRecordsEntity recordsEntity = this.buildBookkeepingRecordAddDto(dto);
+        var tagSnapshots = snapshots.prepareUpdate(recordsEntity, bookkeepingRecordsEntity, dto.getDictionaryChanges(), dto);
         FamilySharedSavePolicyVo sharedSavePolicy = familyService.querySharedSavePolicy(bookkeepingRecordsEntity.getUserId());
         recordsEntity.setGroupId(bookkeepingRecordsEntity.getGroupId());
-        recordsEntity.setShareState(this.resolveRecordShareState(bookkeepingRecordsEntity.getGroupId(), sharedSavePolicy, dto.getShared()));
+        // Missing update fields preserve the saved choice; defaults apply only to newly created records.
+        Integer requestedShared = dto.getShared() != null ? dto.getShared() : resolveSharedCode(bookkeepingRecordsEntity.getShareState());
+        recordsEntity.setShareState(this.resolveRecordShareState(bookkeepingRecordsEntity.getGroupId(), sharedSavePolicy, requestedShared));
         payerPolicy.apply(recordsEntity, dto.getExpenseUserId(), bookkeepingRecordsEntity, sharedSavePolicy, taskRecord);
         if (!getBaseDao().updateById(recordsEntity)) throw new BusinessException("记账更新失败，请重试");
 
+        if (dto.getDictionaryChanges() != null && dto.getDictionaryChanges().isTagsPresent()) snapshots.replace(dto.getId(), tagSnapshots);
         walletLedger.apply(bookkeepingRecordsEntity, recordsEntity);
         if (taskRecord && RecordCategoryEnum.INCOME.equals(dto.getRecordCategory())
                 && !Objects.equals(bookkeepingRecordsEntity.getIsExcitationRecord(), dto.getIsExcitationRecord())) {
@@ -297,7 +304,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         if (!getBaseDao().removeById(id)) throw new BusinessException("记账删除失败，请重试");
 
         // 删除标签
-        baseDictBusinessRelationDao.removeRelation(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, id);
+        // Snapshot rows remain available for provenance after logical bill deletion.
 
         // 删除记账附件
         baseBusinessFileDao.removeBusinessFile(id, BusinessFileTypeEnum.BOOKKEEPING_RECORDS);
@@ -318,6 +325,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
     public BookkeepingRecordDetailVo detail(Integer id) {
         BookkeepingRecordsEntity bookkeepingRecordsEntity = this.queryRecordByIdIgnorePermission(id);
         Integer userId = UserUtils.getUserId();
+        if (bookkeepingRecordsEntity == null) throw new BusinessException("记账记录不存在或无权查看");
         boolean participant = Objects.equals(userId, bookkeepingRecordsEntity.getUserId())
                 || (RecordCategoryEnum.CONSUME.equals(bookkeepingRecordsEntity.getRecordCategory())
                     && Objects.equals(userId, bookkeepingRecordsEntity.getExpenseUserId()));
@@ -336,7 +344,9 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 && !ShareStateEnum.LEFT_GROUP.equals(bookkeepingRecordsEntity.getShareState()));
 
         // 查询标签
-        List<Integer> tagIdList = baseDictBusinessRelationDao.queryDictIdList(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG, id);
+        var savedTags = snapshots.tags(id);
+        vo.setRecordTagSnapshots(savedTags);
+        List<Integer> tagIdList = savedTags.stream().map(com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot::getId).toList();
         vo.setRecordTags(tagIdList);
 
         // 查询记账附件
@@ -375,6 +385,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 t.setRecordTimeStr(t.getRecordTime().format(oldYearFormatter));
             }
         });
+        pageVo.getRecords().forEach(vo -> vo.setRecordTagSnapshots(snapshots.tags(vo.getId())));
         BookkeepingExpenseFillSupport.fill(pageVo.getRecords());
 
         return pageVo;
@@ -393,11 +404,42 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 .stream()
                 .map(t -> BeanUtil.copyProperties(t, BookkeepingRecordPageVo.class))
                 .collect(Collectors.toList());
+        recordList.forEach(vo -> vo.setRecordTagSnapshots(snapshots.tags(vo.getId())));
         BookkeepingExpenseFillSupport.fill(recordList);
         return recordList;
     }
 
+    @Override
+    public Map<String,List<Map<String,String>>> filterOptions(BookkeepingRecordPageDto dto) {
+        dto.setCategoryState(null);dto.setCategoryNames(null);dto.setTagNames(null);dto.setRecordType(null);dto.setTagIdList(null);
+        processBookkeepingRecordPageDto(dto);
+        Set<String> categories=new TreeSet<>(),expenseTags=new TreeSet<>(),incomeTags=new TreeSet<>();
+        for(var row:getBaseDao().getBaseMapper().historyForFilters(dto)) {
+            if(Objects.equals(row.getDictionarySnapshotStatus(),1)&&row.getRecordTypeName()!=null)categories.add(row.getRecordTypeName());
+            for(var tag:snapshots.tags(row.getId()))(tag.getType()==4001?expenseTags:incomeTags).add(tag.getName());
+        }
+        Map<String,List<Map<String,String>>> result=new LinkedHashMap<>();
+        result.put("categories",categories.stream().map(n->Map.of("name",n)).toList());
+        result.put("expenseTags",expenseTags.stream().map(n->Map.of("name",n)).toList());
+        result.put("incomeTags",incomeTags.stream().map(n->Map.of("name",n)).toList());return result;
+    }
+    @Override
+    public List<Map<String,Object>> dictionarySources(Integer id) {
+        BookkeepingRecordDetailVo bill=detail(id); // Authorization precedes every source lookup.
+        List<com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot> refs=new ArrayList<>(bill.getRecordTagSnapshots());
+        if(bill.getRecordTypeId()!=null)refs.add(new com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot(bill.getRecordTypeId(),4002,bill.getRecordTypeName()));
+        var sourceMap=dictionaries.sources(refs.stream().map(com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot::getId).toList());
+        List<Map<String,Object>> result=new ArrayList<>();
+        for(var ref:refs){
+            BaseDictEntity source=sourceMap.stream().filter(d->Objects.equals(d.getId(),ref.getId())).findFirst().orElse(null);
+            Map<String,Object> item=new LinkedHashMap<>();item.put("id",ref.getId());item.put("type",ref.getType());item.put("name",ref.getName());item.put("sourceExists",source!=null);
+            item.put("scope",source==null?null:Objects.equals(source.getScopeType(),1)?"FAMILY":"PERSONAL");
+            item.put("selectable",dictionaries.options(UserUtils.getUserId(),ref.getType()).stream().anyMatch(d->Objects.equals(d.getId(),ref.getId())));result.add(item);
+        }return result;
+    }
+
     private void processBookkeepingRecordPageDto(BookkeepingRecordPageDto dto) {
+        com.itwray.iw.bookkeeping.support.BookkeepingCategoryFilter.validate(dto.getCategoryNames(),dto.getCategoryState());
         if (dto.getRecordStartDate() == null) {
             if (dto.getRecordEndDate() != null) {
                 dto.setRecordStartDate(DateUtils.startDateOfMonth(dto.getRecordEndDate()));
@@ -408,9 +450,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                 dto.setRecordEndDate(DateUtils.endDateOfMonth(dto.getRecordStartDate()));
             }
         }
-        if (CollUtil.isNotEmpty(dto.getTagIdList())) {
-            dto.setTagBusinessType(DictBusinessTypeEnum.BOOKKEEPING_RECORD_TAG.getCode());
-        }
+        if(dto.getRecordType()!=null || CollUtil.isNotEmpty(dto.getTagIdList())) throw new BusinessException("请更新客户端后重试：历史筛选须使用名称");
     }
 
     @Override
@@ -442,8 +482,8 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         Integer currentGroupId = sharedSavePolicy.getCurrentGroupId();
         ShareStateEnum defaultShareState = this.resolveRecordShareState(currentGroupId, sharedSavePolicy, null);
         // 查询当前用户的记账-记录分类字典项
-        List<BaseDictEntity> dictEntityList = baseDictDao.queryDictEntityList(DictTypeEnum.BOOKKEEPING_RECORD_TYPE);
-        Map<String, Integer> dictNameMap = dictEntityList.stream().collect(Collectors.toMap(BaseDictEntity::getDictName, BaseDictEntity::getDictCode));
+        List<BaseDictEntity> dictEntityList = dictionaries.options(userId,4002);
+        Map<String, Integer> dictNameMap = dictEntityList.stream().collect(Collectors.toMap(BaseDictEntity::getDictName, BaseDictEntity::getId));
         BookkeepingRecordsImportDataListener listener = new BookkeepingRecordsImportDataListener(userId, currentGroupId, defaultShareState, dictNameMap);
         try {
             FastExcel.read(file.getInputStream(), BookkeepingRecordsImportBo.class, listener)
@@ -463,17 +503,12 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         if (bo.getRecordCategory() == null) {
             return;
         }
-        BookkeepingRecordTypeDefaultEnum recordTypeDefaultEnum = BookkeepingRecordTypeDefaultEnum.confirmRecordType(bo.getRecordTypeDesc());
-        if (BookkeepingRecordTypeDefaultEnum.IGNORE.equals(recordTypeDefaultEnum)) {
-            return;
-        }
-        Integer recordTypeCode = dictNameMap.get(recordTypeDefaultEnum.getName());
-        if (recordTypeCode == null) {
-            recordTypeCode = dictNameMap.get(BookkeepingRecordTypeDefaultEnum.OTHER.getName());
-        }
-        if (recordTypeCode == null) {
-            log.warn("BookkeepingRecordsService#processImportData 无法确定记录分类的字典值, bo: {}", bo.getRecordTypeDesc());
-            return;
+        String categoryName=bo.getRecordTypeDesc();
+        Integer categoryId=null;
+        if(categoryName!=null && !categoryName.isBlank()) {
+            categoryName=com.itwray.iw.web.bookkeeping.DictionaryNames.normalize(categoryName);
+            categoryId=dictNameMap.get(categoryName);
+            if(categoryId==null)throw new BusinessException("导入分类不存在："+categoryName+"，请先配置；记录时间："+bo.getRecordTime());
         }
         BookkeepingRecordsEntity recordsEntity = new BookkeepingRecordsEntity();
         recordsEntity.setOrderNo(OrderNoUtils.getAndIncrement(OrderNoEnum.BOOKKEEPING_RECORDS));
@@ -490,15 +525,19 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
             recordsEntity.setRecordSource(bo.getRemark().substring(0, 50));
         }
         recordsEntity.setAmount(bo.getAmount());
-        recordsEntity.setRecordType(recordTypeCode);
-        if (isFillRemark) {
+        BookkeepingRecordAddDto sourceDto=new BookkeepingRecordAddDto();
+        sourceDto.setRecordTypeId(categoryId);
+        var importedTags=snapshots.prepareNew(recordsEntity,sourceDto);
+        if (isFillRemark && bo.getRemark()!=null) {
             recordsEntity.setRemark(bo.getRemark().length() < 255 ? bo.getRemark() : bo.getRemark().substring(0, 255));
         }
         recordsEntity.setUserId(bo.getUserId());
         recordsEntity.setExpenseUserId(RecordCategoryEnum.CONSUME.equals(bo.getRecordCategory()) ? bo.getUserId() : null);
         recordsEntity.setGroupId(Optional.ofNullable(bo.getGroupId()).orElse(0));
         recordsEntity.setShareState(Optional.ofNullable(bo.getShareState()).orElse(ShareStateEnum.NOT_SHARED));
-        getBaseDao().save(recordsEntity);
+        if(!getBaseDao().save(recordsEntity))throw new BusinessException("导入保存失败");
+        snapshots.replace(recordsEntity.getId(),importedTags);
+        // Import retains its existing balance policy; this change only adds trusted dictionary facts.
     }
 
     @Override
@@ -516,14 +555,11 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
             try {
                 UserUtils.setUserId(userId);
                 UserUtils.setToken(userToken);
-                // 查询记账分类字典值
-                List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
-                Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
                 for (BookkeepingBudgetEntity budgetEntity : entry.getValue()) {
                     BookkeepingRecordsStatisticsDto statisticsDto = new BookkeepingRecordsStatisticsDto();
                     statisticsDto.setRecordStartDate(DateUtils.startDateOfMonth(budgetEntity.getBudgetMonth()));
                     statisticsDto.setRecordEndDate(DateUtils.endDateOfMonth(budgetEntity.getBudgetMonth()));
-                    statisticsDto.setRecordType(budgetEntity.getRecordType());
+                    statisticsDto.setCategoryNames(java.util.List.of(budgetEntity.getRecordTypeName()));
                     statisticsDto.setQueryOnlyMyself(BoolEnum.TRUE.getCode());
                     // 统计预算所在月份下, 指定记账分类的实际支出情况
                     BookkeepingRecordsStatisticsVo statisticsVo = this.statistics(statisticsDto);
@@ -536,7 +572,7 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
                     pointsRecordsAddDto.setPoints(points);
                     pointsRecordsAddDto.setSource(
                             budgetEntity.getBudgetMonth().format(dateTimeFormatter) + "\"" +
-                                    dictMap.get(budgetEntity.getRecordType()) + "\"" +
+                                    budgetEntity.getRecordTypeName() + "\"" +
                                     (stayBudget ? "符合预算" : "超出预算")
                     );
                     pointsRecordsAddDto.setSourceType(PointsSourceTypeEnum.BOOKKEEPING_BUDGET_MONTH.getCode());
@@ -649,14 +685,11 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         if (CollectionUtil.isNotEmpty(statisticsCategoryVos)) {
             BigDecimal totalAmount = statisticsCategoryVos.stream().map(BookkeepingConsumeStatisticsCategoryVo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
             List<BookkeepingRecordsConsumeCategoriesVo> categoryVoList = new ArrayList<>();
-            // 查询记账分类字典值
-            List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
-            Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
             for (BookkeepingConsumeStatisticsCategoryVo statisticsCategoryVo : statisticsCategoryVos) {
                 BookkeepingRecordsConsumeCategoriesVo categoriesVo = new BookkeepingRecordsConsumeCategoriesVo();
-                categoriesVo.setName(dictMap.get(statisticsCategoryVo.getRecordType()));
+                categoriesVo.setName(snapshotLabel(statisticsCategoryVo.getRecordTypeName(), statisticsCategoryVo.getDictionarySnapshotStatus()));
                 categoriesVo.setAmount(statisticsCategoryVo.getAmount());
-                categoriesVo.setRatio(statisticsCategoryVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
+                categoriesVo.setRatio(totalAmount.signum()==0?BigDecimal.ZERO:statisticsCategoryVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
                 categoryVoList.add(categoriesVo);
             }
             consumeVo.setConsumeCategories(categoryVoList);
@@ -668,13 +701,9 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
             BigDecimal totalAmount = consumeTagsVos.stream().map(BookkeepingRecordsConsumeTagsVo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
             int totalCount = consumeTagsVos.stream().map(BookkeepingRecordsConsumeTagsVo::getCount).reduce(0, Integer::sum);
 
-            // 查询记账标签字典值
-            List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TAG_CONSUME.getCode());
-            Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getId, DictListVo::getDictName));
             for (BookkeepingRecordsConsumeTagsVo consumeTagsVo : consumeTagsVos) {
-                consumeTagsVo.setName(dictMap.get(consumeTagsVo.getDictId()));
-                consumeTagsVo.setRatio(new BigDecimal(consumeTagsVo.getCount() * 100).divide(new BigDecimal(totalCount), 2, RoundingMode.HALF_UP));
-                consumeTagsVo.setAmountRatio(consumeTagsVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
+                consumeTagsVo.setRatio(totalCount==0?BigDecimal.ZERO:new BigDecimal(consumeTagsVo.getCount() * 100).divide(new BigDecimal(totalCount), 2, RoundingMode.HALF_UP));
+                consumeTagsVo.setAmountRatio(totalAmount.signum()==0?BigDecimal.ZERO:consumeTagsVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
             }
         }
         consumeVo.setConsumeTags(consumeTagsVos);
@@ -689,15 +718,12 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         List<BookkeepingStatisticsRankVo> rankVoList = getBaseDao().getBaseMapper().rankStatistics(statisticsDto);
         if (CollectionUtil.isNotEmpty(rankVoList)) {
             BookkeepingExpenseFillSupport.fill(rankVoList);
-            // 查询记账分类字典值
-            List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
-            Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
             List<BookkeepingRecordsConsumeTopVo> topConsumeList = new ArrayList<>();
             for (BookkeepingStatisticsRankVo rankVo : rankVoList) {
                 BookkeepingRecordsConsumeTopVo topVo = new BookkeepingRecordsConsumeTopVo();
                 topVo.setExpenseUserId(rankVo.getExpenseUserId());
                 topVo.setExpenseUserName(rankVo.getExpenseUserName());
-                topVo.setCategory(dictMap.get(rankVo.getRecordType()));
+                topVo.setCategory(snapshotLabel(rankVo.getRecordTypeName(), rankVo.getDictionarySnapshotStatus()));
                 topVo.setDescription(rankVo.getRecordSource());
                 topVo.setDate(rankVo.getRecordDate());
                 topVo.setAmount(rankVo.getAmount());
@@ -782,14 +808,11 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         if (CollectionUtil.isNotEmpty(statisticsCategoryVos)) {
             BigDecimal totalAmount = statisticsCategoryVos.stream().map(BookkeepingConsumeStatisticsCategoryVo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
             List<BookkeepingRecordsIncomeCategoriesVo> categoryVoList = new ArrayList<>();
-            // 查询记账分类字典值
-            List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
-            Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
             for (BookkeepingConsumeStatisticsCategoryVo statisticsCategoryVo : statisticsCategoryVos) {
                 BookkeepingRecordsIncomeCategoriesVo categoriesVo = new BookkeepingRecordsIncomeCategoriesVo();
-                categoriesVo.setName(dictMap.get(statisticsCategoryVo.getRecordType()));
+                categoriesVo.setName(snapshotLabel(statisticsCategoryVo.getRecordTypeName(), statisticsCategoryVo.getDictionarySnapshotStatus()));
                 categoriesVo.setAmount(statisticsCategoryVo.getAmount());
-                categoriesVo.setRatio(statisticsCategoryVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
+                categoriesVo.setRatio(totalAmount.signum()==0?BigDecimal.ZERO:statisticsCategoryVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
                 categoryVoList.add(categoriesVo);
             }
             incomeVo.setIncomeCategories(categoryVoList);
@@ -805,13 +828,10 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
         List<BookkeepingStatisticsRankVo> rankVoList = getBaseDao().getBaseMapper().rankStatistics(statisticsDto);
         if (CollectionUtil.isNotEmpty(rankVoList)) {
             BookkeepingExpenseFillSupport.fill(rankVoList);
-            // 查询记账分类字典值
-            List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
-            Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getDictCode, DictListVo::getDictName));
             List<BookkeepingRecordsIncomeTopVo> topIncomeList = new ArrayList<>();
             for (BookkeepingStatisticsRankVo rankVo : rankVoList) {
                 BookkeepingRecordsIncomeTopVo topVo = new BookkeepingRecordsIncomeTopVo();
-                topVo.setCategory(dictMap.get(rankVo.getRecordType()));
+                topVo.setCategory(snapshotLabel(rankVo.getRecordTypeName(), rankVo.getDictionarySnapshotStatus()));
                 topVo.setDescription(rankVo.getRecordSource());
                 topVo.setDate(rankVo.getRecordDate());
                 topVo.setAmount(rankVo.getAmount());
@@ -852,6 +872,8 @@ public class BookkeepingRecordsServiceImpl extends WebServiceImpl<BookkeepingRec
 
         return incomeVo;
     }
+
+    private String snapshotLabel(String name,Integer status){return !Objects.equals(status,1)?"分类待核对":name==null?"未分类":name;}
 
     private void computeYearStatisticsParam(BookkeepingRecordsYearStatisticsQueryDto dto) {
         dto.setUserId(UserUtils.getUserId());

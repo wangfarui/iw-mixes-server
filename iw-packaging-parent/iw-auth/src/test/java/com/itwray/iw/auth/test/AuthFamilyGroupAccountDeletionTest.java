@@ -7,6 +7,8 @@ import com.itwray.iw.auth.dao.AuthFamilyGroupDao;
 import com.itwray.iw.auth.dao.AuthFamilyInviteDao;
 import com.itwray.iw.auth.dao.AuthFamilyMemberDao;
 import com.itwray.iw.auth.dao.AuthUserDao;
+import com.itwray.iw.auth.mapper.BookkeepingDictionaryMapper;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.itwray.iw.auth.model.entity.AuthFamilyMemberEntity;
 import com.itwray.iw.auth.model.entity.AuthUserEntity;
 import com.itwray.iw.auth.model.enums.FamilyMemberRoleEnum;
@@ -73,11 +75,15 @@ class AuthFamilyGroupAccountDeletionTest {
     }
 
     private TestAuthFamilyGroupServiceImpl service(AuthFamilyMemberDao memberDao, AuthUserDao userDao) {
-        return new TestAuthFamilyGroupServiceImpl(
+        TestAuthFamilyGroupServiceImpl service = new TestAuthFamilyGroupServiceImpl(
                 mock(AuthFamilyGroupDao.class),
                 memberDao,
                 mock(AuthFamilyInviteDao.class),
                 userDao);
+        BookkeepingDictionaryMapper mapper = mock(BookkeepingDictionaryMapper.class);
+        when(mapper.lockGroup(3)).thenReturn(3);
+        ReflectionTestUtils.setField(service, "bookkeepingDictionaryMapper", mapper);
+        return service;
     }
 
     private AuthFamilyMemberEntity member(Integer id, FamilyMemberRoleEnum role) {

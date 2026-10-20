@@ -31,6 +31,8 @@ public class TaskBookkeepingAdapter implements TaskBookkeepingGateway {
     private final BaseDictDao dictDao;
     private final AuthFamilyGroupService familyService;
     private final JdbcTemplate jdbc;
+    @org.springframework.beans.factory.annotation.Autowired private com.itwray.iw.web.bookkeeping.BookkeepingDictionaryAccess dictionaries;
+    @org.springframework.beans.factory.annotation.Autowired private com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshots snapshots;
 
     public TaskBookkeepingAdapter(BookkeepingRecordsService recordsService, BookkeepingRecordsDao recordsDao,
                                   BaseDictDao dictDao, AuthFamilyGroupService familyService, JdbcTemplate jdbc) {
@@ -42,6 +44,7 @@ public class TaskBookkeepingAdapter implements TaskBookkeepingGateway {
     }
 
     @Override
+    @Transactional
     public TaskBookkeepingTemplateDto validateAndBind(TaskBookkeepingTemplateDto input) {
         TaskBookkeepingTemplateDto template = validateFields(input);
         FamilySharedSavePolicyVo policy = familyService.querySharedSavePolicy(UserUtils.getUserId());
@@ -52,17 +55,23 @@ public class TaskBookkeepingAdapter implements TaskBookkeepingGateway {
         }
         template.setShared(shared);
         template.setFamilyGroupId(shared == 1 ? groupId : 0);
-        template.setSchemaVersion(1);
+        template.setSchemaVersion(2);
         return template;
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public TaskBookkeepingRecordVo create(TaskBookkeepingTemplateDto snapshot, LocalDateTime completedAt) {
-        if (!Objects.equals(snapshot.getSchemaVersion(), 1)) {
-            throw new BusinessException("记账模板版本无效，请修改本次记账模板");
+        if (!Objects.equals(snapshot.getSchemaVersion(), 2)) {
+            throw new BusinessException("请重新保存记账模板：旧模板尚未升级");
         }
-        TaskBookkeepingTemplateDto template = validateFields(snapshot);
+        TaskBookkeepingTemplateDto resolved=BeanUtil.copyProperties(snapshot,TaskBookkeepingTemplateDto.class);
+        if(resolved.getRecordTypeId()!=null)resolved.setRecordTypeId(dictionaries.resolveSuccessor(UserUtils.getUserId(),4002,resolved.getRecordTypeId()).getId());
+        int tagType=Objects.equals(resolved.getRecordCategory(),1)?4001:4011;
+        java.util.List<Integer> resolvedTags=new java.util.ArrayList<>();
+        for(Integer id:Objects.requireNonNullElse(resolved.getRecordTags(),List.<Integer>of()))resolvedTags.add(dictionaries.resolveSuccessor(UserUtils.getUserId(),tagType,id).getId());
+        resolved.setRecordTags(resolvedTags);resolved.setRecordType(null);
+        TaskBookkeepingTemplateDto template = validateFields(resolved);
         FamilySharedSavePolicyVo policy = familyService.querySharedSavePolicy(UserUtils.getUserId());
         if (template.getShared() == 1 && (!Objects.equals(snapshot.getFamilyGroupId(), policy.getCurrentGroupId())
                 || snapshot.getFamilyGroupId() == null || snapshot.getFamilyGroupId() <= 0)
@@ -87,11 +96,7 @@ public class TaskBookkeepingAdapter implements TaskBookkeepingGateway {
                 || amount.compareTo(new BigDecimal("999999.99")) > 0) {
             throw new BusinessException("金额须大于零，最多两位小数且不超过999999.99");
         }
-        if (template.getRecordType() == null || dictDao.queryDictEntityList(DictTypeEnum.BOOKKEEPING_RECORD_TYPE).stream()
-                .noneMatch(d -> Objects.equals(d.getDictCode(), template.getRecordType())
-                        && (Objects.equals(d.getUserId(), UserUtils.getUserId()) || Objects.equals(d.getUserId(), 0)))) {
-            throw new BusinessException("记账分类已失效，请修改本次记账模板");
-        }
+        if(template.getRecordType()!=null)throw new BusinessException("请更新客户端后重新保存记账模板");
         checkLength(template.getRecordSource(), 64, "收支项目");
         checkLength(template.getRemark(), 255, "备注");
         checkLength(template.getRecordIcon(), 255, "图标");
@@ -102,13 +107,12 @@ public class TaskBookkeepingAdapter implements TaskBookkeepingGateway {
         template.setIsStatistics(flag(template.getIsStatistics(), 1));
         template.setIsExcitationRecord(template.getRecordCategory() == 1 ? 0 : flag(template.getIsExcitationRecord(), 0));
         List<Integer> tags = template.getRecordTags() == null ? List.of() : template.getRecordTags();
-        DictTypeEnum tagType = template.getRecordCategory() == 1 ? DictTypeEnum.BOOKKEEPING_RECORD_TAG_CONSUME : DictTypeEnum.BOOKKEEPING_RECORD_TAG_INCOME;
-        Set<Integer> allowedTags = new HashSet<>();
-        for (BaseDictEntity dict : dictDao.queryDictEntityList(tagType)) {
-            if (Objects.equals(dict.getUserId(), UserUtils.getUserId()) || Objects.equals(dict.getUserId(), 0)) allowedTags.add(dict.getId());
-        }
-        if (tags.size() > 100 || !allowedTags.containsAll(tags)) throw new BusinessException("记账标签已失效，请修改本次记账模板");
+        int tagType=template.getRecordCategory()==1?4001:4011;
+        if(tags.size()>100)throw new BusinessException("标签数量过多");
+        var selected=snapshots.lock(template.getRecordTypeId(),tags,tagType);
+        template.setRecordTypeName(template.getRecordTypeId()==null?null:selected.get(template.getRecordTypeId()).getDictName());
         template.setRecordTags(tags.stream().distinct().toList());
+        template.setRecordTagSnapshots(template.getRecordTags().stream().map(id->new com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot(id,tagType,selected.get(id).getDictName())).toList());
         return template;
     }
 

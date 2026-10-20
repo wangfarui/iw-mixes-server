@@ -26,6 +26,7 @@ import com.itwray.iw.external.model.dto.AsrSentenceRecognizeDto;
 import com.itwray.iw.external.model.vo.AiStructuredChatVo;
 import com.itwray.iw.external.model.vo.AsrSentenceRecognizeVo;
 import com.itwray.iw.web.exception.IwWebException;
+import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.enums.DictTypeEnum;
 import com.itwray.iw.web.utils.UserUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
     private final BookkeepingActionsDao bookkeepingActionsDao;
 
     private final BaseDictClient baseDictClient;
+    @org.springframework.beans.factory.annotation.Autowired private com.itwray.iw.web.bookkeeping.BookkeepingDictionaryAccess dictionaries;
 
     private final AuthFamilyGroupClient authFamilyGroupClient;
 
@@ -128,13 +130,13 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
                 }
 
                 List<BookkeepingActionsEntity> actionList = this.queryExpenseActionList();
-                List<DictListVo> recordTypeList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TYPE.getCode());
-                List<DictListVo> recordTagList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TAG_CONSUME.getCode());
+                List<DictListVo> recordTypeList = dictionaryOptions(4002);
+                List<DictListVo> recordTagList = dictionaryOptions(4001);
                 aiResponse = bookkeepingAssistantRemoteService.structuredChat(this.buildStructuredChatDto(recognizedText, amount, actionList, recordTypeList, recordTagList));
 
                 matchedActionId = this.applyAiResult(aiResponse == null ? null : aiResponse.getContent(), actionList, recordTypeList, recordTagList, draftVo, ambiguities);
 
-                if (draftVo.getAmount() != null && draftVo.getRecordType() != null && StringUtils.isNotBlank(draftVo.getRecordSource())) {
+                if (draftVo.getAmount() != null && draftVo.getRecordTypeId() != null && StringUtils.isNotBlank(draftVo.getRecordSource())) {
                     status = ambiguities.isEmpty() ? BookkeepingAssistantParseStatusEnum.READY : BookkeepingAssistantParseStatusEnum.NEED_CONFIRM;
                     message = ambiguities.isEmpty() ? "已生成记账草稿" : "已生成记账草稿，请确认分类";
                     confidence = ambiguities.isEmpty() ? new BigDecimal("0.88") : new BigDecimal("0.72");
@@ -144,8 +146,8 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
                         status = BookkeepingAssistantParseStatusEnum.NEED_MORE_INFO;
                         message = "暂未识别到明确金额";
                     }
-                    if (draftVo.getRecordType() == null) {
-                        missingFields.add("recordType");
+                    if (draftVo.getRecordTypeId() == null) {
+                        missingFields.add("recordTypeId");
                     }
                     if (StringUtils.isBlank(draftVo.getRecordSource())) {
                         missingFields.add("recordSource");
@@ -272,7 +274,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
                 && draftVo != null
                 && Objects.equals(draftVo.getRecordCategory(), RecordCategoryEnum.CONSUME.getCode())
                 && draftVo.getAmount() != null
-                && draftVo.getRecordType() != null
+                && draftVo.getRecordTypeId() != null
                 && StringUtils.isNotBlank(draftVo.getRecordSource())
                 && missingFields.isEmpty()
                 && ambiguities.isEmpty();
@@ -285,7 +287,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
         dto.setRecordCategory(RecordCategoryEnum.CONSUME);
         dto.setRecordSource(draftVo.getRecordSource());
         dto.setAmount(draftVo.getAmount());
-        dto.setRecordType(draftVo.getRecordType());
+        dto.setRecordTypeId(draftVo.getRecordTypeId());
         dto.setRecordTags(draftVo.getRecordTags());
         dto.setIsExcitationRecord(BoolEnum.FALSE.getCode());
         dto.setIsStatistics(draftVo.getIsStatistics());
@@ -326,11 +328,11 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
         promptBuilder.append("你是一个记账助手，只做单笔支出记账解析。");
         promptBuilder.append("请基于用户文本和真实消费场景，解析金额、记录来源、记账分类、记账标签，并从提供的候选行为、候选分类和候选标签中选择最合适的结果，输出严格JSON。");
         promptBuilder.append("不要输出markdown，不要补充解释。");
-        promptBuilder.append("JSON字段固定为：amount,recordSource,recordType,recordTags,matchedActionId,ambiguities。");
+        promptBuilder.append("JSON字段固定为：amount,recordSource,recordTypeId,recordTags,matchedActionId,ambiguities。");
         promptBuilder.append("amount必须是以元为单位的数字，支持将中文金额转换为数字，最多保留两位小数；如果金额不确定，amount返回null。");
         promptBuilder.append("recordSource必须根据语音里的商户、物品、用途或消费场景提炼，优先填写具体来源，例如早餐、星巴克咖啡、地铁、给孩子买书；不要直接复制候选分类名或标签名。");
         promptBuilder.append("如果无法从用户文本辨别具体记录来源，recordSource返回null，服务端会使用已确定的记账分类名称兜底。");
-        promptBuilder.append("如果分类不确定，recordType返回null，matchedActionId返回null，ambiguities写原因数组。");
+        promptBuilder.append("如果分类不确定，recordTypeId返回null，matchedActionId返回null，ambiguities写原因数组。");
         promptBuilder.append("recordTags必须从候选标签中选择匹配的标签id数组；没有明确匹配标签时返回空数组。");
         promptBuilder.append("用户文本：").append(recognizedText).append("。");
         if (amount != null) {
@@ -342,14 +344,14 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("id", t.getId());
             map.put("recordSource", t.getRecordSource());
-            map.put("recordType", t.getRecordType());
+            map.put("recordTypeId", t.getRecordTypeId());
             map.put("recordIcon", t.getRecordIcon());
             map.put("recordTags", t.getRecordTags());
             return map;
         }).toList())).append("。");
         promptBuilder.append("候选分类：").append(JSONUtil.toJsonStr(recordTypeList.stream().map(t -> {
             Map<String, Object> map = new LinkedHashMap<>();
-            map.put("dictCode", t.getDictCode());
+            map.put("id", t.getId());
             map.put("dictName", t.getDictName());
             return map;
         }).toList())).append("。");
@@ -390,7 +392,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
             Map<String, Object> map = JSONUtil.toBean(jsonContent, Map.class);
             BigDecimal aiAmount = this.parseAmount(map.get("amount"));
             Integer matchedActionId = this.parseInteger(map.get("matchedActionId"));
-            Integer recordType = this.parseInteger(map.get("recordType"));
+            Integer recordType = this.parseInteger(map.get("recordTypeId"));
             String recordSource = this.parseNullableText(map.get("recordSource"));
             List<Integer> recordTags = this.parseRecordTags(map.get("recordTags"), recordTagList);
 
@@ -405,13 +407,15 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
                         .findFirst();
                 if (actionOptional.isPresent()) {
                     matchedAction = actionOptional.get();
-                    draftVo.setRecordType(matchedAction.getRecordType());
+                    draftVo.setRecordTypeId(matchedAction.getRecordTypeId());
                     draftVo.setRecordIcon(matchedAction.getRecordIcon());
                 }
             }
 
-            if (recordType != null && recordTypeList.stream().anyMatch(t -> Objects.equals(t.getDictCode(), recordType))) {
-                draftVo.setRecordType(recordType);
+            if (recordType != null) {
+                if(recordTypeList.stream().noneMatch(t -> Objects.equals(t.getId(),recordType)))throw new BusinessException("AI返回无效分类，请重新选择");
+                draftVo.setRecordTypeId(recordType);
+                draftVo.setRecordTypeName(this.resolveRecordTypeName(recordType,recordTypeList));
             }
             if (map.containsKey("recordTags")) {
                 draftVo.setRecordTags(recordTags);
@@ -421,8 +425,9 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
             if (StringUtils.isNotBlank(recordSource)) {
                 draftVo.setRecordSource(recordSource);
             } else {
-                draftVo.setRecordSource(this.resolveRecordTypeName(draftVo.getRecordType(), recordTypeList));
+                draftVo.setRecordSource(this.resolveRecordTypeName(draftVo.getRecordTypeId(), recordTypeList));
             }
+            draftVo.setRecordTypeName(this.resolveRecordTypeName(draftVo.getRecordTypeId(),recordTypeList));
             List<?> aiAmbiguities = map.get("ambiguities") instanceof List<?> list ? list : Collections.emptyList();
             aiAmbiguities.stream().map(String::valueOf).forEach(ambiguities::add);
             return matchedAction == null ? null : matchedActionId;
@@ -439,6 +444,10 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
             return content.substring(start, end + 1);
         }
         return content;
+    }
+
+    private List<DictListVo> dictionaryOptions(int type){
+        return dictionaries.options(UserUtils.getUserId(),type).stream().map(d->{DictListVo vo=new DictListVo();vo.setId(d.getId());vo.setDictCode(d.getId());vo.setDictName(d.getDictName());return vo;}).toList();
     }
 
     private List<Integer> parseTags(String recordTags) {
@@ -479,16 +488,19 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
                 if (tagId != null) {
                     tagIdList.add(tagId);
                 }
-            } catch (Exception ignored) {
+                else throw new BusinessException("AI返回无法识别的标签，请重新选择");
+            } catch (Exception invalid) {
+                throw new BusinessException("AI返回无法识别的标签，请重新选择");
             }
         }
         return this.filterValidRecordTags(tagIdList, recordTagList);
     }
 
     private List<Integer> filterValidRecordTags(Collection<Integer> tagIdList, List<DictListVo> recordTagList) {
-        if (tagIdList == null || tagIdList.isEmpty() || recordTagList == null || recordTagList.isEmpty()) {
+        if (tagIdList == null || tagIdList.isEmpty()) {
             return Collections.emptyList();
         }
+        if(recordTagList==null || recordTagList.isEmpty())throw new BusinessException("AI返回无效标签，请重新选择");
         Set<Integer> validTagIdSet = new HashSet<>();
         for (DictListVo dict : recordTagList) {
             if (dict.getId() != null) {
@@ -499,6 +511,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
         List<Integer> validTagList = new ArrayList<>();
         Set<Integer> addedTagIdSet = new HashSet<>();
         for (Integer tagId : tagIdList) {
+            if(!validTagIdSet.contains(tagId))throw new BusinessException("AI返回无效标签，请重新选择");
             if (validTagIdSet.contains(tagId) && addedTagIdSet.add(tagId)) {
                 validTagList.add(tagId);
             }
@@ -511,7 +524,7 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
             return null;
         }
         return recordTypeList.stream()
-                .filter(t -> Objects.equals(t.getDictCode(), recordType))
+                .filter(t -> Objects.equals(t.getId(), recordType))
                 .map(DictListVo::getDictName)
                 .filter(StringUtils::isNotBlank)
                 .findFirst()
@@ -530,12 +543,17 @@ public class BookkeepingAssistantServiceImpl implements BookkeepingAssistantServ
     }
 
     private List<BookkeepingActionsEntity> queryExpenseActionList() {
-        return bookkeepingActionsDao.lambdaQuery()
-                .eq(BookkeepingActionsEntity::getUserId, UserUtils.getUserId())
-                .eq(BookkeepingActionsEntity::getRecordCategory, RecordCategoryEnum.CONSUME.getCode())
-                .orderByAsc(BookkeepingActionsEntity::getSort)
-                .orderByAsc(BookkeepingActionsEntity::getId)
-                .list();
+        List<BookkeepingActionsEntity> result=new ArrayList<>();
+        for(var action:bookkeepingActionsDao.lambdaQuery().eq(BookkeepingActionsEntity::getUserId,UserUtils.getUserId())
+                .eq(BookkeepingActionsEntity::getRecordCategory,1).orderByAsc(BookkeepingActionsEntity::getSort).orderByAsc(BookkeepingActionsEntity::getId).list()){
+            try{
+                if(action.getRecordTypeId()==null && action.getRecordType()!=null && action.getRecordType()!=0)continue;
+                if(action.getRecordTypeId()!=null)action.setRecordTypeId(dictionaries.resolveSuccessor(UserUtils.getUserId(),4002,action.getRecordTypeId()).getId());
+                List<Integer> tagIds=new ArrayList<>();
+                for(Integer id:parseTags(action.getRecordTags()))tagIds.add(dictionaries.resolveSuccessor(UserUtils.getUserId(),4001,id).getId());
+                action.setRecordTags(tagIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));result.add(action);
+            }catch(BusinessException ignored){/* Invalid future configurations are excluded from AI candidates. */}
+        }return result;
     }
 
     private Integer resolveDefaultShared() {

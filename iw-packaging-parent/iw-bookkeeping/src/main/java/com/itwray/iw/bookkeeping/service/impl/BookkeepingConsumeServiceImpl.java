@@ -80,7 +80,7 @@ public class BookkeepingConsumeServiceImpl implements BookkeepingConsumeService 
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         // 计算各分类支出金额的占比
         for (BookkeepingConsumeStatisticsCategoryVo vo : currentMonthCategoryVoList) {
-            vo.setRatio(vo.getAmount().divide(totalAmount, 5, RoundingMode.HALF_UP)
+            vo.setRatio(totalAmount.signum() == 0 ? BigDecimal.ZERO : vo.getAmount().divide(totalAmount, 5, RoundingMode.HALF_UP)
                     .multiply(new BigDecimal("100"))
                     .setScale(WebCommonConstants.AMOUNT_SCALE, RoundingMode.HALF_UP));
         }
@@ -94,11 +94,11 @@ public class BookkeepingConsumeServiceImpl implements BookkeepingConsumeService 
             // 查询上个月度的分类支出统计数据
             List<BookkeepingConsumeStatisticsCategoryVo> lastMonthCategoryVoList = bookkeepingRecordsDao.getBaseMapper().categoryStatistics(dto);
             // key -> recordType, value -> amount
-            Map<Integer, BigDecimal> lastMonthStatisticsMap = lastMonthCategoryVoList.stream()
-                    .collect(Collectors.toMap(BookkeepingConsumeStatisticsCategoryVo::getRecordType, BookkeepingConsumeStatisticsCategoryVo::getAmount));
+            Map<String, BigDecimal> lastMonthStatisticsMap = lastMonthCategoryVoList.stream()
+                    .collect(Collectors.toMap(v -> statisticsKey(v), BookkeepingConsumeStatisticsCategoryVo::getAmount));
             for (BookkeepingConsumeStatisticsCategoryVo vo : currentMonthCategoryVoList) {
                 // 根据记录分类获取上个月的金额
-                BigDecimal lastMonthAmount = lastMonthStatisticsMap.get(vo.getRecordType());
+                BigDecimal lastMonthAmount = lastMonthStatisticsMap.get(statisticsKey(vo));
                 if (lastMonthAmount != null) {
                     // 判断当前月的金额是否大于等于上个月的基恩
                     vo.setIsGreaterThan(vo.getAmount().compareTo(lastMonthAmount) >= 0);
@@ -115,13 +115,14 @@ public class BookkeepingConsumeServiceImpl implements BookkeepingConsumeService 
                 }
             }
             // 将当前月没有的分类支出，而上个月有的分类支出按照金额降序追加到列表末尾
-            Set<Integer> currentMonthRecordTypeMap = currentMonthCategoryVoList.stream()
-                    .map(BookkeepingConsumeStatisticsCategoryVo::getRecordType)
+            Set<String> currentMonthRecordTypeMap = currentMonthCategoryVoList.stream()
+                    .map(v -> statisticsKey(v))
                     .collect(Collectors.toSet());
             for (BookkeepingConsumeStatisticsCategoryVo vo : lastMonthCategoryVoList) {
-                if (!currentMonthRecordTypeMap.contains(vo.getRecordType())) {
+                if (!currentMonthRecordTypeMap.contains(statisticsKey(vo))) {
                     BookkeepingConsumeStatisticsCategoryVo t = new BookkeepingConsumeStatisticsCategoryVo();
-                    t.setRecordType(vo.getRecordType());
+                    t.setRecordTypeName(vo.getRecordTypeName());
+                    t.setDictionarySnapshotStatus(vo.getDictionarySnapshotStatus());
                     t.setAmount(BigDecimal.ZERO);
                     t.setIsGreaterThan(false);
                     t.setLastAmount(vo.getAmount());
@@ -161,19 +162,18 @@ public class BookkeepingConsumeServiceImpl implements BookkeepingConsumeService 
             BigDecimal totalAmount = consumeTagsVos.stream().map(BookkeepingRecordsConsumeTagsVo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
             int totalCount = consumeTagsVos.stream().map(BookkeepingRecordsConsumeTagsVo::getCount).reduce(0, Integer::sum);
 
-            // 查询记账标签字典值
-            List<DictListVo> dictList = baseDictClient.getDictListByType(DictTypeEnum.BOOKKEEPING_RECORD_TAG_CONSUME.getCode());
-            Map<Integer, String> dictMap = dictList.stream().collect(Collectors.toMap(DictListVo::getId, DictListVo::getDictName));
             for (BookkeepingRecordsConsumeTagsVo consumeTagsVo : consumeTagsVos) {
-                consumeTagsVo.setName(dictMap.get(consumeTagsVo.getDictId()));
-                consumeTagsVo.setRatio(new BigDecimal(consumeTagsVo.getCount() * 100).divide(new BigDecimal(totalCount), 2, RoundingMode.HALF_UP));
-                consumeTagsVo.setAmountRatio(consumeTagsVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
+                consumeTagsVo.setRatio(totalCount==0?BigDecimal.ZERO:new BigDecimal(consumeTagsVo.getCount() * 100).divide(new BigDecimal(totalCount), 2, RoundingMode.HALF_UP));
+                consumeTagsVo.setAmountRatio(totalAmount.signum()==0?BigDecimal.ZERO:consumeTagsVo.getAmount().multiply(new BigDecimal("100")).divide(totalAmount, 2, RoundingMode.HALF_UP));
             }
         }
         return consumeTagsVos;
     }
 
+    private String statisticsKey(BookkeepingConsumeStatisticsCategoryVo v) { return v.getDictionarySnapshotStatus() + (v.getRecordTypeName()==null?":null":":name:"+v.getRecordTypeName()); }
+
     private BookkeepingStatisticsDto buildStatisticsDto(BookkeepingConsumeStatisticsDto dto) {
+        com.itwray.iw.bookkeeping.support.BookkeepingCategoryFilter.validate(dto.getCategoryNames(),dto.getCategoryState());
         if (dto.getCurrentMonth() == null) {
             dto.setCurrentMonth(LocalDate.now());
         }

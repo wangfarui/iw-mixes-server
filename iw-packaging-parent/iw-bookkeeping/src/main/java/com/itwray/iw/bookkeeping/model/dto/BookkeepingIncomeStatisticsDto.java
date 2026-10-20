@@ -44,4 +44,8 @@ public class BookkeepingIncomeStatisticsDto implements SharedQueryRequest {
      */
     private Integer queryOnlyMyself;
 
+    /** UNCATEGORIZED or PENDING; mutually exclusive with categoryNames. */
+    private String categoryState;
+    private java.util.List<String> categoryNames;
+    private java.util.List<String> tagNames;
 }

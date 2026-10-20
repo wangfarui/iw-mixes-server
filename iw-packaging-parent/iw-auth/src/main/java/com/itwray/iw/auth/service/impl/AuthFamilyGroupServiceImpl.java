@@ -6,6 +6,7 @@ import com.itwray.iw.auth.dao.AuthFamilyInviteDao;
 import com.itwray.iw.auth.dao.AuthFamilyMemberDao;
 import com.itwray.iw.auth.dao.AuthUserDao;
 import com.itwray.iw.auth.mapper.AuthFamilyGroupMapper;
+import com.itwray.iw.auth.mapper.BookkeepingDictionaryMapper;
 import com.itwray.iw.auth.model.dto.*;
 import com.itwray.iw.auth.model.entity.AuthFamilyGroupEntity;
 import com.itwray.iw.auth.model.entity.AuthFamilyInviteEntity;
@@ -61,6 +62,12 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     private final AuthUserDao authUserDao;
 
     @Autowired
+    private BookkeepingDictionaryMapper bookkeepingDictionaryMapper;
+
+    @Autowired
+    private BookkeepingDictionaryService bookkeepingDictionaryService;
+
+    @Autowired
     public AuthFamilyGroupServiceImpl(AuthFamilyGroupDao baseDao,
                                       AuthFamilyMemberDao familyMemberDao,
                                       AuthFamilyInviteDao familyInviteDao,
@@ -100,12 +107,14 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
                 .set(AuthUserEntity::getFamilyGroupId, groupEntity.getId())
                 .update();
 
+        bookkeepingDictionaryService.initializeFamily(groupEntity.getId());
         return groupEntity.getId();
     }
 
     @Override
     @Transactional
     public void update(FamilyGroupUpdateDto dto) {
+        lockDictionaryFamily(dto.getId());
         // 校验权限（仅群主可修改）
         checkOwnerPermission(dto.getId());
         super.update(dto);
@@ -114,6 +123,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     @Override
     @Transactional
     public void delete(Integer id) {
+        lockDictionaryFamily(id);
         // 校验权限（仅群主可解散）
         checkOwnerPermission(id);
 
@@ -293,6 +303,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
 
         // 验证邀请码
         FamilyInviteVo inviteVo = validateInvite(dto.getInviteCode());
+        lockDictionaryFamily(inviteVo.getGroupId());
 
         // 查询用户当前是否已在其他家庭组
         AuthFamilyMemberEntity currentMember = familyMemberDao.lambdaQuery()
@@ -345,6 +356,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     @Override
     @Transactional
     public void quit(Integer groupId) {
+        lockDictionaryFamily(groupId);
         Integer userId = UserUtils.getUserId();
 
         // 查询成员信息
@@ -384,6 +396,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     @Override
     @Transactional
     public void removeMember(FamilyMemberRemoveDto dto) {
+        lockDictionaryFamily(dto.getGroupId());
         Integer userId = UserUtils.getUserId();
 
         // 校验权限（仅群主可移除成员）
@@ -490,6 +503,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     @Override
     @Transactional
     public void transferOwner(FamilyGroupTransferDto dto) {
+        lockDictionaryFamily(dto.getGroupId());
         Integer userId = UserUtils.getUserId();
 
         // 校验权限（仅群主可转让）
@@ -534,6 +548,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     @Override
     @Transactional
     public void assignRole(FamilyMemberRoleAssignDto dto) {
+        lockDictionaryFamily(dto.getGroupId());
         Integer currentUserId = UserUtils.getUserId();
         FamilyMemberRoleEnum targetRole = ConstantEnumUtil.findByType(FamilyMemberRoleEnum.class, dto.getRole());
         if (targetRole == null || FamilyMemberRoleEnum.OWNER.equals(targetRole)) {
@@ -643,6 +658,9 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
         if (memberEntity == null) {
             return;
         }
+        lockDictionaryFamily(memberEntity.getGroupId());
+        memberEntity = queryNormalMember(memberEntity.getGroupId(), userId);
+        if (memberEntity == null) return;
         if (FamilyMemberRoleEnum.OWNER.equals(memberEntity.getRole())) {
             throw new BusinessException("您是家庭组群主，请先转让群主或解散家庭组");
         }
@@ -882,4 +900,10 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
         mqDto.setUserIdList(userIdList);
         MQProducerHelper.send(FamilyGroupTopicEnum.MEMBER_LEAVE, mqDto);
     }
+    private void lockDictionaryFamily(Integer groupId) {
+        if (bookkeepingDictionaryMapper.lockGroup(groupId) == null) {
+            throw new BusinessException("家庭已失效，请刷新后重试");
+        }
+    }
+
 }

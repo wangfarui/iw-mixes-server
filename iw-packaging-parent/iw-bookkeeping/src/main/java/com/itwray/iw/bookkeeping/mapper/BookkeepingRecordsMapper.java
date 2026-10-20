@@ -39,4 +39,5 @@ public interface BookkeepingRecordsMapper extends BaseMapper<BookkeepingRecordsE
     List<BookkeepingBarChartStatisticsBo> barChartStatistics(@Param("dto") BookkeepingStatisticsDto dto);
 
     List<BookkeepingConsumeStatisticsCategoryVo> categoryStatistics(@Param("dto") BookkeepingConsumeCategoryStatisticsDto dto);
+    java.util.List<com.itwray.iw.bookkeeping.model.vo.BookkeepingRecordPageVo> historyForFilters(@org.apache.ibatis.annotations.Param("dto") com.itwray.iw.bookkeeping.model.dto.BookkeepingRecordPageDto dto);
 }

@@ -60,10 +60,8 @@ public class SharedQueryScopeAspect {
     }
 
     private UserSharedQueryPolicy querySharedQueryPolicy() {
-        Integer userId = UserUtils.getUserId(false);
-        if (userId == null) {
-            return null;
-        }
+        // Authentication may resolve the identity lazily. Apply role policy before the first mapper query.
+        Integer userId = UserUtils.getUserId();
         UserCurrentGroupProvider provider = getUserCurrentGroupProvider();
         if (provider == null) {
             return null;

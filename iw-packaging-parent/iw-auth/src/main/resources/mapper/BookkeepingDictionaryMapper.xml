@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.itwray.iw.auth.mapper.BookkeepingDictionaryMapper">
+ <select id="listScope" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
+ SELECT * FROM base_dict WHERE scope_type=#{scope} AND family_group_id=#{groupId}
+ AND user_id=#{userId} AND dict_type=#{type} AND deleted=0 ORDER BY sort,id
+ </select>
+ <select id="sources" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
+ SELECT * FROM base_dict WHERE id IN <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+ </select>
+ <select id="lockOwned" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
+ SELECT * FROM base_dict WHERE id IN <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+ AND ((scope_type=0 AND family_group_id=0 AND user_id=#{userId})
+ OR (#{groupId}>0 AND scope_type=1 AND family_group_id=#{groupId} AND user_id=0)) ORDER BY id FOR UPDATE
+ </select>
+ <select id="successor" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
+ SELECT * FROM base_dict WHERE previous_id=#{previousId} AND scope_type=#{scope}
+ AND family_group_id=#{groupId} AND user_id=#{userId} AND dict_type=#{type} FOR UPDATE
+ </select>
+ <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+ INSERT INTO base_dict(parent_id,dict_type,dict_code,dict_name,dict_status,sort,user_id,
+ scope_type,family_group_id,previous_id,revision,deleted,create_time,update_time)
+ VALUES(0,#{dictType},#{dictCode},#{dictName},#{dictStatus},#{sort},#{userId},
+ #{scopeType},#{familyGroupId},#{previousId},#{revision},0,NOW(),NOW())
+ </insert>
+ <update id="updateCurrent">
+ UPDATE base_dict SET dict_status=#{dictStatus},sort=#{sort},revision=revision+1,update_time=NOW()
+ WHERE id=#{id} AND user_id=#{userId} AND scope_type=#{scopeType} AND family_group_id=#{familyGroupId}
+ AND deleted=0 AND revision=#{revision}
+ </update>
+ <update id="retire">
+ UPDATE base_dict SET deleted=1,revision=revision+1,update_time=NOW()
+ WHERE id=#{id} AND user_id=#{userId} AND scope_type=#{scopeType} AND family_group_id=#{familyGroupId}
+ AND deleted=0 AND revision=#{revision}
+ </update>
+</mapper>

@@ -11,11 +11,19 @@ create table base_dict
     create_time datetime          default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time datetime          default CURRENT_TIMESTAMP not null comment '更新时间',
     user_id     int unsigned      default 0                 not null comment '用户id',
+    scope_type tinyint default 0 not null comment '0个人或个人模板 1家庭',
+    family_group_id int unsigned default 0 not null,
+    previous_id int unsigned null,
+    revision int unsigned default 0 not null,
+    active_name_key varbinary(128) generated always as (case when dict_type in (4001,4002,4011) and deleted=0 then convert(dict_name using binary) else null end) stored,
+    unique key uk_bookkeeping_dict_name(scope_type,family_group_id,user_id,dict_type,active_name_key),
+    unique key uk_dict_previous(previous_id),
+    key idx_bookkeeping_scope(scope_type,family_group_id,user_id,dict_type,deleted),
     primary key (id),
     key idx_dict_type (dict_type)
-) comment '字典表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 comment '字典表';
 
-# 字典表的用户id应该是非空且有实际用户id的，当 user_id == 0 时，表示该字典值为模板字典
+# 字典表的用户id应该是非空且有实际用户id的，当 user_id == 0 且 scope_type=0/family_group_id=0 时才是个人模板；家庭项 user_id 也为0
 alter table base_dict
     modify column user_id int unsigned not null comment '用户id';
 
@@ -202,13 +210,13 @@ join base_dict c on c.user_id = 0 and c.dict_type = 5002 and c.dict_code = t.cat
 insert into base_dict(parent_id, dict_type, dict_code, dict_name, dict_status, sort, user_id)
 select 0, bd.dict_type, bd.dict_code, bd.dict_name, bd.dict_status, bd.sort, au.id
 from auth_user au
-join base_dict bd on bd.user_id = 0
+join base_dict bd on bd.user_id = 0 and bd.scope_type = 0 and bd.family_group_id = 0
 where bd.dict_type <> 5006
 ;
 insert into base_dict(parent_id, dict_type, dict_code, dict_name, dict_status, sort, user_id)
 select user_category.id, bd.dict_type, bd.dict_code, bd.dict_name, bd.dict_status, bd.sort, au.id
 from auth_user au
-join base_dict bd on bd.user_id = 0 and bd.dict_type = 5006
+join base_dict bd on bd.user_id = 0 and bd.scope_type = 0 and bd.family_group_id = 0 and bd.dict_type = 5006
 join base_dict template_category on template_category.id = bd.parent_id
 join base_dict user_category on user_category.user_id = au.id
     and user_category.dict_type = template_category.dict_type

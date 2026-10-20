@@ -48,4 +48,6 @@ public interface BookkeepingRecordsService extends WebService<BookkeepingRecordA
     BookkeepingRecordsYearStatisticsConsumeVo yearStatisticsConsume(BookkeepingRecordsYearStatisticsQueryDto dto);
 
     BookkeepingRecordsYearStatisticsIncomeVo yearStatisticsIncome(BookkeepingRecordsYearStatisticsQueryDto dto);
+    java.util.Map<String, java.util.List<java.util.Map<String,String>>> filterOptions(BookkeepingRecordPageDto dto);
+    java.util.List<java.util.Map<String,Object>> dictionarySources(Integer id);
 }

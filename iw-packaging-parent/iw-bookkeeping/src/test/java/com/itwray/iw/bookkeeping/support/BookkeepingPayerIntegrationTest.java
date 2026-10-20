@@ -36,11 +36,14 @@ import com.itwray.iw.web.utils.*;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import javax.sql.DataSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -61,24 +64,46 @@ class BookkeepingPayerIntegrationTest {
     private JdbcTemplate jdbc;
     private SqlSessionTemplate session;
     private TransactionTemplate transaction;
+    private boolean mysql;
+    private boolean ownsMysqlTables;
+    private static final String MYSQL_TEST_URL = "jdbc:mysql://127.0.0.1:13316/iw_dictionary_test";
+    private static final String[] TEST_TABLES = {"bookkeeping_records", "bookkeeping_record_tag_snapshot",
+            "base_dict_business_relation", "points_task_bookkeeping", "bookkeeping_wallet", "bookkeeping_wallet_records", "dictionary_tx_probe"};
 
     @BeforeEach
     void setUp() throws Exception {
-        JdbcDataSource dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:payer" + System.nanoTime() + ";MODE=MySQL;DB_CLOSE_DELAY=-1");
+        DataSource dataSource;
+        mysql = System.getenv("IW_DICTIONARY_TEST_MYSQL_URL") != null;
+        if (mysql) {
+            assertEquals(MYSQL_TEST_URL, System.getenv("IW_DICTIONARY_TEST_MYSQL_URL"), "Only the private test MySQL is allowed");
+            dataSource = new DriverManagerDataSource(MYSQL_TEST_URL, "root", "");
+        } else {
+            JdbcDataSource h2 = new JdbcDataSource();
+            h2.setURL("jdbc:h2:mem:payer" + System.nanoTime() + ";MODE=MySQL;DB_CLOSE_DELAY=-1");
+            dataSource = h2;
+        }
         jdbc = new JdbcTemplate(dataSource);
+        if (mysql) {
+            assertTrue(jdbc.queryForObject("SELECT @@datadir", String.class)
+                    .startsWith("/private/tmp/iw-dict-v2-functional-mysql-"), "Refuse application/production data directories");
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()", Integer.class),
+                    "Private test schema must be empty");
+            ownsMysqlTables = true;
+        }
         jdbc.execute("CREATE TABLE bookkeeping_records (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, expense_user_id INT, "
                 + "group_id INT DEFAULT 10, share_state INT DEFAULT 0, deleted BOOLEAN DEFAULT FALSE, record_category INT, "
                 + "record_date DATE, record_time TIMESTAMP, create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                 + "update_time TIMESTAMP, order_no VARCHAR(64), record_source VARCHAR(64), record_icon VARCHAR(64), "
-                + "record_type INT DEFAULT 1, amount DECIMAL(14,2), remark VARCHAR(255), is_statistics INT DEFAULT 1, is_excitation_record INT DEFAULT 0)");
-        jdbc.execute("CREATE TABLE base_dict_business_relation (id INT AUTO_INCREMENT, business_type INT, business_id INT, dict_id INT)");
+                + "record_type INT DEFAULT 1, record_type_id INT, record_type_name VARCHAR(32), dictionary_snapshot_status INT DEFAULT 1, amount DECIMAL(14,2), remark VARCHAR(255), is_statistics INT DEFAULT 1, is_excitation_record INT DEFAULT 0)");
+        jdbc.execute("CREATE TABLE bookkeeping_record_tag_snapshot (id INT AUTO_INCREMENT PRIMARY KEY, record_id INT, dict_type INT, source_dict_id INT, tag_name VARCHAR(32))");
+        jdbc.execute("CREATE TABLE base_dict_business_relation (id INT AUTO_INCREMENT PRIMARY KEY, business_type INT, business_id INT, dict_id INT)");
         jdbc.execute("CREATE TABLE points_task_bookkeeping (bookkeeping_record_id INT)");
         jdbc.execute("CREATE TABLE bookkeeping_wallet (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, wallet_balance DECIMAL(14,2), wallet_assets DECIMAL(14,2), deleted BOOLEAN DEFAULT FALSE, create_time TIMESTAMP, update_time TIMESTAMP)");
         jdbc.execute("CREATE TABLE bookkeeping_wallet_records (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, change_type INT, before_amount DECIMAL(14,2), after_amount DECIMAL(14,2), change_amount DECIMAL(14,2), deleted BOOLEAN DEFAULT FALSE, create_time TIMESTAMP, update_time TIMESTAMP)");
         jdbc.update("INSERT INTO bookkeeping_wallet(user_id,wallet_balance,wallet_assets) VALUES (1,1000,0),(2,1000,0)");
         add(1, 1, 0, 100); add(1, 1, 1, 200); add(2, 2, 0, 80); add(2, 2, 1, 300); add(1, 2, 1, 50);
         jdbc.update("INSERT INTO base_dict_business_relation(business_type,business_id,dict_id) SELECT 4001,id,7 FROM bookkeeping_records");
+        jdbc.update("INSERT INTO bookkeeping_record_tag_snapshot(record_id,dict_type,source_dict_id,tag_name) SELECT id,4001,7,'外卖' FROM bookkeeping_records");
 
         IwDaoProperties.DataPermission permission = new IwDaoProperties.DataPermission();
         permission.setEnableTableNames(Set.of("bookkeeping_records", "bookkeeping_wallet", "bookkeeping_wallet_records"));
@@ -118,6 +143,9 @@ class BookkeepingPayerIntegrationTest {
         UserSharedQueryUtils.clearContext(); UserCurrentGroupUtils.removeCurrentGroupId();
         if (context != null) context.close();
         ReflectionTestUtils.setField(ApplicationContextHolder.class, "applicationContext", null);
+        if (ownsMysqlTables && jdbc != null) {
+            for (String table : TEST_TABLES) jdbc.execute("DROP TABLE IF EXISTS " + table);
+        }
     }
 
     private void add(int recorder, int payer, int shared, int amount) {
@@ -173,6 +201,76 @@ class BookkeepingPayerIntegrationTest {
         yearly.setRecordCategories(Set.of(RecordCategoryEnum.CONSUME));
         assertEquals(new BigDecimal("430.00"), session.getMapper(BookkeepingRecordsYearlyStatisticsMapper.class).statisticsTagConsume(yearly).get(0).getAmount());
         assertEquals(new BigDecimal("430.00"), session.getMapper(BookkeepingRecordsYearlyStatisticsMapper.class).statisticsMaxDay(yearly).getMaxDayAmount());
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "IW_DICTIONARY_TEST_MYSQL_URL", matches = ".+")
+    void dictionaryNameFiltersAndGroupingRemainExactThroughDataPermissions() {
+        scope(2, false);
+        jdbc.update("UPDATE bookkeeping_records SET record_type_name=CASE id WHEN 3 THEN 'Food' WHEN 4 THEN 'food' ELSE 'food2' END");
+        jdbc.update("UPDATE bookkeeping_record_tag_snapshot SET tag_name=CASE record_id WHEN 3 THEN '外卖A' WHEN 4 THEN '外卖a' ELSE '外卖啊' END");
+        BookkeepingRecordsMapper mapper = session.getMapper(BookkeepingRecordsMapper.class);
+        BookkeepingConsumeCategoryStatisticsDto category = new BookkeepingConsumeCategoryStatisticsDto();
+        category.setRecordCategory(RecordCategoryEnum.CONSUME);
+        category.setCurrentStartMonth(params().getCurrentStartMonth());
+        category.setCurrentEndMonth(params().getCurrentEndMonth());
+        assertEquals(3, mapper.categoryStatistics(category).size());
+
+        BookkeepingStatisticsDto filtered = params();
+        filtered.setCategoryNames(List.of("food"));
+        assertEquals(new BigDecimal("300.00"), mapper.totalStatistics(filtered).getTotalAmount());
+        assertEquals(1, mapper.rankStatistics(filtered).size());
+        assertEquals(new BigDecimal("300.00"), mapper.barChartStatistics(filtered).get(0).getAmount());
+        category.setCategoryNames(List.of("food"));
+        assertEquals(new BigDecimal("300.00"), mapper.categoryStatistics(category).get(0).getAmount());
+
+        BookkeepingRecordsStatisticsDto detail = new BookkeepingRecordsStatisticsDto();
+        detail.setRecordStartDate(params().getCurrentStartMonth());
+        detail.setRecordEndDate(params().getCurrentEndMonth());
+        detail.setCategoryNames(List.of("food"));
+        PageVo<BookkeepingRecordPageVo> page = new PageVo<>(detail);
+        mapper.page(page, detail);
+        assertEquals(1, page.getTotal());
+
+        filtered.setCategoryNames(null);
+        filtered.setTagNames(List.of("外卖a"));
+        assertEquals(new BigDecimal("300.00"), mapper.totalStatistics(filtered).getTotalAmount());
+        assertEquals(1, mapper.rankStatistics(filtered).size());
+        assertEquals(new BigDecimal("300.00"), mapper.barChartStatistics(filtered).get(0).getAmount());
+        category.setCategoryNames(null);
+        category.setTagNames(List.of("外卖a"));
+        assertEquals(new BigDecimal("300.00"), mapper.categoryStatistics(category).get(0).getAmount());
+        detail.setCategoryNames(null);
+        detail.setTagNames(List.of("外卖a"));
+        mapper.page(page, detail);
+        assertEquals(1, page.getTotal());
+    }
+
+    @Test
+    void handledUnavailableFutureOptionDoesNotPoisonCallerTransactionButUncaughtFailureRollsBack() {
+        var mapper = mock(com.itwray.iw.auth.mapper.BookkeepingDictionaryMapper.class);
+        when(mapper.currentGroup(1)).thenReturn(0);
+        when(mapper.lockUser(1)).thenReturn(0);
+        var disabled = new com.itwray.iw.web.model.entity.BaseDictEntity();
+        disabled.setId(77); disabled.setDictType(4002); disabled.setDictStatus(0); disabled.setDeleted(false);
+        when(mapper.lockOwned(List.of(77), 1, 0)).thenReturn(List.of(disabled));
+        var target = new com.itwray.iw.auth.service.impl.BookkeepingDictionaryService(mapper);
+        ProxyFactory factory = new ProxyFactory(target);
+        factory.addAdvice(new TransactionInterceptor(transaction.getTransactionManager(), new AnnotationTransactionAttributeSource()));
+        var dictionaries = (com.itwray.iw.web.bookkeeping.BookkeepingDictionaryAccess) factory.getProxy();
+        jdbc.execute("CREATE TABLE dictionary_tx_probe (id INT PRIMARY KEY)");
+        transaction.executeWithoutResult(status -> {
+            jdbc.update("INSERT INTO dictionary_tx_probe VALUES (1)");
+            assertThrows(com.itwray.iw.web.exception.BusinessException.class,
+                    () -> dictionaries.resolveSuccessor(1, 4002, 77));
+            assertFalse(status.isRollbackOnly(), "Expected unavailable configuration must be returnable by the caller");
+        });
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dictionary_tx_probe", Integer.class));
+        assertThrows(com.itwray.iw.web.exception.BusinessException.class, () -> transaction.executeWithoutResult(status -> {
+            jdbc.update("INSERT INTO dictionary_tx_probe VALUES (2)");
+            dictionaries.resolveSuccessor(1, 4002, 77);
+        }));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dictionary_tx_probe", Integer.class));
     }
 
     @Test
@@ -247,6 +345,7 @@ class BookkeepingPayerIntegrationTest {
         ReflectionTestUtils.setField(service, "walletLedger", new BookkeepingWalletLedger(wallets, walletRecords));
         ReflectionTestUtils.setField(service, "taskSourceQuery", mock(TaskBookkeepingSourceQuery.class));
         ReflectionTestUtils.setField(service, "jdbc", jdbc);
+        ReflectionTestUtils.setField(service, "snapshots", new BookkeepingDictionarySnapshots(mock(com.itwray.iw.web.bookkeeping.BookkeepingDictionaryAccess.class),jdbc));
         try (MockedStatic<OrderNoUtils> orders = mockStatic(OrderNoUtils.class)) {
             orders.when(() -> OrderNoUtils.getAndIncrement(OrderNoEnum.BOOKKEEPING_RECORDS)).thenReturn("payer-test");
             BookkeepingRecordAddDto add = new BookkeepingRecordAddDto();
@@ -267,6 +366,18 @@ class BookkeepingPayerIntegrationTest {
             edit.setExpenseUserId(1);
             transaction.executeWithoutResult(status -> service.update(edit));
             assertBalance(1, "930.00"); assertBalance(2, "1000.00");
+            // An ordinary edit must preserve an explicit sharing choice, independent of the current default.
+            edit.setShared(1);
+            transaction.executeWithoutResult(status -> service.update(edit));
+            edit.setShared(null);
+            transaction.executeWithoutResult(status -> service.update(edit));
+            assertEquals(1, jdbc.queryForObject("SELECT share_state FROM bookkeeping_records WHERE id = ?", Integer.class, id));
+            edit.setShared(0);
+            transaction.executeWithoutResult(status -> service.update(edit));
+            savePolicy.setDefaultShared(1);
+            edit.setShared(null);
+            transaction.executeWithoutResult(status -> service.update(edit));
+            assertEquals(0, jdbc.queryForObject("SELECT share_state FROM bookkeeping_records WHERE id = ?", Integer.class, id));
             transaction.executeWithoutResult(status -> service.delete(id));
             assertBalance(1, "1000.00");
             assertEquals(1, jdbc.queryForObject("SELECT deleted FROM bookkeeping_records WHERE id = ?", Integer.class, id));

@@ -27,6 +27,8 @@ public class BookkeepingBudgetAddDto implements AddDto {
 
     @Schema(title = "记录分类")
     private Integer recordType;
+    private Integer recordTypeId;
+    private String recordTypeName;
 
     @Schema(title = "预算金额")
     @NotNull(message = "预算金额不能为空")

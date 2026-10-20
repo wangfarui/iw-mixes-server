@@ -56,4 +56,10 @@ public class BaseDictEntity extends UserEntity<Integer> {
      */
     private Integer sort;
 
+    /** 0 personal (user_id=0 is a template), 1 family. */
+    private Integer scopeType;
+    private Integer familyGroupId;
+    private Integer previousId;
+    private Integer revision;
+
 }

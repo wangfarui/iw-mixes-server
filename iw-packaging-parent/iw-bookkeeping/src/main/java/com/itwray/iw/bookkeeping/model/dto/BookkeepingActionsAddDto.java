@@ -29,8 +29,8 @@ public class BookkeepingActionsAddDto implements AddDto {
     private String recordSource;
 
     @Schema(title = "记录分类")
-    @NotNull(message = "记录分类不能为空")
     private Integer recordType;
+    private Integer recordTypeId;
 
     @Schema(title = "记录图标")
     private String recordIcon;

@@ -39,6 +39,17 @@ public class BookkeepingRecordsController extends WebController<BookkeepingRecor
         super(webService);
     }
 
+    @GetMapping("/filter-options")
+    @SharedQueryScope
+    public java.util.Map<String, java.util.List<java.util.Map<String,String>>> filterOptions(BookkeepingRecordPageDto dto) {
+        return getWebService().filterOptions(dto);
+    }
+    @GetMapping("/{id}/dictionary-sources")
+    @SharedQueryScope
+    public java.util.List<java.util.Map<String,Object>> dictionarySources(@PathVariable Integer id) {
+        return getWebService().dictionarySources(id);
+    }
+
     @PostMapping("/page")
     @Operation(summary = "分页查询记账记录")
     @SharedQueryScope

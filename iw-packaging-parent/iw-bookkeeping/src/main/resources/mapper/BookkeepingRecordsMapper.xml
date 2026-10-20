@@ -28,9 +28,6 @@
     </select>
     <sql id="fromForPageList">
         FROM bookkeeping_records br
-        <if test="dto.tagBusinessType != null and dto.tagIdList != null and dto.tagIdList.size > 0">
-            INNER JOIN base_dict_business_relation bdbr on bdbr.business_type = #{dto.tagBusinessType} and br.id = bdbr.business_id
-        </if>
     </sql>
     <sql id="whereForPageList">
         WHERE br.deleted = 0
@@ -40,8 +37,13 @@
         <if test="dto.recordSource != null and dto.recordSource != ''">
             AND br.record_source like concat('%', #{dto.recordSource}, '%')
         </if>
-        <if test="dto.recordType != null">
-            AND br.record_type = #{dto.recordType}
+        <choose>
+            <when test="dto.categoryState == 'UNCATEGORIZED'">AND br.dictionary_snapshot_status=1 AND br.record_type_name IS NULL</when>
+            <when test="dto.categoryState == 'PENDING'">AND br.dictionary_snapshot_status=0</when>
+        </choose>
+        <if test="dto.categoryNames != null and dto.categoryNames.size > 0">
+            AND br.dictionary_snapshot_status = 1 AND CAST(br.record_type_name AS BINARY) IN
+            <foreach collection="dto.categoryNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>
         </if>
         <if test="dto.recordCategory != null">
             AND br.record_category = #{dto.recordCategory}
@@ -55,8 +57,10 @@
         <if test="dto.maxAmount != null">
             AND br.amount <![CDATA[<=]]>  #{dto.maxAmount}
         </if>
-        <if test="dto.tagBusinessType != null and dto.tagIdList != null and dto.tagIdList.size > 0">
-            AND bdbr.dict_id in <foreach collection="dto.tagIdList" item="tagId" open="(" close=")" separator=",">#{tagId}</foreach>
+        <if test="dto.tagNames != null and dto.tagNames.size > 0">
+            AND EXISTS (SELECT 1 FROM bookkeeping_record_tag_snapshot ts WHERE ts.record_id=br.id
+                AND ts.dict_type = CASE WHEN br.record_category=1 THEN 4001 ELSE 4011 END
+                AND CAST(ts.tag_name AS BINARY) IN <foreach collection="dto.tagNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>)
         </if>
     </sql>
     <select id="totalStatistics"
@@ -71,15 +75,43 @@
         <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
             AND is_statistics = 1
         </if>
+        <choose>
+            <when test="dto.categoryState == 'UNCATEGORIZED'">AND dictionary_snapshot_status=1 AND record_type_name IS NULL</when>
+            <when test="dto.categoryState == 'PENDING'">AND dictionary_snapshot_status=0</when>
+        </choose>
+        <if test="dto.categoryNames != null and dto.categoryNames.size > 0">
+            AND dictionary_snapshot_status=1 AND CAST(record_type_name AS BINARY) IN
+            <foreach collection="dto.categoryNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>
+        </if>
+        <if test="dto.tagNames != null and dto.tagNames.size > 0">
+            AND EXISTS (SELECT 1 FROM bookkeeping_record_tag_snapshot tag_filter WHERE tag_filter.record_id=bookkeeping_records.id
+            AND tag_filter.dict_type=CASE WHEN bookkeeping_records.record_category=1 THEN 4001 ELSE 4011 END
+            AND CAST(tag_filter.tag_name AS BINARY) IN <foreach collection="dto.tagNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>)
+        </if>
+
     </select>
     <select id="rankStatistics" resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingStatisticsRankVo">
-        select id, user_id, expense_user_id, record_category, record_type, record_source, record_date, record_time, amount
+        select id, user_id, expense_user_id, record_category, record_type, record_type_id, record_type_name, dictionary_snapshot_status, record_source, record_date, record_time, amount
         from bookkeeping_records
         WHERE deleted = 0 and record_category = #{dto.recordCategory}
         AND record_date BETWEEN #{dto.currentStartMonth} AND #{dto.currentEndMonth}
         <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
             AND is_statistics = 1
         </if>
+        <choose>
+            <when test="dto.categoryState == 'UNCATEGORIZED'">AND dictionary_snapshot_status=1 AND record_type_name IS NULL</when>
+            <when test="dto.categoryState == 'PENDING'">AND dictionary_snapshot_status=0</when>
+        </choose>
+        <if test="dto.categoryNames != null and dto.categoryNames.size > 0">
+            AND dictionary_snapshot_status=1 AND CAST(record_type_name AS BINARY) IN
+            <foreach collection="dto.categoryNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>
+        </if>
+        <if test="dto.tagNames != null and dto.tagNames.size > 0">
+            AND EXISTS (SELECT 1 FROM bookkeeping_record_tag_snapshot tag_filter WHERE tag_filter.record_id=bookkeeping_records.id
+            AND tag_filter.dict_type=CASE WHEN bookkeeping_records.record_category=1 THEN 4001 ELSE 4011 END
+            AND CAST(tag_filter.tag_name AS BINARY) IN <foreach collection="dto.tagNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>)
+        </if>
+
         order by amount desc
         limit ${dto.limit}
     </select>
@@ -98,13 +130,27 @@
             AND is_statistics = 1
         </if>
         <choose>
+            <when test="dto.categoryState == 'UNCATEGORIZED'">AND dictionary_snapshot_status=1 AND record_type_name IS NULL</when>
+            <when test="dto.categoryState == 'PENDING'">AND dictionary_snapshot_status=0</when>
+        </choose>
+        <if test="dto.categoryNames != null and dto.categoryNames.size > 0">
+            AND dictionary_snapshot_status=1 AND CAST(record_type_name AS BINARY) IN
+            <foreach collection="dto.categoryNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>
+        </if>
+        <if test="dto.tagNames != null and dto.tagNames.size > 0">
+            AND EXISTS (SELECT 1 FROM bookkeeping_record_tag_snapshot tag_filter WHERE tag_filter.record_id=bookkeeping_records.id
+            AND tag_filter.dict_type=CASE WHEN bookkeeping_records.record_category=1 THEN 4001 ELSE 4011 END
+            AND CAST(tag_filter.tag_name AS BINARY) IN <foreach collection="dto.tagNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>)
+        </if>
+
+        <choose>
             <when test="dto.statisticsType.code == 1">group by record_date</when>
             <when test="dto.statisticsType.code == 2">group by DATE_FORMAT(record_date, '%Y-%m')</when>
         </choose>
     </select>
     <select id="categoryStatistics"
             resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingConsumeStatisticsCategoryVo">
-        SELECT record_type, IFNULL(sum(amount), 0) AS amount, count(*) AS recordNum
+        SELECT MAX(record_type_name) AS record_type_name, dictionary_snapshot_status, IFNULL(sum(amount), 0) AS amount, count(*) AS recordNum
         FROM bookkeeping_records
         WHERE deleted = 0
         AND record_category = #{dto.recordCategory}
@@ -112,10 +158,23 @@
         <if test="dto.isSearchAll != null and dto.isSearchAll == 0">
             AND is_statistics = 1
         </if>
-        <if test="dto.recordTypeList != null and dto.recordTypeList.size > 0">
-            AND record_type in <foreach collection="dto.recordTypeList" separator="," open="(" close=")" item="item">#{item}</foreach>
+        <choose>
+            <when test="dto.categoryState == 'UNCATEGORIZED'">AND dictionary_snapshot_status=1 AND record_type_name IS NULL</when>
+            <when test="dto.categoryState == 'PENDING'">AND dictionary_snapshot_status=0</when>
+        </choose>
+        <if test="dto.categoryNames != null and dto.categoryNames.size > 0">
+            AND dictionary_snapshot_status=1 AND CAST(record_type_name AS BINARY) IN
+            <foreach collection="dto.categoryNames" separator="," open="(" close=")" item="item">CAST(#{item} AS BINARY)</foreach>
         </if>
-        GROUP BY record_type
+        <if test="dto.tagNames != null and dto.tagNames.size > 0">
+            AND EXISTS (SELECT 1 FROM bookkeeping_record_tag_snapshot tag_filter WHERE tag_filter.record_id=bookkeeping_records.id
+            AND tag_filter.dict_type=CASE WHEN bookkeeping_records.record_category=1 THEN 4001 ELSE 4011 END
+            AND CAST(tag_filter.tag_name AS BINARY) IN <foreach collection="dto.tagNames" item="name" open="(" close=")" separator=",">CAST(#{name} AS BINARY)</foreach>)
+        </if>
+        GROUP BY CAST(record_type_name AS BINARY), dictionary_snapshot_status
         ORDER BY amount desc
+    </select>
+    <select id="historyForFilters" resultType="com.itwray.iw.bookkeeping.model.vo.BookkeepingRecordPageVo">
+        SELECT br.* <include refid="fromForPageList"/><include refid="whereForPageList"/>
     </select>
 </mapper>

@@ -60,4 +60,8 @@ public class BookkeepingStatisticsDto implements SharedQueryRequest {
      * <p>如果为 {@link com.itwray.iw.common.constants.BoolEnum#TRUE} , 表示仅查询本人数据</p>
      */
     private Integer queryOnlyMyself;
+    /** UNCATEGORIZED or PENDING; mutually exclusive with categoryNames. */
+    private String categoryState;
+    private java.util.List<String> categoryNames;
+    private java.util.List<String> tagNames;
 }

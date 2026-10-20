@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 public class BookkeepingRecordsImportBo {
 
     @ExcelProperty("记录时间")
-    @DateTimeFormat("yyyy/m/d h:mm")
+    @DateTimeFormat("yyyy/M/d H:mm")
     private LocalDateTime recordTime;
 
     @ExcelProperty("分类")

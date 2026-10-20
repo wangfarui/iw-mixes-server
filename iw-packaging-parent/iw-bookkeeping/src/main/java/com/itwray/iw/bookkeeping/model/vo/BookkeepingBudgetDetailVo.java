@@ -25,6 +25,8 @@ public class BookkeepingBudgetDetailVo implements DetailVo {
 
     @Schema(title = "记录分类")
     private Integer recordType;
+    private Integer recordTypeId;
+    private String recordTypeName;
 
     @Schema(title = "预算金额")
     private BigDecimal budgetAmount;

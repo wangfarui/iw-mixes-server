@@ -4,6 +4,8 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itwray.iw.auth.dao.AuthUserDao;
+import com.itwray.iw.auth.mapper.BookkeepingDictionaryMapper;
+import com.itwray.iw.web.bookkeeping.DictionaryNames;
 import com.itwray.iw.auth.model.AuthRedisKeyEnum;
 import com.itwray.iw.auth.model.bo.UserAddBo;
 import com.itwray.iw.auth.model.dto.DictAddDto;
@@ -56,6 +58,9 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
     private AuthUserDao authUserDao;
 
+    @Autowired
+    private BookkeepingDictionaryMapper bookkeepingDictionaryMapper;
+
     /**
      * 操作管理员字典 分布式锁Key
      * <p>全局锁</p>
@@ -77,6 +82,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         boolean adminUser = this.isAdminUser(UserUtils.getUserId());
         return Arrays.stream(DictTypeEnum.values())
                 // 如果是管理员用户, 则默认所有字典为true. 如果不是管理员用户, 则只返回非管理员字典
+                .filter(t -> !DictionaryNames.isBookkeeping(t.getCode()))
                 .filter(t -> !t.isAdminDict() || adminUser)
                 .map(t -> new DictTypeVo(t.getCode(), t.getName()))
                 .collect(Collectors.toList());
@@ -84,7 +90,10 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
     @Override
     public List<DictListVo> getDictList(Integer dictType) {
+        rejectMigrated(dictType);
         return getBaseDao().lambdaQuery()
+                .eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
                 .eq(BaseDictEntity::getDictType, dictType)
                 .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
                 .orderByAsc(BaseDictEntity::getSort)
@@ -99,11 +108,15 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         if (latest == null || !latest) {
             Map<Object, Object> dictMapCache = RedisUtil.getHashEntries(this.obtainDictRedisKeyByUser());
             if (!dictMapCache.isEmpty()) {
+                dictMapCache.keySet().removeIf(key -> List.of("4001", "4002", "4011").contains(String.valueOf(key)));
                 return (Map) dictMapCache;
             }
         }
 
         Map<String, List<DictAllListVo>> dictMap = getBaseDao().lambdaQuery()
+                .eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
+                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4011)
                 .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
                 .list()
                 .stream()
@@ -136,6 +149,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     @Override
     @Transactional
     public Integer add(DictAddDto dto) {
+        rejectMigrated(dto.getDictType());
         boolean isAdminDict = this.verifyUserPermission(dto.getDictType(), dto.getIsSyncAll());
         this.checkAndFillSaveParam(dto);
 
@@ -188,6 +202,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     @Override
     @Transactional
     public void update(DictUpdateDto dto) {
+        rejectMigrated(getBaseDao().queryById(dto.getId()).getDictType());
+        rejectMigrated(dto.getDictType());
         boolean isAdminDict = this.verifyUserPermission(dto.getDictType(), dto.getIsSyncAll());
         this.checkAndFillSaveParam(dto);
 
@@ -235,6 +251,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     @Transactional
     public void delete(Integer id) {
         BaseDictEntity dictEntity = getBaseDao().queryById(id);
+        rejectMigrated(dictEntity.getDictType());
         boolean isAdminDict = this.verifyUserPermission(dictEntity.getDictType(), null);
 
         // 根据id查询字典类型
@@ -268,9 +285,13 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
     @Override
     public PageVo<DictPageVo> page(DictPageDto dto) {
+        rejectMigrated(dto.getDictType());
         LambdaQueryWrapper<BaseDictEntity> queryWrapper = new LambdaQueryWrapper<>();
         boolean adminUser = this.isAdminUser(UserUtils.getUserId());
-        queryWrapper.eq(dto.getDictType() != null, BaseDictEntity::getDictType, dto.getDictType())
+        queryWrapper.eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
+                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4011)
+                .eq(dto.getDictType() != null, BaseDictEntity::getDictType, dto.getDictType())
                 .eq(dto.getDictCode() != null, BaseDictEntity::getDictCode, dto.getDictCode())
                 .eq(dto.getDictStatus() != null, BaseDictEntity::getDictStatus, dto.getDictStatus())
                 .in(!adminUser, BaseDictEntity::getDictType, DictTypeEnum.getUserDict().stream().map(DictTypeEnum::getCode).toList())
@@ -318,8 +339,22 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         }
     }
 
+    @Override
+    public DictDetailVo detail(Integer id) {
+        rejectMigrated(getBaseDao().queryById(id).getDictType());
+        return super.detail(id);
+    }
+
+    private static void rejectMigrated(Integer type) {
+        if (DictionaryNames.isBookkeeping(type)) {
+            throw new BusinessException("记账分类与标签请通过记账设置维护，请更新客户端后重试");
+        }
+    }
+
     private List<DictAllListVo> queryAllDictByType(Integer dictType) {
         return getBaseDao().lambdaQuery()
+                .eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
                 .eq(BaseDictEntity::getDictType, dictType)
                 .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
                 .orderByAsc(BaseDictEntity::getSort)
@@ -368,7 +403,14 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     }
 
     private int copyMissingVisibleDictData(Integer userId) {
-        List<BaseDictEntity> templateDictList = this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict());
+        return copyMissingVisibleDictData(userId, false);
+    }
+
+    private int copyMissingVisibleDictData(Integer userId, boolean registration) {
+        // Replayed registration and repair must never resurrect renamed/deleted business options.
+        boolean firstRegistration = registration && bookkeepingDictionaryMapper.countPersonalHistory(userId) == 0;
+        List<BaseDictEntity> templateDictList = this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict()).stream()
+                .filter(row -> firstRegistration || !DictionaryNames.isBookkeeping(row.getDictType())).toList();
         Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(templateDictList);
         Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(this.queryDictListByUser(userId, DictTypeEnum.getUserVisibleDict()));
         List<BaseDictEntity> insertList = templateDictMap.entrySet().stream()
@@ -392,6 +434,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     private List<BaseDictEntity> queryTemplateDictList(List<DictTypeEnum> dictTypeList) {
         return getBaseDao().lambdaQuery()
                 .eq(BaseDictEntity::getUserId, WebCommonConstants.DATABASE_DEFAULT_INT_VALUE)
+                .eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
                 .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(dictTypeList))
                 .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
                 .orderByAsc(BaseDictEntity::getDictType)
@@ -403,24 +447,25 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     private List<BaseDictEntity> queryDictListByUser(Integer userId, List<DictTypeEnum> dictTypeList) {
         return getBaseDao().lambdaQuery()
                 .eq(BaseDictEntity::getUserId, userId)
+                .eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
                 .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(dictTypeList))
                 .list();
     }
 
     private List<BaseDictEntity> queryAdminManagedDictList() {
-        try {
-            UserUtils.setUserDataPermission(false);
-            return getBaseDao().lambdaQuery()
-                    .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(DictTypeEnum.getAdminManagedDict()))
-                    .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
-                    .orderByAsc(BaseDictEntity::getDictType)
-                    .orderByAsc(BaseDictEntity::getSort)
-                    .orderByAsc(BaseDictEntity::getUserId)
-                    .orderByAsc(BaseDictEntity::getId)
-                    .list();
-        } finally {
-            UserUtils.removeUserDataPermission();
-        }
+        // Privileged repair reads only personal administrator dictionaries, with an explicit scope.
+        return getBaseDao().lambdaQuery()
+                .ge(BaseDictEntity::getUserId, 0)
+                .eq(BaseDictEntity::getScopeType, 0)
+                .eq(BaseDictEntity::getFamilyGroupId, 0)
+                .in(BaseDictEntity::getDictType, this.toDictTypeCodeList(DictTypeEnum.getAdminManagedDict()))
+                .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
+                .orderByAsc(BaseDictEntity::getDictType)
+                .orderByAsc(BaseDictEntity::getSort)
+                .orderByAsc(BaseDictEntity::getUserId)
+                .orderByAsc(BaseDictEntity::getId)
+                .list();
     }
 
     private Map<DictUniqueKey, BaseDictEntity> toDictUniqueMap(List<BaseDictEntity> dictEntityList) {
@@ -454,6 +499,10 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         dictEntity.setId(null);
         dictEntity.setParentId(WebCommonConstants.DATABASE_DEFAULT_INT_VALUE);
         dictEntity.setUserId(userId);
+        dictEntity.setScopeType(0);
+        dictEntity.setFamilyGroupId(0);
+        dictEntity.setPreviousId(null);
+        dictEntity.setRevision(0);
         dictEntity.setDeleted(Boolean.FALSE);
         dictEntity.setCreateTime(null);
         dictEntity.setUpdateTime(null);
@@ -468,6 +517,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(userDictList);
         int updateCount = 0;
         for (BaseDictEntity userDict : userDictList) {
+            if (DictionaryNames.isBookkeeping(userDict.getDictType())) continue;
             BaseDictEntity templateDict = templateDictMap.get(this.buildDictUniqueKey(userDict));
             if (templateDict == null || NumberUtils.isNullOrZero(templateDict.getParentId())) {
                 continue;
@@ -613,6 +663,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
      * @return 是否为管理员字典项 true->是
      */
     private boolean verifyUserPermission(Integer dictType, Integer isSyncAll) {
+        rejectMigrated(dictType);
         DictTypeEnum dictTypeEnum = ConstantEnumUtil.findByType(DictTypeEnum.class, dictType);
         if (dictTypeEnum == null) {
             throw new BusinessException("无权操作");
@@ -695,7 +746,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     private void initDictData(UserAddBo bo) {
         RedisLockUtil.lock(OPERATE_ADMIN_DICT_LOCK_KEY);
         try {
-            int insertCount = this.copyMissingVisibleDictData(bo.getUserId());
+            int insertCount = this.copyMissingVisibleDictData(bo.getUserId(), true);
             if (insertCount == 0) {
                 log.info("用户[{}]无需补齐基础字典数据", bo.getUserId());
             } else {

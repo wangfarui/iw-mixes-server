@@ -72,6 +72,11 @@ public class BookkeepingRecordsEntity extends UserEntity<Integer> {
      * 记录分类
      */
     private Integer recordType;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer recordTypeId;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String recordTypeName;
+    private Integer dictionarySnapshotStatus;
 
     /**
      * 备注

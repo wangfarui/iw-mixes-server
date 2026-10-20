@@ -17,6 +17,8 @@ public class BookkeepingConsumeStatisticsCategoryVo {
      * 记录分类
      */
     private Integer recordType;
+    private String recordTypeName;
+    private Integer dictionarySnapshotStatus;
 
     /**
      * 金额占比

@@ -20,4 +20,9 @@ public class BookkeepingBudgetUpdateDto extends BookkeepingBudgetAddDto implemen
     @NotNull(message = "id不能为空")
     @Schema(title = "id")
     private Integer id;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private boolean recordTypeIdPresent;
+    @Override
+    @com.fasterxml.jackson.annotation.JsonSetter("recordTypeId")
+    public void setRecordTypeId(Integer id) {recordTypeIdPresent=true;super.setRecordTypeId(id);}
 }

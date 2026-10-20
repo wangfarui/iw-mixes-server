@@ -20,4 +20,5 @@ public class BookkeepingRecordUpdateDto extends BookkeepingRecordAddDto implemen
      */
     @NotNull(message = "id不能为空")
     private Integer id;
+    private BookkeepingDictionaryChangesDto dictionaryChanges;
 }

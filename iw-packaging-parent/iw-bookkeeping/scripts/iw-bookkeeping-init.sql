@@ -156,3 +156,25 @@ create table bookkeeping_voice_parse_log
 alter table bookkeeping_records add column expense_user_id int unsigned null comment '实际付款人' after user_id;
 update bookkeeping_records set expense_user_id = user_id where record_category = 1 and expense_user_id is null;
 alter table bookkeeping_records add key idx_expense_user_date (expense_user_id, record_date);
+
+-- Dictionary snapshot v2 new-database baseline. Existing database: dictionary-snapshot-v2/00..04 ONLY.
+ALTER TABLE bookkeeping_records
+ ADD COLUMN record_type_id INT UNSIGNED NULL,
+ ADD COLUMN record_type_name VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL,
+ ADD COLUMN dictionary_snapshot_status TINYINT NOT NULL DEFAULT 0;
+ALTER TABLE bookkeeping_budget
+ ADD COLUMN record_type_id INT UNSIGNED NULL,
+ ADD COLUMN record_type_name VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL;
+ALTER TABLE bookkeeping_actions ADD COLUMN record_type_id INT UNSIGNED NULL;
+CREATE TABLE bookkeeping_record_tag_snapshot (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,record_id INT UNSIGNED NOT NULL,
+ dict_type SMALLINT UNSIGNED NOT NULL,source_dict_id INT UNSIGNED NOT NULL,
+ tag_name VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+ UNIQUE KEY uk_record_tag_source(record_id,dict_type,source_dict_id),
+ KEY idx_record_tag_type(record_id,dict_type),
+ CONSTRAINT ck_bookkeeping_tag_type CHECK (dict_type IN (4001,4011))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- Template actions resolve to personal template IDs, then registration maps to each user's ID.
+UPDATE bookkeeping_actions a JOIN base_dict d ON d.user_id=0 AND d.scope_type=0 AND d.family_group_id=0
+ AND d.dict_type=4002 AND d.dict_code=a.record_type AND d.deleted=0
+ SET a.record_type_id=d.id WHERE a.user_id=0;

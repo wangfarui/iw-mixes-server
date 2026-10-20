@@ -74,6 +74,7 @@ public class BookkeepingIncomeServiceImpl implements BookkeepingIncomeService {
     }
 
     private BookkeepingStatisticsDto buildStatisticsDto(BookkeepingIncomeStatisticsDto dto) {
+        com.itwray.iw.bookkeeping.support.BookkeepingCategoryFilter.validate(dto.getCategoryNames(),dto.getCategoryState());
         BookkeepingStatisticsDto statisticsDto = new BookkeepingStatisticsDto();
         statisticsDto.setCurrentMonth(Optional.ofNullable(dto.getCurrentMonth()).orElse(LocalDate.now()));
         switch (dto.getStatisticsType()) {
@@ -92,6 +93,9 @@ public class BookkeepingIncomeServiceImpl implements BookkeepingIncomeService {
         statisticsDto.setQueryOnlyMyself(dto.getQueryOnlyMyself());
         statisticsDto.setIsSearchAll(dto.getIsSearchAll());
         statisticsDto.setLimit(dto.getLimit());
+        statisticsDto.setCategoryState(dto.getCategoryState());
+        statisticsDto.setCategoryNames(dto.getCategoryNames());
+        statisticsDto.setTagNames(dto.getTagNames());
         return statisticsDto;
     }
 }

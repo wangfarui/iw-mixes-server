@@ -29,6 +29,11 @@ public class BookkeepingActionsDetailVo implements DetailVo {
 
     @Schema(title = "记录分类")
     private Integer recordType;
+    private Integer recordTypeId;
+    private String recordTypeName;
+    private java.util.List<com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot> recordTagSnapshots;
+    private Boolean available;
+    private String unavailableReason;
 
     @Schema(title = "记录图标")
     private String recordIcon;
