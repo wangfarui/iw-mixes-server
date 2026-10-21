@@ -13,6 +13,21 @@
  AND ((scope_type=0 AND family_group_id=0 AND user_id=#{userId})
  OR (#{groupId}>0 AND scope_type=1 AND family_group_id=#{groupId} AND user_id=0)) ORDER BY id FOR UPDATE
  </select>
+ <select id="readOwned" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
+ SELECT * FROM base_dict WHERE id IN <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+ AND dict_type IN (4001,4002,4011)
+ AND ((scope_type=0 AND family_group_id=0 AND user_id=#{userId})
+ OR (#{groupId}>0 AND scope_type=1 AND family_group_id=#{groupId} AND user_id=0)) ORDER BY id
+ </select>
+ <select id="readSuccessors" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
+ SELECT d.* FROM base_dict d JOIN base_dict p ON d.previous_id=p.id
+ AND d.scope_type=p.scope_type AND d.family_group_id=p.family_group_id
+ AND d.user_id=p.user_id AND d.dict_type=p.dict_type
+ WHERE p.id IN <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+ AND d.dict_type IN (4001,4002,4011)
+ AND ((d.scope_type=0 AND d.family_group_id=0 AND d.user_id=#{userId})
+ OR (#{groupId}>0 AND d.scope_type=1 AND d.family_group_id=#{groupId} AND d.user_id=0)) ORDER BY d.id
+ </select>
  <select id="successor" resultType="com.itwray.iw.web.model.entity.BaseDictEntity">
  SELECT * FROM base_dict WHERE previous_id=#{previousId} AND scope_type=#{scope}
  AND family_group_id=#{groupId} AND user_id=#{userId} AND dict_type=#{type} FOR UPDATE

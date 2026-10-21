@@ -24,6 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import com.itwray.iw.web.model.entity.BaseDictEntity;
+import com.itwray.iw.web.exception.BusinessException;
 
 /**
  * 记账行为表 服务实现类
@@ -84,7 +89,7 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public List<BookkeepingActionsDetailVo> list(Integer recordCategory) {
         Integer userId = UserUtils.getUserId();
 
@@ -98,7 +103,7 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
                 .map(t -> BeanUtil.copyProperties(t, BookkeepingActionsDetailVo.class))
                 .toList();
 
-        for(var vo:voList)resolve(vo);
+        resolve(voList);
         // Future configurations refresh source validity on every read; cached IDs are never facts.
 
         return voList;
@@ -114,19 +119,35 @@ public class BookkeepingActionsServiceImpl extends WebServiceImpl<BookkeepingAct
         if(!java.util.Objects.equals(dto.getRecordCategory(),1)&&!java.util.Objects.equals(dto.getRecordCategory(),2))throw new com.itwray.iw.web.exception.BusinessException("收支类型不正确");
         snapshots.lock(dto.getRecordTypeId(),tags(dto.getRecordTags()),dto.getRecordCategory()==1?4001:4011);dto.setRecordType(0);
     }
-    private void resolve(BookkeepingActionsDetailVo vo){
+    private void resolve(List<BookkeepingActionsDetailVo> actions) {
+        Set<Integer> ids=new TreeSet<>();
+        for(var action:actions) {
+            if(action.getRecordTypeId()!=null && action.getRecordTypeId()>0) ids.add(action.getRecordTypeId());
+            try { tags(action.getRecordTags()).stream().filter(id->id>0).forEach(ids::add); }
+            catch(BusinessException ignored) { /* Mark only this malformed action unavailable below. */ }
+        }
+        Map<Integer,BaseDictEntity> resolved=ids.isEmpty()?Map.of():dictionaries.resolveSuccessors(UserUtils.getUserId(),ids);
+        actions.forEach(vo->resolve(vo,resolved));
+    }
+    private BaseDictEntity current(Map<Integer,BaseDictEntity> resolved,Integer id,int type) {
+        BaseDictEntity row=resolved.get(id);
+        if(row==null || !java.util.Objects.equals(row.getDictType(),type))
+            throw new BusinessException("记账配置选项已失效，请重新保存配置");
+        return row;
+    }
+    private void resolve(BookkeepingActionsDetailVo vo,Map<Integer,BaseDictEntity> resolved){
         try{
             if(vo.getRecordTypeId()==null&&vo.getRecordType()!=null&&vo.getRecordType()!=0)throw new com.itwray.iw.web.exception.BusinessException("请重新保存快捷配置");
-            if(vo.getRecordTypeId()!=null){var current=dictionaries.resolveSuccessor(UserUtils.getUserId(),4002,vo.getRecordTypeId());vo.setRecordTypeId(current.getId());vo.setRecordTypeName(current.getDictName());}
+            if(vo.getRecordTypeId()!=null){var current=current(resolved,vo.getRecordTypeId(),4002);vo.setRecordTypeId(current.getId());vo.setRecordTypeName(current.getDictName());}
             var tagSnapshots=new java.util.ArrayList<com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot>();
             int type=vo.getRecordCategory()==1?4001:4011;
-            for(Integer id:tags(vo.getRecordTags())){var current=dictionaries.resolveSuccessor(UserUtils.getUserId(),type,id);tagSnapshots.add(new com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot(current.getId(),type,current.getDictName()));}
+            for(Integer id:tags(vo.getRecordTags())){var current=current(resolved,id,type);tagSnapshots.add(new com.itwray.iw.web.bookkeeping.DictionaryTagSnapshot(current.getId(),type,current.getDictName()));}
             vo.setRecordTags(tagSnapshots.stream().map(t->t.getId().toString()).collect(java.util.stream.Collectors.joining(",")));vo.setRecordTagSnapshots(tagSnapshots);vo.setAvailable(true);
         }catch(com.itwray.iw.web.exception.BusinessException ex){vo.setAvailable(false);vo.setUnavailableReason("请重新配置快捷记账："+ex.getMessage());}
     }
     @Override
-    @Transactional
-    public BookkeepingActionsDetailVo detail(Integer id){var vo=super.detail(id);resolve(vo);return vo;}
+    @Transactional(readOnly = true)
+    public BookkeepingActionsDetailVo detail(Integer id){var vo=super.detail(id);resolve(List.of(vo));return vo;}
 
     @Override
     public Class<UserAddBo> getGenericClass() {

@@ -95,8 +95,9 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         return new Copied(created,skipped);
     }
     @Override
+    @Transactional(readOnly = true)
     public List<BaseDictEntity> options(Integer userId,Integer dictType) {
-        checkType(dictType); Actor actor=actor(userId);
+        checkType(dictType); Actor actor=reader(userId);
         Map<String,BaseDictEntity> names=new LinkedHashMap<>();
         list(actor,dictType,Scope.PERSONAL).stream().filter(this::enabled).forEach(r->names.putIfAbsent(r.getDictName(),r));
         if(actor.groupId>0) list(actor,dictType,Scope.FAMILY).stream().filter(this::enabled).forEach(r->names.putIfAbsent(r.getDictName(),r));
@@ -133,6 +134,51 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         throw unavailable();
     }
     @Override
+    @Transactional(readOnly = true)
+    public Map<Integer,BaseDictEntity> resolveSuccessors(Integer userId,Collection<Integer> sourceIds) {
+        List<Integer> ids=ids(sourceIds);
+        if(ids.isEmpty()) return Map.of();
+        Actor actor=reader(userId);
+        Map<Integer,BaseDictEntity> rows=new HashMap<>();
+        mapper.readOwned(ids,actor.userId,actor.groupId).forEach(row->rows.put(row.getId(),row));
+        Map<Integer,BaseDictEntity> successors=new HashMap<>();
+        Set<Integer> expanded=new HashSet<>();
+        List<Integer> frontier=rows.values().stream().filter(row->Boolean.TRUE.equals(row.getDeleted()))
+                .map(BaseDictEntity::getId).sorted().toList();
+        // One query per rename depth, shared by all actions and repeated source IDs.
+        for(int depth=0;depth<127 && !frontier.isEmpty();depth++) {
+            expanded.addAll(frontier);
+            List<BaseDictEntity> next=mapper.readSuccessors(frontier,actor.userId,actor.groupId);
+            for(BaseDictEntity row:next) {
+                successors.put(row.getPreviousId(),row);
+                rows.put(row.getId(),row);
+            }
+            frontier=next.stream().filter(row->Boolean.TRUE.equals(row.getDeleted())&&!expanded.contains(row.getId()))
+                    .map(BaseDictEntity::getId).distinct().sorted().toList();
+        }
+        Map<Integer,BaseDictEntity> result=new HashMap<>();
+        for(Integer id:ids) {
+            BaseDictEntity source=rows.get(id), row=source;
+            Set<Integer> visited=new HashSet<>();
+            for(int depth=0;depth<128 && row!=null;depth++) {
+                if(!visited.add(row.getId()) || !sameOwnerAndType(source,row)) break;
+                if(!Boolean.TRUE.equals(row.getDeleted())) {
+                    if(enabled(row)) result.put(id,row);
+                    break;
+                }
+                row=successors.get(row.getId());
+            }
+        }
+        return result;
+    }
+
+    private boolean sameOwnerAndType(BaseDictEntity source,BaseDictEntity row) {
+        return Objects.equals(source.getScopeType(),row.getScopeType())
+                && Objects.equals(source.getFamilyGroupId(),row.getFamilyGroupId())
+                && Objects.equals(source.getUserId(),row.getUserId())
+                && Objects.equals(source.getDictType(),row.getDictType());
+    }
+    @Override
     public List<BaseDictEntity> sources(Collection<Integer> authorizedSourceIds) {
         List<Integer> ids=ids(authorizedSourceIds);
         return ids.isEmpty()?List.of():mapper.sources(ids);
@@ -149,6 +195,18 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         for(BaseDictEntity template:mapper.listScope(0,0,0,4002)) {
             if(enabled(template)) insert(newItem(actor,Scope.FAMILY,4002,normalize(template.getDictName()),template.getSort()));
         }
+    }
+    private Actor reader(Integer userId) {
+        if(userId==null||userId<=0) throw new BusinessException("请先登录");
+        BookkeepingDictionaryMapper.Reader reader=mapper.reader(userId);
+        if(reader==null) throw new BusinessException("用户已失效，请重新登录");
+        int group=reader.groupId();
+        if(group>0) {
+            if(reader.activeGroupId()==null) throw new BusinessException("家庭状态已变化，请刷新重试");
+            if(reader.role()==null) throw new BusinessException("家庭成员状态已变化，请刷新重试");
+            if(reader.initializedGroupId()==null) throw new BusinessException("家庭字典初始化状态缺失，请先完成迁移");
+        }
+        return new Actor(userId,group,Objects.equals(reader.role(),1)||Objects.equals(reader.role(),2));
     }
     private Actor actor(Integer userId) {
         if(userId==null||userId<=0) throw new BusinessException("请先登录");
