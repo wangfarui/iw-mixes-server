@@ -4,6 +4,7 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueType;
@@ -1209,6 +1210,122 @@ class DefaultTeamIterationModuleTest {
                 .hasMessageContaining("优先级");
         verifyNoInteractions(coding);
         verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://example.com/design?id=1#page", "http://localhost:8080/原型"})
+    void quickPrototypeSaveOnlyWritesLocalMetadata(String url) {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity issue = linkedIssue(2L, CodingIssueType.REQUIREMENT, 8001L, "需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var result = module.updateIssuePrototypeUrl(actor, 1L, 2L, new IssuePrototypeLink("  " + url + "  "));
+
+        assertThat(result.prototypeUrl()).isEqualTo(url);
+        verify(repository).updateIssuePrototypeUrl(1L, 2L, url, actor);
+        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void prototypeLengthAllows255AndRejects256BeforeAnyWrite() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity issue = localIssue(2L, 1L, CodingIssueType.REQUIREMENT, "需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        String url = "https://example.com/" + "a".repeat(235);
+        assertThat(url).hasSize(255);
+        assertThat(module.updateIssuePrototypeUrl(actor, 1L, 2L, new IssuePrototypeLink(url)).prototypeUrl()).isEqualTo(url);
+        assertThatThrownBy(() -> module.updateIssuePrototypeUrl(actor, 1L, 2L, new IssuePrototypeLink(url + "a")))
+                .hasMessageContaining("255");
+        verify(repository, never()).updateIssuePrototypeUrl(1L, 2L, url + "a", actor);
+        verifyNoInteractions(coding);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   ", "example.com/design", "//example.com/design", "javascript:alert(1)",
+            "data:text/html,hello", "ftp://example.com/file", "https://", "https://example.com/a b", "https://example.com/%", "http://example.com:99999/"})
+    void invalidPrototypeIsRejectedWithoutCodingOrLocalWrites(String url) {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity issue = linkedIssue(2L, CodingIssueType.REQUIREMENT, 8001L, "需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThatThrownBy(() -> module.updateIssuePrototypeUrl(actor, 1L, 2L, new IssuePrototypeLink(url)))
+                .isInstanceOf(TeamIterationException.class);
+        verify(repository, never()).updateIssuePrototypeUrl(anyLong(), anyLong(), any(), any());
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void prototypeRequiresMembershipAndOwnedRequirement() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity task = linkedIssue(2L, CodingIssueType.TASK, 8001L, "任务");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(task))));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        IssuePrototypeLink command = new IssuePrototypeLink("https://example.com/design");
+        assertThatThrownBy(() -> module.updateIssuePrototypeUrl(actor, 1L, 2L, command)).hasMessageContaining("只有需求");
+        assertThatThrownBy(() -> module.updateIssuePrototypeUrl(actor, 1L, 3L, command)).hasMessageContaining("事项不存在");
+        Actor outsider = new Actor(999L, "outsider", "", "token", "g-iijw5014");
+        assertThatThrownBy(() -> module.updateIssuePrototypeUrl(outsider, 1L, 2L, command)).hasMessageContaining("不是迭代成员");
+        verify(repository, never()).updateIssuePrototypeUrl(anyLong(), anyLong(), any(), any());
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void requirementEditorSavesClearsAndOmitsPrototypeIndependently() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity issue = localIssue(2L, 1L, CodingIssueType.REQUIREMENT, "需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
+        when(repository.updateIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+            UpdateIssueCommand command = invocation.getArgument(2);
+            if (command.prototypeUrl() != null) issue.setPrototypeUrl(command.prototypeUrl().isEmpty() ? null : command.prototypeUrl());
+            return issue;
+        });
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        var saved = module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("需求", "描述", null, null,
+                null, null, null, null, null, " https://example.com/design "));
+        assertThat(saved.prototypeUrl()).isEqualTo("https://example.com/design");
+        var omitted = module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("需求", "描述", null, null,
+                null, null, null, null));
+        assertThat(omitted.prototypeUrl()).isEqualTo(saved.prototypeUrl());
+        var cleared = module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("需求", "描述", null, null,
+                null, null, null, null, null, "  "));
+        assertThat(cleared.prototypeUrl()).isNull();
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void invalidPrototypeInFullEditorDoesNotModifyCoding() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity issue = linkedIssue(2L, CodingIssueType.REQUIREMENT, 8001L, "需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThatThrownBy(() -> module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("需求", "描述", null, null,
+                null, null, null, null, null, "javascript:alert(1)"))).hasMessageContaining("HTTP/HTTPS");
+        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void linkedRequirementReturnsLocalPrototypeEvenWhenCodingCannotBeRead() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity issue = linkedIssue(2L, CodingIssueType.REQUIREMENT, 8001L, "需求");
+        issue.setPrototypeUrl("https://example.com/design");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
+        when(coding.issue("token", "project-a", 8001L)).thenReturn(codingIssue(8001L, "REQUIREMENT", "需求", "需求", false));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThat(module.detail(actor, 1L).issues().get(0).prototypeUrl()).isEqualTo(issue.getPrototypeUrl());
+        when(coding.issue("token", "project-a", 8001L)).thenThrow(new RuntimeException("unavailable"));
+        assertThat(module.detail(actor, 1L).issues().get(0).prototypeUrl()).isEqualTo(issue.getPrototypeUrl());
     }
 
     private IssueEntity linkedIssue(long id, CodingIssueType type, long code, String title) {

@@ -1,6 +1,8 @@
 package com.itwray.iw.external.zhaogang.iteration.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.itwray.iw.web.model.entity.BaseEntity;
@@ -83,6 +85,9 @@ public final class TeamIterationEntities {
         private String issueTypeName;
         private String title;
         private String description;
+        // Local metadata is written explicitly; CODING snapshot updates must never overwrite it.
+        @TableField(updateStrategy = FieldStrategy.NEVER)
+        private String prototypeUrl;
         private String developmentTeam;
         private String definitionOfDone;
         private BigDecimal estimatedHours;

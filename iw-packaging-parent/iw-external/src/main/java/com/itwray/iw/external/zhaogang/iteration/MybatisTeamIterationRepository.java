@@ -256,8 +256,26 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setOnlineBug(command.onlineBug());
         entity.setBugPriority(command.bugPriority());
         issueMapper.updateById(entity);
+        if (command.prototypeUrl() != null) {
+            writePrototypeUrl(iterationId, issueId, command.prototypeUrl());
+            entity.setPrototypeUrl(StringUtils.trimToNull(command.prototypeUrl()));
+        }
         iterationMapper.touch(iterationId, actor.userId(), actor.userName());
         return entity;
+    }
+
+    @Override
+    @Transactional
+    public void updateIssuePrototypeUrl(long iterationId, long issueId, String prototypeUrl, Actor actor) {
+        writePrototypeUrl(iterationId, issueId, prototypeUrl);
+        iterationMapper.touch(iterationId, actor.userId(), actor.userName());
+    }
+
+    private void writePrototypeUrl(long iterationId, long issueId, String prototypeUrl) {
+        issueMapper.update(null, new LambdaUpdateWrapper<IssueEntity>()
+                .eq(IssueEntity::getIterationId, iterationId)
+                .eq(IssueEntity::getId, issueId)
+                .set(IssueEntity::getPrototypeUrl, StringUtils.trimToNull(prototypeUrl)));
     }
 
     @Override

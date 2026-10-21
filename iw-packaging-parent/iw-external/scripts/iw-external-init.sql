@@ -271,6 +271,7 @@ create table external_zhaogang_iteration_issue
     issue_type_name   varchar(64)                           not null comment '事项类型名称快照',
     title             varchar(256)                          not null comment '事项标题快照',
     description       varchar(4000)                         null comment '工作台人工事项描述',
+    prototype_url     varchar(255)                          null comment '工作台需求原型链接，不同步CODING',
     development_team  varchar(128)                          null comment '用户故事开发团队业务值',
     definition_of_done varchar(256)                         null comment '用户故事DoD业务值',
     estimated_hours   decimal(10, 2)                        null comment '子工作项预估工时（小时）',

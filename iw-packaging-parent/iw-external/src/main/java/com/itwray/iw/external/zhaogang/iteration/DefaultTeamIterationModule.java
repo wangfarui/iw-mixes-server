@@ -9,6 +9,7 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CustomFieldValue;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.ModifyIssueRequest;
 import com.itwray.iw.external.zhaogang.iteration.CodingIssueUrlParser.ParsedIssueUrl;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueType;
@@ -54,6 +55,8 @@ import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.ZoneId;
@@ -344,6 +347,21 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         }
         IssueEntity updated = repository.updateIssue(iterationId, issueId, normalized, actor);
         return toIssue(actor, updated, Map.of(), worklogsByIssue(stored.worklogs()), new HashSet<>());
+    }
+
+    @Override
+    public IssuePrototypeLink updateIssuePrototypeUrl(Actor actor, long iterationId, long issueId,
+                                                      IssuePrototypeLink command) {
+        StoredIteration stored = requireStored(iterationId);
+        requireMember(actor, stored);
+        IssueEntity issue = stored.issues().stream().filter(item -> item.getId() == issueId).findFirst()
+                .orElseThrow(() -> new TeamIterationException("事项不存在"));
+        if (command == null || StringUtils.isBlank(command.prototypeUrl())) {
+            throw new TeamIterationException("请输入需求原型链接");
+        }
+        String prototypeUrl = normalizePrototypeUrl(CodingIssueType.valueOf(issue.getIssueType()), command.prototypeUrl());
+        repository.updateIssuePrototypeUrl(iterationId, issueId, prototypeUrl, actor);
+        return new IssuePrototypeLink(prototypeUrl);
     }
 
     @Override
@@ -814,7 +832,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                     worklogs.getOrDefault(entity.getId(), List.of()).stream().map(this::toWorklog).toList(), childViews,
                     recordedHours(entity, worklogs.get(entity.getId())), recordedWorklogCount(entity, worklogs.get(entity.getId())),
                     issue.assigneeName(), type == CodingIssueType.SUB_TASK
-                            ? StringUtils.defaultIfBlank(issue.priority(), entity.getPriority()) : null);
+                            ? StringUtils.defaultIfBlank(issue.priority(), entity.getPriority()) : null,
+                    type == CodingIssueType.REQUIREMENT ? entity.getPrototypeUrl() : null);
         } catch (CodingOpenApiException error) {
             return snapshotIssue(actor, entity, false, error.isPermissionDenied()
                             ? error.permissionMessage() : "当前令牌无法读取该 CODING 事项",
@@ -859,7 +878,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 entity.getDevelopmentTeam(), entity.getDefinitionOfDone(), entity.getEstimatedHours(),
                 entity.getTaskType(), entity.getOnlineBug(), entity.getBugPriority(), entity.getSyncedAt(),
                 entity.getCreateTime(), worklogs == null ? List.of() : worklogs.stream().map(this::toWorklog).toList(),
-                children, recordedHours(entity, worklogs), recordedWorklogCount(entity, worklogs), null, entity.getPriority());
+                children, recordedHours(entity, worklogs), recordedWorklogCount(entity, worklogs), null, entity.getPriority(),
+                CodingIssueType.REQUIREMENT.name().equals(entity.getIssueType()) ? entity.getPrototypeUrl() : null);
     }
 
     private IssueSource source(IssueEntity entity) {
@@ -1288,7 +1308,26 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 type == CodingIssueType.DEFECT ? command.onlineBug() : null,
                 type == CodingIssueType.DEFECT ? StringUtils.trimToNull(command.bugPriority()) : null,
                 type == CodingIssueType.SUB_TASK
-                        ? StringUtils.defaultIfBlank(StringUtils.trimToNull(command.priority()), issue.getPriority()) : null);
+                        ? StringUtils.defaultIfBlank(StringUtils.trimToNull(command.priority()), issue.getPriority()) : null,
+                command.prototypeUrl() == null ? null : normalizePrototypeUrl(type, command.prototypeUrl()));
+    }
+
+    private String normalizePrototypeUrl(CodingIssueType type, String value) {
+        if (type != CodingIssueType.REQUIREMENT) throw new TeamIterationException("只有需求可以设置需求原型链接");
+        String url = value.trim();
+        if (url.length() > 255) throw new TeamIterationException("需求原型链接不能超过255个字符");
+        if (url.isEmpty()) return "";
+        try {
+            URI uri = new URI(url);
+            if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+                    || StringUtils.isBlank(uri.getHost()) || uri.getPort() > 65535
+                    || url.chars().anyMatch(Character::isWhitespace)) {
+                throw new URISyntaxException(url, "Invalid HTTP URL");
+            }
+        } catch (URISyntaxException error) {
+            throw new TeamIterationException("请输入完整的 HTTP/HTTPS 需求原型链接");
+        }
+        return url;
     }
 
     private String issueHash(String projectName, long issueCode) {

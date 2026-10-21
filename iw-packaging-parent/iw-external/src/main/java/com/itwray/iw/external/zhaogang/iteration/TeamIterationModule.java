@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.iteration;
 
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CreateChildIssueCommand;
@@ -61,6 +62,9 @@ public interface TeamIterationModule {
     List<SelectionOption> issueStatusOptions(Actor actor, long iterationId, long issueId);
 
     IterationIssue updateIssue(Actor actor, long iterationId, long issueId, UpdateIssueCommand command);
+
+    IssuePrototypeLink updateIssuePrototypeUrl(Actor actor, long iterationId, long issueId,
+                                               IssuePrototypeLink command);
 
     IterationIssue updateIssueStatus(Actor actor, long iterationId, long issueId, UpdateIssueStatusCommand command);
 

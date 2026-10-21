@@ -138,13 +138,23 @@ public final class TeamIterationModels {
 
     public record UpdateIssueCommand(String title, String description, String developmentTeam,
                                      String definitionOfDone, BigDecimal estimatedHours, String taskType,
-                                     Boolean onlineBug, String bugPriority, String priority) {
+                                     Boolean onlineBug, String bugPriority, String priority, String prototypeUrl) {
+        public UpdateIssueCommand(String title, String description, String developmentTeam,
+                                  String definitionOfDone, BigDecimal estimatedHours, String taskType,
+                                  Boolean onlineBug, String bugPriority, String priority) {
+            this(title, description, developmentTeam, definitionOfDone, estimatedHours, taskType,
+                    onlineBug, bugPriority, priority, null);
+        }
+
         public UpdateIssueCommand(String title, String description, String developmentTeam,
                                   String definitionOfDone, BigDecimal estimatedHours, String taskType,
                                   Boolean onlineBug, String bugPriority) {
             this(title, description, developmentTeam, definitionOfDone, estimatedHours, taskType,
                     onlineBug, bugPriority, null);
         }
+    }
+
+    public record IssuePrototypeLink(String prototypeUrl) {
     }
 
     public record UpdateIssueStatusCommand(long statusId) {
@@ -213,7 +223,7 @@ public final class TeamIterationModels {
                                  String taskType, Boolean onlineBug, String bugPriority,
                                  LocalDateTime syncedAt, LocalDateTime createdAt, List<IssueWorklog> worklogs,
                                  List<IterationIssue> children, BigDecimal recordedHours,
-                                 Integer recordedWorklogCount, String assigneeName, String priority) {
+                                 Integer recordedWorklogCount, String assigneeName, String priority, String prototypeUrl) {
         public IterationIssue {
             worklogs = worklogs == null ? List.of() : List.copyOf(worklogs);
             children = children == null ? List.of() : List.copyOf(children);
@@ -232,7 +242,7 @@ public final class TeamIterationModels {
             this(id, parentId, source, url, projectName, issueId, issueCode, issueType, issueTypeName,
                     title, description, statusName, available, warning, syncStatus, syncMessage, developmentTeam,
                     definitionOfDone, estimatedHours, taskType, onlineBug, bugPriority, syncedAt, createdAt,
-                    worklogs, children, recordedHours, recordedWorklogCount, null, null);
+                    worklogs, children, recordedHours, recordedWorklogCount, null, null, null);
         }
 
         public IterationIssue(long id, Long parentId, IssueSource source, String url, String projectName,
@@ -246,7 +256,7 @@ public final class TeamIterationModels {
             this(id, parentId, source, url, projectName, issueId, issueCode, issueType, issueTypeName,
                     title, description, statusName, available, warning, syncStatus, syncMessage, developmentTeam,
                     definitionOfDone, estimatedHours, taskType, onlineBug, bugPriority, syncedAt, createdAt,
-                    worklogs, children, null, null, null, null);
+                    worklogs, children, null, null, null, null, null);
         }
     }
 

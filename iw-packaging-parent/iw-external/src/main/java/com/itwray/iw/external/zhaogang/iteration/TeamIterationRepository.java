@@ -76,6 +76,8 @@ interface TeamIterationRepository {
 
     IssueEntity updateIssue(long iterationId, long issueId, UpdateIssueCommand command, Actor actor);
 
+    void updateIssuePrototypeUrl(long iterationId, long issueId, String prototypeUrl, Actor actor);
+
     boolean claimIssueSync(long iterationId, long issueId, Actor actor);
 
     IssueEntity markIssueSynced(long iterationId, long issueId, String url, String urlHash, long codingIssueId,

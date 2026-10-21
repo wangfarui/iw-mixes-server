@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang;
 
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CreateChildIssueCommand;
@@ -173,6 +174,14 @@ public class ZhaogangIterationController {
                                                        HttpServletRequest request,
                                                        HttpServletResponse response) {
         return GeneralResponse.success(module.updateIssue(actor(request, response), iterationId, issueId, command));
+    }
+
+    @PutMapping("/iterations/{iterationId}/issues/{issueId}/prototype")
+    public GeneralResponse<IssuePrototypeLink> updateIssuePrototypeUrl(
+            @PathVariable long iterationId, @PathVariable long issueId,
+            @RequestBody IssuePrototypeLink command,
+            HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.updateIssuePrototypeUrl(actor(request, response), iterationId, issueId, command));
     }
 
     @PutMapping("/iterations/{iterationId}/issues/{issueId}/status")
