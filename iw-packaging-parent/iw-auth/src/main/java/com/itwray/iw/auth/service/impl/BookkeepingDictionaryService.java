@@ -21,7 +21,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
     private final BookkeepingDictionaryMapper mapper;
     public BookkeepingDictionaryService(BookkeepingDictionaryMapper mapper) { this.mapper = mapper; }
     public enum Type {
-        CATEGORY(4002), EXPENSE_TAG(4001), INCOME_TAG(4011);
+        CATEGORY(4002), EXPENSE_TAG(4001), INCOME_TAG(4011), MEMBERSHIP_TYPE(4004);
         public final int code;
         Type(int code) { this.code=code; }
     }
@@ -34,14 +34,14 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
     private record Actor(int userId, int groupId, boolean manager) { }
 
     public Management items(int userId, Type type, Scope scope) {
-        Actor actor=actor(userId);
+        checkScope(type,scope); Actor actor=actor(userId,type.code);
         requireScope(actor,scope,false);
         List<BaseDictEntity> rows=list(actor,type.code,scope);
         return new Management(rows.stream().map(this::item).toList(),scope==Scope.PERSONAL||actor.manager,
                 version(rows),actor.groupId);
     }
     public Item create(int userId, Type type, Scope scope, String name) {
-        Actor actor=actor(userId); requireScope(actor,scope,true);
+        checkScope(type,scope); Actor actor=actor(userId,type.code); requireScope(actor,scope,true);
         List<BaseDictEntity> rows=list(actor,type.code,scope);
         String normalized=normalize(name); unique(rows,normalized,null);
         BaseDictEntity row=newItem(actor,scope,type.code,normalized,
@@ -49,7 +49,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         insert(row); return item(row);
     }
     public Rename rename(int userId, int id, String name, Integer revision) {
-        Actor actor=actor(userId); BaseDictEntity old=managed(actor,id,revision);
+        Actor actor=actorForId(userId,id); BaseDictEntity old=managed(actor,id,revision);
         String normalized=normalize(name);
         if (old.getDictName().equals(normalized)) return new Rename(id,item(old));
         unique(list(actor,old.getDictType(),scope(old)),normalized,id);
@@ -59,15 +59,15 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         insert(next); return new Rename(id,item(next));
     }
     public Item status(int userId, int id, boolean enabled, Integer revision) {
-        Actor actor=actor(userId); BaseDictEntity row=managed(actor,id,revision);
+        Actor actor=actorForId(userId,id); BaseDictEntity row=managed(actor,id,revision);
         row.setDictStatus(enabled?1:0); update(row); return item(row);
     }
     public void delete(int userId,int id,Integer revision) {
-        BaseDictEntity row=managed(actor(userId),id,revision);
+        BaseDictEntity row=managed(actorForId(userId,id),id,revision);
         if(mapper.retire(row)!=1) throw stale();
     }
     public void order(int userId, Type type, Scope scope, List<Integer> ids, String expectedVersion) {
-        Actor actor=actor(userId); requireScope(actor,scope,true);
+        checkScope(type,scope); Actor actor=actor(userId,type.code); requireScope(actor,scope,true);
         List<BaseDictEntity> rows=list(actor,type.code,scope);
         if(ids==null || expectedVersion==null || !expectedVersion.equals(version(rows))
                 || ids.size()!=rows.size() || new HashSet<>(ids).size()!=ids.size()
@@ -82,7 +82,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         Actor actor=actor(userId); requireScope(actor,Scope.FAMILY,true);
         List<Integer> ids=ids(sourceIds); List<BaseDictEntity> rows=owned(actor,ids);
         if(rows.size()!=ids.size() || rows.stream().anyMatch(r->!Objects.equals(r.getScopeType(),0)
-                || !DictionaryNames.isBookkeeping(r.getDictType()) || Boolean.TRUE.equals(r.getDeleted())))
+                || !DictionaryNames.supportsFamily(r.getDictType()) || Boolean.TRUE.equals(r.getDeleted())))
             throw new BusinessException("只能复制本人当前记账选项");
         List<Item> created=new ArrayList<>(); List<Integer> skipped=new ArrayList<>();
         for(BaseDictEntity source:rows) {
@@ -97,7 +97,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
     @Override
     @Transactional(readOnly = true)
     public List<BaseDictEntity> options(Integer userId,Integer dictType) {
-        checkType(dictType); Actor actor=reader(userId);
+        checkType(dictType); Actor actor=personal(dictType)?personalReader(userId):reader(userId);
         Map<String,BaseDictEntity> names=new LinkedHashMap<>();
         list(actor,dictType,Scope.PERSONAL).stream().filter(this::enabled).forEach(r->names.putIfAbsent(r.getDictName(),r));
         if(actor.groupId>0) list(actor,dictType,Scope.FAMILY).stream().filter(this::enabled).forEach(r->names.putIfAbsent(r.getDictName(),r));
@@ -107,7 +107,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public List<BaseDictEntity> lockSelectable(Integer userId,Integer dictType,Collection<Integer> references) {
-        checkType(dictType); Actor actor=actor(userId);
+        checkType(dictType); Actor actor=actor(userId,dictType);
         List<Integer> ids=ids(references); List<BaseDictEntity> rows=owned(actor,ids);
         if(rows.size()!=ids.size() || rows.stream().anyMatch(r->!enabled(r) || !Objects.equals(r.getDictType(),dictType)))
             throw new BusinessException("选项已失效或无权使用，请重新选择");
@@ -118,7 +118,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
     // An uncaught failure still rolls back the enclosing writer transaction.
     @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = BusinessException.class)
     public BaseDictEntity resolveSuccessor(Integer userId,Integer dictType,Integer sourceId) {
-        checkType(dictType); Actor actor=actor(userId);
+        checkType(dictType); Actor actor=actor(userId,dictType);
         List<BaseDictEntity> initial=owned(actor,ids(Collections.singletonList(sourceId)));
         if(initial.size()!=1 || !Objects.equals(initial.get(0).getDictType(),dictType)) throw unavailable();
         BaseDictEntity row=initial.get(0); Set<Integer> visited=new HashSet<>();
@@ -196,6 +196,23 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
             if(enabled(template)) insert(newItem(actor,Scope.FAMILY,4002,normalize(template.getDictName()),template.getSort()));
         }
     }
+    private boolean personal(Integer type) { return Objects.equals(type,4004); }
+    private void checkScope(Type type,Scope scope) {
+        if(type==null || (personal(type.code) && scope!=Scope.PERSONAL))
+            throw new BusinessException("会员类型仅支持个人范围");
+    }
+    private Actor actorForId(Integer userId,int id) { return actor(userId,mapper.typeOf(id)); }
+    private Actor actor(Integer userId,Integer type) {
+        if(!personal(type)) return actor(userId);
+        if(userId==null || userId<=0) throw new BusinessException("请先登录");
+        if(mapper.lockUser(userId)==null) throw new BusinessException("用户已失效，请重新登录");
+        return new Actor(userId,0,false);
+    }
+    private Actor personalReader(Integer userId) {
+        if(userId==null || userId<=0) throw new BusinessException("请先登录");
+        if(mapper.currentGroup(userId)==null) throw new BusinessException("用户已失效，请重新登录");
+        return new Actor(userId,0,false);
+    }
     private Actor reader(Integer userId) {
         if(userId==null||userId<=0) throw new BusinessException("请先登录");
         BookkeepingDictionaryMapper.Reader reader=mapper.reader(userId);
@@ -227,6 +244,7 @@ public class BookkeepingDictionaryService implements BookkeepingDictionaryAccess
         List<BaseDictEntity> rows=owned(actor,List.of(id));
         if(rows.size()!=1) throw new BusinessException("选项不存在或无权管理");
         BaseDictEntity row=rows.get(0); checkType(row.getDictType());
+        if(personal(row.getDictType()) && (!Objects.equals(row.getScopeType(),0) || !Objects.equals(row.getFamilyGroupId(),0) || !Objects.equals(row.getUserId(),actor.userId))) throw new BusinessException("会员类型仅支持本人个人范围");
         requireScope(actor,scope(row),true);
         if(Boolean.TRUE.equals(row.getDeleted())||revision==null||!revision.equals(row.getRevision())) throw stale();
         return row;

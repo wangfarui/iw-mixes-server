@@ -1,0 +1,7 @@
+PASS normal password authentication for three generated ordinary accounts
+PASS no-family user, actual family owner and actual member can independently manage personal 4004
+PASS family list/create/order/copy and foreign IDs rejected by backend
+PASS revision/scopeVersion, Unicode, duplicate disabled names, source validity/ownership, immutable rename/delete snapshots, omit versus explicit change, legacy compatibility and owner isolation
+PASS historical PENDING/name filters, legacy read/detail guard and original category family roles
+PASS missing family initialization does not affect membership personal reads/writes; original categories retain guard
+ALL ISOLATED API CHECKS PASSED; 77 asserted requests; fixtures retained only until UI verification/owned-instance cleanup

@@ -1,0 +1,220 @@
+
+> iw-mixes-web-platform@0.1.0 prebuild
+> npm run test:zg-workbench-agent-update && npm run check:zg-workbench-agent && npm run check:zhaogang-release-notes
+
+
+> iw-mixes-web-platform@0.1.0 test:zg-workbench-agent-update
+> node scripts/testZgWorkbenchAgentUpdate.mjs
+
+zg-workbench-agent update eligibility tests passed
+
+> iw-mixes-web-platform@0.1.0 check:zg-workbench-agent
+> node scripts/checkZgWorkbenchAgentRelease.mjs
+
+zg-workbench-agent 2.0.2: 4 个平台发布文件已就绪
+
+> iw-mixes-web-platform@0.1.0 check:zhaogang-release-notes
+> node scripts/checkZhaogangReleaseNotes.mjs
+
+zhaogang release notes valid: zg-2026-10-09-01 (28 releases)
+
+> iw-mixes-web-platform@0.1.0 build
+> vite build --mode prod
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v5.4.21 building for prod...
+transforming...
+node_modules/pdfjs-dist/legacy/build/pdf.js (4549:23): Use of eval in "node_modules/pdfjs-dist/legacy/build/pdf.js" is strongly discouraged as it poses security risks and may cause issues with minification.
+✓ 2339 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                           0.46 kB │ gzip:   0.31 kB
+dist/assets/imageProcessor.worker-CzV1kSq4.js                             7.30 kB
+dist/assets/textDiff.worker-DDM2gVML.js                                  12.97 kB
+dist/assets/encodingConverter.worker-BtnWDO_O.js                         16.53 kB
+dist/assets/skillWorkbench.worker-IBtRUUGH.js                           104.74 kB
+dist/assets/formatter.worker-oXInIekS.js                              1,674.89 kB
+dist/assets/documentConverter.worker-D30KWVkw.js                      1,710.01 kB
+dist/assets/MealForm-DK7tc9YV.css                                         0.05 kB │ gzip:   0.07 kB
+dist/assets/ToolHomeButton-RvNTT72w.css                                   0.05 kB │ gzip:   0.07 kB
+dist/assets/PointsRecords-CkI1afcg.css                                    0.06 kB │ gzip:   0.08 kB
+dist/assets/Bookkeeping-HsP8Amha.css                                      0.12 kB │ gzip:   0.08 kB
+dist/assets/DishesTable-Ci7oH7m-.css                                      0.29 kB │ gzip:   0.17 kB
+dist/assets/DictManagement-CYKuowPn.css                                   0.29 kB │ gzip:   0.17 kB
+dist/assets/AccountManagement-DqFdutmJ.css                                0.29 kB │ gzip:   0.17 kB
+dist/assets/WebsiteManagement-x1rl0gb5.css                                0.29 kB │ gzip:   0.17 kB
+dist/assets/DishesForm-XhalGlzA.css                                       0.30 kB │ gzip:   0.21 kB
+dist/assets/ZhaogangInvitationView-uKpy83iK.css                           0.42 kB │ gzip:   0.25 kB
+dist/assets/TaskRecords-tpd0fDUI.css                                      0.65 kB │ gzip:   0.29 kB
+dist/assets/ZhaogangServiceView-Q3RLdh80.css                              2.77 kB │ gzip:   0.74 kB
+dist/assets/NumberGeneratorTool-CMVlhNAU.css                              2.82 kB │ gzip:   0.88 kB
+dist/assets/RemoteShareTool-C2FCDL0y.css                                  2.85 kB │ gzip:   0.96 kB
+dist/assets/ZhaogangAgentGuideView-b0G4k6x1.css                           2.88 kB │ gzip:   0.86 kB
+dist/assets/SecretManagement-CWBdg5Lr.css                                 2.89 kB │ gzip:   0.86 kB
+dist/assets/NetworkDiagnosticsTool-EFFoxyZQ.css                           3.63 kB │ gzip:   1.02 kB
+dist/assets/ZhaogangTeamView-BcxkvB6y.css                                 3.71 kB │ gzip:   0.98 kB
+dist/assets/ZhaogangCalendarView-Bv25b2bb.css                             3.79 kB │ gzip:   1.08 kB
+dist/assets/ZhaogangIterationListView-WuTEvC8a.css                        3.85 kB │ gzip:   1.12 kB
+dist/assets/TextPlaygroundTool-Dm885ynX.css                               4.10 kB │ gzip:   1.18 kB
+dist/assets/IpLookupTool-BZofFYf0.css                                     4.14 kB │ gzip:   1.16 kB
+dist/assets/AiSessionHub-Dy8hfuMz.css                                     4.89 kB │ gzip:   1.30 kB
+dist/assets/AddressGeneratorTool-q8as1IZV.css                             5.01 kB │ gzip:   1.21 kB
+dist/assets/BmiCalculatorTool-Bzh9BoVc.css                                5.06 kB │ gzip:   1.40 kB
+dist/assets/EncodingConverterTool-DLuc4E8e.css                            5.38 kB │ gzip:   1.44 kB
+dist/assets/FormatterTool-DTyLR2em.css                                    5.57 kB │ gzip:   1.42 kB
+dist/assets/StockTrackerTool-DXlmGxMI.css                                 6.49 kB │ gzip:   1.62 kB
+dist/assets/ImageProcessorTool-ZsmrAmIE.css                               6.66 kB │ gzip:   1.67 kB
+dist/assets/CalculatorTool-ewRCM9EO.css                                   6.81 kB │ gzip:   1.62 kB
+dist/assets/DocumentConverterTool-BXBY6qzi.css                            6.84 kB │ gzip:   1.55 kB
+dist/assets/ColorPickerTool-D0xqfebl.css                                  8.57 kB │ gzip:   1.87 kB
+dist/assets/TextDiffTool-BLpX1jNk.css                                     9.22 kB │ gzip:   2.17 kB
+dist/assets/TypingPracticeTool-CLgrSG6d.css                               9.29 kB │ gzip:   2.26 kB
+dist/assets/SkillWorkbenchTool-D4XHveZU.css                               9.47 kB │ gzip:   2.33 kB
+dist/assets/ToolsHome-B7RysxMQ.css                                        9.66 kB │ gzip:   2.36 kB
+dist/assets/ZhaogangIterationDetailView-BjWAG3Y7.css                     15.53 kB │ gzip:   3.30 kB
+dist/assets/TaskList-DDgkwSAT.css                                        18.15 kB │ gzip:   3.43 kB
+dist/assets/ZhaogangWorkbench-DOuQMsFr.css                               33.03 kB │ gzip:   6.35 kB
+dist/assets/index-MUqS7luU.css                                          365.25 kB │ gzip:  49.19 kB
+dist/assets/ZhaogangEmptyRoute-CZVQrAHT.js                                0.13 kB │ gzip:   0.13 kB
+dist/assets/ToolsLayout-CaDGIcxl.js                                       0.16 kB │ gzip:   0.15 kB
+dist/assets/de-DKoN2FH8.js                                                0.16 kB │ gzip:   0.15 kB
+dist/assets/es-CUE6FDE0.js                                                0.16 kB │ gzip:   0.15 kB
+dist/assets/fr-CTy23JpW.js                                                0.16 kB │ gzip:   0.15 kB
+dist/assets/nl-BR0QKFXd.js                                                0.16 kB │ gzip:   0.15 kB
+dist/assets/DishesAdd-C0jBsnER.js                                         0.22 kB │ gzip:   0.19 kB
+dist/assets/DishesEdit-BSVP3Fx4.js                                        0.22 kB │ gzip:   0.19 kB
+dist/assets/DishesDetail-CCUkC2OB.js                                      0.22 kB │ gzip:   0.19 kB
+dist/assets/DictAdd-DIbRkZ6f.js                                           0.26 kB │ gzip:   0.22 kB
+dist/assets/DictEdit-DWwtRAkK.js                                          0.27 kB │ gzip:   0.22 kB
+dist/assets/MealAdd-BLtrhz7n.js                                           0.27 kB │ gzip:   0.21 kB
+dist/assets/MealEdit-DkCYnxyT.js                                          0.27 kB │ gzip:   0.22 kB
+dist/assets/MealDetail-DU0qZUUY.js                                        0.28 kB │ gzip:   0.22 kB
+dist/assets/dict-DxxvP8t5.js                                              0.31 kB │ gzip:   0.18 kB
+dist/assets/ToolHomeButton-C5XFBnK2.js                                    0.47 kB │ gzip:   0.37 kB
+dist/assets/last-7day-RwdENi2-.js                                         0.51 kB │ gzip:   0.38 kB
+dist/assets/toolbox-BQvTWfbE.js                                           0.52 kB │ gzip:   0.36 kB
+dist/assets/list-BZCWMh4v.js                                              0.53 kB │ gzip:   0.32 kB
+dist/assets/Dishes-CRLQdj-e.js                                            0.53 kB │ gzip:   0.41 kB
+dist/assets/dict-manage-BJ8lx5XT.js                                       0.55 kB │ gzip:   0.38 kB
+dist/assets/meal-CScmEqeb.js                                              0.59 kB │ gzip:   0.34 kB
+dist/assets/dishes-CkcjbpSO.js                                            0.68 kB │ gzip:   0.36 kB
+dist/assets/config-BApTdFuR.js                                            0.78 kB │ gzip:   0.51 kB
+dist/assets/done-4SwLEaDw.js                                              0.83 kB │ gzip:   0.49 kB
+dist/assets/copy-text-white-DjgEcoQG.js                                   0.91 kB │ gzip:   0.43 kB
+dist/assets/copy-text-aLBRb0w3.js                                         0.91 kB │ gzip:   0.43 kB
+dist/assets/home-DbUCzvww.js                                              0.96 kB │ gzip:   0.56 kB
+dist/assets/zhaogangTeam-DIqI0ApX.js                                      1.05 kB │ gzip:   0.40 kB
+dist/assets/task-records-Bh9WUGZI.js                                      1.09 kB │ gzip:   0.59 kB
+dist/assets/task-list-rsOtNqCI.js                                         1.13 kB │ gzip:   0.51 kB
+dist/assets/deleted-Dufo4GPS.js                                           1.14 kB │ gzip:   0.52 kB
+dist/assets/task-manage-XBQxG4SE.js                                       1.19 kB │ gzip:   0.61 kB
+dist/assets/today-CL4Xm7tN.js                                             1.43 kB │ gzip:   0.69 kB
+dist/assets/custom-date-Crx0cGcD.js                                       1.45 kB │ gzip:   0.77 kB
+dist/assets/box-CFXazOzo.js                                               1.56 kB │ gzip:   0.62 kB
+dist/assets/bookkeeping-manage-DBv1Txqv.js                                1.57 kB │ gzip:   0.73 kB
+dist/assets/deadline-tXec-sxO.js                                          1.58 kB │ gzip:   0.90 kB
+dist/assets/meal-manage-lL7K5kVX.js                                       1.60 kB │ gzip:   0.80 kB
+dist/assets/aiLauncherClient-TEtbKZs1.js                                  1.65 kB │ gzip:   0.95 kB
+dist/assets/fr_CA-CbU60qoP.js                                             1.67 kB │ gzip:   0.87 kB
+dist/assets/last-week-DMZbkAV2.js                                         1.91 kB │ gzip:   0.91 kB
+dist/assets/ZhaogangInvitationView-BI51mL1Q.js                            1.92 kB │ gzip:   1.09 kB
+dist/assets/points-manage-BYJqSqOZ.js                                     1.95 kB │ gzip:   0.74 kB
+dist/assets/tomorrow-Cb1YQlfl.js                                          1.99 kB │ gzip:   0.97 kB
+dist/assets/taskList-D-deNh-y.js                                          2.17 kB │ gzip:   0.63 kB
+dist/assets/meal-records-BZpQnCzq.js                                      2.20 kB │ gzip:   1.27 kB
+dist/assets/dishes-manage-DwOwGlPx.js                                     2.22 kB │ gzip:   0.97 kB
+dist/assets/points-records-azXBCCzO.js                                    2.25 kB │ gzip:   0.78 kB
+dist/assets/base-setting-RBb3g7Id.js                                      2.25 kB │ gzip:   0.97 kB
+dist/assets/Meal-eVPTMe_W.js                                              2.30 kB │ gzip:   1.15 kB
+dist/assets/zhaogangIteration-GYSamdW5.js                                 2.66 kB │ gzip:   0.88 kB
+dist/assets/PointsRecords-Cd2sUDZF.js                                     3.13 kB │ gzip:   1.50 kB
+dist/assets/account-manage-CNzp4oru.js                                    3.43 kB │ gzip:   1.28 kB
+dist/assets/zh_TW-KHqN0Uv9.js                                             3.43 kB │ gzip:   2.17 kB
+dist/assets/DictForm.vue_vue_type_script_setup_true_lang-8j9aRAQb.js      3.45 kB │ gzip:   1.54 kB
+dist/assets/zhaogangReleaseK8s-DVb7u_-b.js                                3.52 kB │ gzip:   1.71 kB
+dist/assets/MealForm-CQQrcjvf.js                                          3.79 kB │ gzip:   1.73 kB
+dist/assets/fi-ISj2znpq.js                                                3.82 kB │ gzip:   1.45 kB
+dist/assets/bookkeeping-records-8J8ivDVV.js                               3.95 kB │ gzip:   1.96 kB
+dist/assets/TaskRecords-B4gjdx8Z.js                                       3.98 kB │ gzip:   1.65 kB
+dist/assets/zgWorkbenchAgentClient-BHqHX9lw.js                            4.19 kB │ gzip:   1.85 kB
+dist/assets/DictManagement-B2ZCBK9z.js                                    4.37 kB │ gzip:   1.92 kB
+dist/assets/en_HK-DO8dpure.js                                             4.49 kB │ gzip:   1.98 kB
+dist/assets/DishesTable-DMm2rNmA.js                                       4.91 kB │ gzip:   2.06 kB
+dist/assets/zhaogang-ByeO5NFC.js                                          5.05 kB │ gzip:   2.22 kB
+dist/assets/en_CA-DE67MCFT.js                                             5.35 kB │ gzip:   2.44 kB
+dist/assets/ZhaogangAgentGuideView-B0W5svX1.js                            5.47 kB │ gzip:   2.71 kB
+dist/assets/Bookkeeping-C3RKHWcr.js                                       6.02 kB │ gzip:   2.43 kB
+dist/assets/ZhaogangCalendarView-0PQZNV_t.js                              6.62 kB │ gzip:   2.84 kB
+dist/assets/ToolsHome-CbpMyAbm.js                                         6.90 kB │ gzip:   2.94 kB
+dist/assets/BmiCalculatorTool-Cj87wvwE.js                                 6.97 kB │ gzip:   3.51 kB
+dist/assets/AccountManagement-TS_SHbv7.js                                 7.70 kB │ gzip:   2.75 kB
+dist/assets/en_AU-1w2X_CD4.js                                             8.01 kB │ gzip:   3.05 kB
+dist/assets/browser-rRD0OW0-.js                                           8.81 kB │ gzip:   4.40 kB
+dist/assets/DishesForm-CFSYFyK9.js                                        8.83 kB │ gzip:   2.94 kB
+dist/assets/WebsiteManagement-o7Q6P6bs.js                                 8.87 kB │ gzip:   3.06 kB
+dist/assets/en_GB-BMKvjeq2.js                                            10.09 kB │ gzip:   3.39 kB
+dist/assets/en_NG-Cej82a0B.js                                            10.26 kB │ gzip:   3.99 kB
+dist/assets/ZhaogangServiceView-CvXIDqFB.js                              10.51 kB │ gzip:   4.52 kB
+dist/assets/ZhaogangTeamView-Bwt3yh99.js                                 10.66 kB │ gzip:   3.96 kB
+dist/assets/de_CH-BDKR943A.js                                            11.72 kB │ gzip:   4.20 kB
+dist/assets/ko-C4l-9dex.js                                               11.89 kB │ gzip:   7.01 kB
+dist/assets/en_GH-CPn74WCr.js                                            11.90 kB │ gzip:   4.56 kB
+dist/assets/ZhaogangIterationListView-D9lC4ggR.js                        12.48 kB │ gzip:   4.95 kB
+dist/assets/IpLookupTool-CnUxz-ld.js                                     13.42 kB │ gzip:   5.49 kB
+dist/assets/nb_NO-BCUruO7u.js                                            13.57 kB │ gzip:   4.78 kB
+dist/assets/NetworkDiagnosticsTool-DSJ_k3bN.js                           14.48 kB │ gzip:   5.17 kB
+dist/assets/en_US-DNKHtdJf.js                                            15.17 kB │ gzip:   3.76 kB
+dist/assets/sv-Kf8cpr5t.js                                               15.45 kB │ gzip:   6.39 kB
+dist/assets/en_ZA-CZ8FIVwV.js                                            15.76 kB │ gzip:   5.32 kB
+dist/assets/SecretManagement-kLc1StVt.js                                 16.10 kB │ gzip:   5.52 kB
+dist/assets/DocumentConverterTool-BkalPqHy.js                            17.71 kB │ gzip:   7.26 kB
+dist/assets/nl_BE-Dn1qJD1n.js                                            18.70 kB │ gzip:   6.86 kB
+dist/assets/ColorPickerTool-nKloawW1.js                                  18.78 kB │ gzip:   7.72 kB
+dist/assets/RemoteShareTool-BrIzYYWF.js                                  19.63 kB │ gzip:   7.33 kB
+dist/assets/chunk-7TT5MNTH-rOXhUtHM.js                                   22.03 kB │ gzip:   9.57 kB
+dist/assets/pt_PT-_frwVUHE.js                                            22.11 kB │ gzip:   9.23 kB
+dist/assets/pt_BR-EGb3Bcig.js                                            24.68 kB │ gzip:  10.76 kB
+dist/assets/id_ID-VzojZqwC.js                                            25.28 kB │ gzip:   7.29 kB
+dist/assets/uk-t1eCiGhW.js                                               26.94 kB │ gzip:   9.17 kB
+dist/assets/ro-Bnz8N9Na.js                                               27.51 kB │ gzip:   8.96 kB
+dist/assets/EncodingConverterTool-CdJkqIin.js                            28.07 kB │ gzip:  10.56 kB
+dist/assets/AddressGeneratorTool-mCCvcs98.js                             28.17 kB │ gzip:   9.65 kB
+dist/assets/FormatterTool-DzPjbTTR.js                                    28.18 kB │ gzip:  10.87 kB
+dist/assets/tr-B4kP_X9R.js                                               30.51 kB │ gzip:  13.31 kB
+dist/assets/NumberGeneratorTool-CDkne-67.js                              31.19 kB │ gzip:   9.08 kB
+dist/assets/en_IN-CXgZA6Lb.js                                            31.66 kB │ gzip:  10.34 kB
+dist/assets/ja-BCj5SmHi.js                                               31.83 kB │ gzip:  16.44 kB
+dist/assets/es_MX-acpX7OLq.js                                            33.25 kB │ gzip:  12.93 kB
+dist/assets/da-D4FJieao.js                                               33.32 kB │ gzip:  14.03 kB
+dist/assets/TypingPracticeTool-BoVatRWe.js                               33.73 kB │ gzip:  13.25 kB
+dist/assets/AiSessionHub-B9_bnIjE.js                                     36.50 kB │ gzip:  11.65 kB
+dist/assets/ImageProcessorTool-9CZU7vdE.js                               36.92 kB │ gzip:  12.77 kB
+dist/assets/TextDiffTool-DzlcAqe2.js                                     37.24 kB │ gzip:  13.13 kB
+dist/assets/TextPlaygroundTool-CCeTKTmF.js                               38.08 kB │ gzip:  15.86 kB
+dist/assets/TaskList-u78XbMjw.js                                         38.75 kB │ gzip:  13.13 kB
+dist/assets/th-D6hHLdLB.js                                               39.38 kB │ gzip:  18.38 kB
+dist/assets/ru-C5als9IF.js                                               46.26 kB │ gzip:  18.90 kB
+dist/assets/chunk-BVTGCSSB-9guE40b6.js                                   47.21 kB │ gzip:  18.85 kB
+dist/assets/de_AT-C-hM79_u.js                                            48.48 kB │ gzip:  17.15 kB
+dist/assets/zh_CN-Aub6D3d2.js                                            53.89 kB │ gzip:  28.87 kB
+dist/assets/pl-CyNjzjTA.js                                               55.70 kB │ gzip:  22.07 kB
+dist/assets/fr_BE-BwLqQTNN.js                                            63.56 kB │ gzip:  19.12 kB
+dist/assets/vi-ClHEC4qp.js                                               64.44 kB │ gzip:  18.30 kB
+dist/assets/CalculatorTool-DdcCZ-31.js                                   76.42 kB │ gzip:  27.95 kB
+dist/assets/it-CidgyRUz.js                                               78.36 kB │ gzip:  25.48 kB
+dist/assets/ZhaogangWorkbench-zImK_0j-.js                                87.55 kB │ gzip:  29.43 kB
+dist/assets/ZhaogangIterationDetailView-DPo3zpWt.js                      90.74 kB │ gzip:  28.03 kB
+dist/assets/vuedraggable.umd-AwMS64V1.js                                100.80 kB │ gzip:  35.97 kB
+dist/assets/chunk-RCCYSHWF-C0_WK1zB.js                                  107.10 kB │ gzip:  37.87 kB
+dist/assets/chunk-BKUYYLI4-2bxAuvOg.js                                  114.11 kB │ gzip:  40.91 kB
+dist/assets/SkillWorkbenchTool-0aSj-1sF.js                              132.76 kB │ gzip:  47.87 kB
+dist/assets/cs_CZ-DAZnKhrz.js                                           183.75 kB │ gzip:  58.65 kB
+dist/assets/StockTrackerTool-hlbGTtG0.js                                200.73 kB │ gzip:  65.80 kB
+dist/assets/chunk-YQYVFZYE-CuX4CIHs.js                                  448.14 kB │ gzip: 158.38 kB
+dist/assets/index-lnz1x5qS.js                                         1,218.65 kB │ gzip: 403.25 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 23.23s

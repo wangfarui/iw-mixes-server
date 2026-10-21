@@ -1,0 +1,289 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO]
+[INFO] iw-parent                                                          [pom]
+[INFO] iw-common                                                          [jar]
+[INFO] iw-starter                                                         [pom]
+[INFO] iw-redis-starter                                                   [jar]
+[INFO] iw-web                                                             [jar]
+[INFO] iw-feign-client                                                    [pom]
+[INFO] iw-points-client                                                   [jar]
+[INFO] iw-bookkeeping-client                                              [jar]
+[INFO] iw-eat-client                                                      [jar]
+[INFO] iw-auth-client                                                     [jar]
+[INFO] iw-external-client                                                 [jar]
+[INFO] iw-rocketmq-starter                                                [jar]
+[INFO] iw-packaging-parent                                                [pom]
+[INFO] iw-auth                                                            [jar]
+[INFO] iw-points                                                          [jar]
+[INFO] iw-eat                                                             [jar]
+[INFO] iw-bookkeeping                                                     [jar]
+[INFO] iw-wardrobe                                                        [jar]
+[INFO] iw-core                                                            [jar]
+[INFO] iw-external                                                        [jar]
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-parent >---------------------
+[INFO] Building iw-parent 0.2.1                                          [1/20]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-common >---------------------
+[INFO] Building iw-common 0.2.1                                          [2/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-common ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-common/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-common ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --------------------< com.itwray.mixes:iw-starter >---------------------
+[INFO] Building iw-starter 0.2.1                                         [3/20]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] -----------------< com.itwray.mixes:iw-redis-starter >------------------
+[INFO] Building iw-redis-starter 0.2.1                                   [4/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-redis-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-redis-starter ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-web >-----------------------
+[INFO] Building iw-web 0.2.1                                             [5/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-web ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 6 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-web ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 120 source files with javac [debug target 17] to target/classes
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-feign-client >------------------
+[INFO] Building iw-feign-client 0.2.1                                    [6/20]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] -----------------< com.itwray.mixes:iw-points-client >------------------
+[INFO] Building iw-points-client 0.2.1                                   [7/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-points-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-points-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-points-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 4 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] ---------------< com.itwray.mixes:iw-bookkeeping-client >---------------
+[INFO] Building iw-bookkeeping-client 0.2.1                              [8/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-bookkeeping-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-bookkeeping-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-bookkeeping-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 4 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] -------------------< com.itwray.mixes:iw-eat-client >-------------------
+[INFO] Building iw-eat-client 0.2.1                                      [9/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-eat-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-eat-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-eat-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-auth-client >-------------------
+[INFO] Building iw-auth-client 0.2.1                                    [10/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-auth-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-auth-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 16 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-external-client >-----------------
+[INFO] Building iw-external-client 0.2.1                                [11/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-external-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-external-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-external-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 18 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-rocketmq-starter >----------------
+[INFO] Building iw-rocketmq-starter 0.2.1                               [12/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-rocketmq-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 3 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-rocketmq-starter ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 13 source files with javac [debug target 17] to target/classes
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/main/java/com/itwray/iw/starter/rocketmq/config/RocketMQAutoConfiguration.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/main/java/com/itwray/iw/starter/rocketmq/config/RocketMQAutoConfiguration.java使用了未经检查或不安全的操作。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/main/java/com/itwray/iw/starter/rocketmq/config/RocketMQAutoConfiguration.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-packaging-parent >----------------
+[INFO] Building iw-packaging-parent 0.2.1                               [13/20]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-auth >----------------------
+[INFO] Building iw-auth 0.2.1                                           [14/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-auth ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 4 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-auth ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 152 source files with javac [debug target 17] to target/classes
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java使用了未经检查或不安全的操作。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-points >---------------------
+[INFO] Building iw-points 0.2.1                                         [15/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-points ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 6 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-points ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 101 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-eat >-----------------------
+[INFO] Building iw-eat 0.2.1                                            [16/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-eat ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-eat ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 56 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-bookkeeping >-------------------
+[INFO] Building iw-bookkeeping 0.2.1                                    [17/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-bookkeeping ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 8 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-bookkeeping ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 135 source files with javac [debug target 17] to target/classes
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java使用了未经检查或不安全的操作。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --------------------< com.itwray.mixes:iw-wardrobe >--------------------
+[INFO] Building iw-wardrobe 0.2.1                                       [18/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-wardrobe ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 0 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-wardrobe ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 88 source files with javac [debug target 17] to target/classes
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/main/java/com/itwray/iw/wardrobe/service/impl/WardrobeImageFileCleanupServiceImpl.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/main/java/com/itwray/iw/wardrobe/service/impl/WardrobeImageFileCleanupServiceImpl.java使用或覆盖了已过时的 API。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/main/java/com/itwray/iw/wardrobe/service/impl/WardrobeImageFileCleanupServiceImpl.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-core >----------------------
+[INFO] Building iw-core 0.2.1                                           [19/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 3 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --------------------< com.itwray.mixes:iw-external >--------------------
+[INFO] Building iw-external 0.2.1                                       [20/20]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-external ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 4 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-external ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 213 source files with javac [debug target 17] to target/classes
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/service/impl/ExternalApiServiceImpl.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/service/impl/ExternalApiServiceImpl.java使用了未经检查或不安全的操作。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/service/impl/ExternalApiServiceImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for iw-parent 0.2.1:
+[INFO]
+[INFO] iw-parent .......................................... SUCCESS [  0.001 s]
+[INFO] iw-common .......................................... SUCCESS [  0.290 s]
+[INFO] iw-starter ......................................... SUCCESS [  0.000 s]
+[INFO] iw-redis-starter ................................... SUCCESS [  0.249 s]
+[INFO] iw-web ............................................. SUCCESS [  4.013 s]
+[INFO] iw-feign-client .................................... SUCCESS [  0.001 s]
+[INFO] iw-points-client ................................... SUCCESS [  0.459 s]
+[INFO] iw-bookkeeping-client .............................. SUCCESS [  0.362 s]
+[INFO] iw-eat-client ...................................... SUCCESS [  0.346 s]
+[INFO] iw-auth-client ..................................... SUCCESS [  0.593 s]
+[INFO] iw-external-client ................................. SUCCESS [  0.602 s]
+[INFO] iw-rocketmq-starter ................................ SUCCESS [  0.492 s]
+[INFO] iw-packaging-parent ................................ SUCCESS [  0.001 s]
+[INFO] iw-auth ............................................ SUCCESS [  2.295 s]
+[INFO] iw-points .......................................... SUCCESS [  1.088 s]
+[INFO] iw-eat ............................................. SUCCESS [  0.600 s]
+[INFO] iw-bookkeeping ..................................... SUCCESS [  1.602 s]
+[INFO] iw-wardrobe ........................................ SUCCESS [  1.856 s]
+[INFO] iw-core ............................................ SUCCESS [  0.501 s]
+[INFO] iw-external ........................................ SUCCESS [  3.924 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  19.510 s
+[INFO] Finished at: 2026-10-21T10:38:12+08:00
+[INFO] ------------------------------------------------------------------------

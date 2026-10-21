@@ -16,6 +16,8 @@ create table base_dict
     previous_id int unsigned null,
     revision int unsigned default 0 not null,
     active_name_key varbinary(128) generated always as (case when dict_type in (4001,4002,4011) and deleted=0 then convert(dict_name using binary) else null end) stored,
+    membership_active_name_key varbinary(128) generated always as (case when dict_type=4004 and deleted=0 then convert(dict_name using binary) else null end) stored,
+    unique key uk_membership_dict_name(scope_type,family_group_id,user_id,dict_type,membership_active_name_key),
     unique key uk_bookkeeping_dict_name(scope_type,family_group_id,user_id,dict_type,active_name_key),
     unique key uk_dict_previous(previous_id),
     key idx_bookkeeping_scope(scope_type,family_group_id,user_id,dict_type,deleted),

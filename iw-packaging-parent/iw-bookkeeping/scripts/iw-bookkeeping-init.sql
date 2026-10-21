@@ -100,6 +100,9 @@ add column `punish_points` tinyint NOT NULL DEFAULT '0' COMMENT '处罚积分';
 create table bookkeeping_membership_subscription
 (
     id              int unsigned auto_increment             not null comment 'id',
+    membership_type_id int unsigned null comment '选择时个人会员类型来源ID',
+    membership_type_name varchar(32) character set utf8mb4 collate utf8mb4_bin null comment '选择时名称快照',
+    membership_type_snapshot_status tinyint default 0 not null comment '0待核对 1已核实',
     membership_type tinyint       default 0                 not null comment '会员类型',
     membership_name varchar(64)   default ''                not null comment '会员名称',
     amount          decimal(8, 2) default 0                 not null comment '金额',
@@ -116,6 +119,7 @@ create table bookkeeping_membership_subscription
     create_time     datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time     datetime      default CURRENT_TIMESTAMP not null comment '更新时间',
     user_id         int unsigned  default '0'               not null comment '用户id',
+    key idx_membership_type_snapshot(user_id,deleted,membership_type_snapshot_status,membership_type_name),
     primary key (id),
     key idx_user_id (user_id)
 ) comment '会员订阅记录表';

@@ -37,6 +37,12 @@ public class BookkeepingMembershipSubscriptionEntity extends UserEntity<Integer>
      */
     private Integer membershipType;
 
+    /** Source ID at selection time; never resolved through a rename successor on display. */
+    private Integer membershipTypeId;
+    private String membershipTypeName;
+    /** 0=pending historical mapping, 1=verified snapshot. */
+    private Integer membershipTypeSnapshotStatus;
+
     /**
      * 会员名称
      */

@@ -3,6 +3,9 @@ package com.itwray.iw.web.bookkeeping;
 public final class DictionaryNames {
     private DictionaryNames() { }
     public static boolean isBookkeeping(Integer type) {
+        return Integer.valueOf(4004).equals(type) || supportsFamily(type);
+    }
+    public static boolean supportsFamily(Integer type) {
         return Integer.valueOf(4002).equals(type) || Integer.valueOf(4001).equals(type)
                 || Integer.valueOf(4011).equals(type);
     }

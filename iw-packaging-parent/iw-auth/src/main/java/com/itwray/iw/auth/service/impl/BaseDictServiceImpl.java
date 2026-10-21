@@ -108,7 +108,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         if (latest == null || !latest) {
             Map<Object, Object> dictMapCache = RedisUtil.getHashEntries(this.obtainDictRedisKeyByUser());
             if (!dictMapCache.isEmpty()) {
-                dictMapCache.keySet().removeIf(key -> List.of("4001", "4002", "4011").contains(String.valueOf(key)));
+                dictMapCache.keySet().removeIf(key -> List.of("4001", "4002", "4004", "4011").contains(String.valueOf(key)));
                 return (Map) dictMapCache;
             }
         }
@@ -116,7 +116,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         Map<String, List<DictAllListVo>> dictMap = getBaseDao().lambdaQuery()
                 .eq(BaseDictEntity::getScopeType, 0)
                 .eq(BaseDictEntity::getFamilyGroupId, 0)
-                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4011)
+                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4004, 4011)
                 .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
                 .list()
                 .stream()
@@ -290,7 +290,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         boolean adminUser = this.isAdminUser(UserUtils.getUserId());
         queryWrapper.eq(BaseDictEntity::getScopeType, 0)
                 .eq(BaseDictEntity::getFamilyGroupId, 0)
-                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4011)
+                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4004, 4011)
                 .eq(dto.getDictType() != null, BaseDictEntity::getDictType, dto.getDictType())
                 .eq(dto.getDictCode() != null, BaseDictEntity::getDictCode, dto.getDictCode())
                 .eq(dto.getDictStatus() != null, BaseDictEntity::getDictStatus, dto.getDictStatus())
@@ -347,7 +347,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
     private static void rejectMigrated(Integer type) {
         if (DictionaryNames.isBookkeeping(type)) {
-            throw new BusinessException("记账分类与标签请通过记账设置维护，请更新客户端后重试");
+            throw new BusinessException("记账分类、标签与会员类型请通过记账设置维护，请更新客户端后重试");
         }
     }
 
@@ -410,7 +410,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         // Replayed registration and repair must never resurrect renamed/deleted business options.
         boolean firstRegistration = registration && bookkeepingDictionaryMapper.countPersonalHistory(userId) == 0;
         List<BaseDictEntity> templateDictList = this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict()).stream()
-                .filter(row -> firstRegistration || !DictionaryNames.isBookkeeping(row.getDictType())).toList();
+                .filter(row -> !DictionaryNames.isBookkeeping(row.getDictType())
+                        || (firstRegistration && (!Objects.equals(row.getDictType(),4004) || bookkeepingDictionaryMapper.countMembershipHistory(userId)==0))).toList();
         Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(templateDictList);
         Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(this.queryDictListByUser(userId, DictTypeEnum.getUserVisibleDict()));
         List<BaseDictEntity> insertList = templateDictMap.entrySet().stream()

@@ -1,0 +1,8 @@
+PASS explicit stop-write approval guard; no schema change before approval
+PASS same legacy code maps by owner; unique disabled source verified; deleted/reused/duplicate/missing/zero/template remain pending
+PASS rerun migration and verification: all dictionary/subscription/baseline columns unchanged
+PASS unique current names, case sensitivity and 32/33 emoji schema bounds
+PASS missing index and original-field changes fail verification
+PASS unexpected family source blocks before schema/backfill
+ALL MYSQL FIXTURE CHECKS PASSED; disposable schemas: mtype_ced2f63b_happy mtype_ced2f63b_family
+No application database was read or changed. Stop and remove only the owned disposable server directory after evidence capture.

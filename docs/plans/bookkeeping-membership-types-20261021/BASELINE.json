@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-21T02:11:48.614966+00:00",
+  "repos": {
+    "iw-mixes-app-wx": {
+      "head": "e6685f1815f970835cb564f801a334c9ee88e1fc",
+      "branch": "main"
+    },
+    "iw-mixes-server": {
+      "head": "40027a95eebea17c08c5f80b9f065b9576168440",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "96d7f17ea0c5ae6dad8d206f9080d9583bce0886",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "22864d75d1f92977fcfcb45477dff620070ee3043c1699ebe983e08ef39d9269",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-app-wx/AGENTS.md",
+      "sha256": "edc385cea5c3e7d00ca330aa330d12ea210029156a78bf712c6201e61a380a75",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-membership-subscription.js",
+      "sha256": "410e55c546b38f5124770389befc26b9857bdd6f444f5575b4c361c73999b8ae",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/pagesBookkeeping/bookkeeping/bookkeeping-settings.js",
+      "sha256": "cfcc9dd9cf57e33fcf44f02929a0dd2f59c87d29d402e6f4860973f118b793c6",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.js",
+      "sha256": "db5aded9e2546d45c45f6712f6edbde6cbd08f60eaf708eb9ca5b79e911d4124",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.wxml",
+      "sha256": "24464b44d120c185509ca799c96ef4b2c4e00190c57580a0a8db2b11b448b101",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/pagesBookkeeping/bookkeeping/dictionary-management.wxss",
+      "sha256": "2cf3aafd0bb4403166258cb379d9133827e8ea6a5f31c3c2060e0073d84fce35",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-app-wx/scripts/test-bookkeeping-quick-loading.js",
+      "sha256": "308ee349eb141c2bf8217308f9159a4507c54f1dcadce7d9498f675cb983643e",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-app-wx/stores/bookkeeping-options.js",
+      "sha256": "e02e1292deccf837d55644b4e6870b6841baabba2652c394952929d553c4084a",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/AGENTS.md",
+      "sha256": "90cff9a99988347de3f01e7d85c9814bb199ba7393095ebae492866ea82af62f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BookkeepingDictionaryMapper.java",
+      "sha256": "c36a381edcad10ce0e3eed1e4291b597d475a9843703b5c9c7fccfc1a30c0e66",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java",
+      "sha256": "389521a8a14c8d897163429d44ce27278102ec87c958a08e1b74a670f36975ad",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryService.java",
+      "sha256": "fb2c9f7be797105d3901bc1ca6503fa92c0f1bc1e8b4845b5158377359e97a72",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-auth/src/main/resources/mapper/BookkeepingDictionaryMapper.xml",
+      "sha256": "c0f9fad8999210d85cfde8e815ea86082a8d9591399659f934117283215f3673",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingMembershipSubscriptionAddDto.java",
+      "sha256": "71a1fe0c9011912796c887f126582201f6f0636fb898d7bd3139dfb505f794ff",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingMembershipSubscriptionUpdateDto.java",
+      "sha256": "88f3bc879c97ffb3641d1345e4c76e75e19c0a39d17114d69c026b929e3ac279",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingMembershipSubscriptionEntity.java",
+      "sha256": "7fc3e70d8cfc5c0da7595dc4200bae2a578509dcc9f8856f4451f23897cc3017",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceImpl.java",
+      "sha256": "0dfe67ae9894b4216ea21772d5e09b00799e5b731bedc0ae001dedd8f6d4b016",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingActionsLoadingTest.java",
+      "sha256": "3e2390a7e6cad033eda36c61ce597027ebb7a740df4f21e1f10194ea0936f467",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionaryReadMapperTest.java",
+      "sha256": "413c1748fee35f36d43c7d2eb132d525fed80d294e4fc067f9d96389c0a5e65a",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryNames.java",
+      "sha256": "08c1a105192f040a26f075a782acb333330285c959efa3d92a50f14e09d313fa",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-web/src/main/java/com/itwray/iw/web/model/enums/DictTypeEnum.java",
+      "sha256": "891ba5dd9aef211df1db878c2590cf7eae0a040a3e17aaa96a9201a55ae2ba67",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/AGENTS.md",
+      "sha256": "b7611beddd999c4c3e46389a1f0bd0ba80b1d9bd0f063a813a2b935b387324e5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/dict/components/DictForm.vue",
+      "sha256": "acb50798e49d0e65196f96a9df94cfc425ecfa2a07e28470f74f53bb632cd2c2",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/dict/components/DictManagementTable.vue",
+      "sha256": "2a53c86839989567a81ec66b851edd4c7224e3ebb698df7c8aa2cffb6ddb7e7c",
+      "tracked": true
+    }
+  ]
+}

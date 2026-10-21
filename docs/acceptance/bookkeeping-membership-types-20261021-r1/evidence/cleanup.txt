@@ -1,0 +1,2 @@
+PASS dropped all 3 owned test schemas; remaining owned schemas=0; private fixture credentials removed
+Java 18011 / PID71488 remains; prescribed stop script cannot detect process in current execution context. MySQL/Redis/Vite and temporary native window stopped.

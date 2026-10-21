@@ -27,6 +27,12 @@ public interface BookkeepingDictionaryMapper {
     })
     Reader reader(Integer userId);
     @IgnorePermission
+    @Select("SELECT dict_type FROM base_dict WHERE id=#{id}")
+    Integer typeOf(Integer id);
+    @IgnorePermission
+    @Select("SELECT COUNT(*) FROM base_dict WHERE user_id=#{userId} AND scope_type=0 AND family_group_id=0 AND dict_type=4004")
+    int countMembershipHistory(Integer userId);
+    @IgnorePermission
     @Select("SELECT COALESCE(family_group_id,0) FROM auth_user WHERE id=#{userId} AND deleted=0")
     Integer currentGroup(Integer userId);
     @IgnorePermission

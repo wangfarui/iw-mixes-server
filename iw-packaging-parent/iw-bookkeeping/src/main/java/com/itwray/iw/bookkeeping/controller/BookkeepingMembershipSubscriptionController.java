@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +37,12 @@ public class BookkeepingMembershipSubscriptionController extends WebController<B
     @Autowired
     public BookkeepingMembershipSubscriptionController(BookkeepingMembershipSubscriptionService webService) {
         super(webService);
+    }
+
+    @GetMapping("/filter-options")
+    @Operation(summary = "查询本人订阅历史类型筛选项")
+    public List<com.itwray.iw.bookkeeping.model.vo.BookkeepingMembershipFilterOption> filterOptions() {
+        return getWebService().filterOptions();
     }
 
     @PostMapping("/list")

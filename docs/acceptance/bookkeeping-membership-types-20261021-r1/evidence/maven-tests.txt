@@ -1,0 +1,371 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO]
+[INFO] iw-parent                                                          [pom]
+[INFO] iw-common                                                          [jar]
+[INFO] iw-starter                                                         [pom]
+[INFO] iw-redis-starter                                                   [jar]
+[INFO] iw-web                                                             [jar]
+[INFO] iw-feign-client                                                    [pom]
+[INFO] iw-points-client                                                   [jar]
+[INFO] iw-bookkeeping-client                                              [jar]
+[INFO] iw-eat-client                                                      [jar]
+[INFO] iw-auth-client                                                     [jar]
+[INFO] iw-external-client                                                 [jar]
+[INFO] iw-rocketmq-starter                                                [jar]
+[INFO] iw-packaging-parent                                                [pom]
+[INFO] iw-auth                                                            [jar]
+[INFO] iw-points                                                          [jar]
+[INFO] iw-eat                                                             [jar]
+[INFO] iw-bookkeeping                                                     [jar]
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-parent >---------------------
+[INFO] Building iw-parent 0.2.1                                          [1/17]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-common >---------------------
+[INFO] Building iw-common 0.2.1                                          [2/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-common ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-common/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-common ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-common ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-common/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-common ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-common ---
+[INFO] No tests to run.
+[INFO]
+[INFO] --------------------< com.itwray.mixes:iw-starter >---------------------
+[INFO] Building iw-starter 0.2.1                                         [3/17]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] -----------------< com.itwray.mixes:iw-redis-starter >------------------
+[INFO] Building iw-redis-starter 0.2.1                                   [4/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-redis-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-redis-starter ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-redis-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-starter/iw-redis-starter/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-redis-starter ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-redis-starter ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-web >-----------------------
+[INFO] Building iw-web 0.2.1                                             [5/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-web ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 6 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-web ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-web ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-web/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-web ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-web ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-feign-client >------------------
+[INFO] Building iw-feign-client 0.2.1                                    [6/17]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] -----------------< com.itwray.mixes:iw-points-client >------------------
+[INFO] Building iw-points-client 0.2.1                                   [7/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-points-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-points-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-points-client ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-points-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-points-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-points-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-points-client ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ---------------< com.itwray.mixes:iw-bookkeeping-client >---------------
+[INFO] Building iw-bookkeeping-client 0.2.1                              [8/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-bookkeeping-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-bookkeeping-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-bookkeeping-client ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-bookkeeping-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-bookkeeping-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-bookkeeping-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-bookkeeping-client ---
+[INFO] No tests to run.
+[INFO]
+[INFO] -------------------< com.itwray.mixes:iw-eat-client >-------------------
+[INFO] Building iw-eat-client 0.2.1                                      [9/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-eat-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-eat-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-eat-client ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-eat-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-eat-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-eat-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-eat-client ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-auth-client >-------------------
+[INFO] Building iw-auth-client 0.2.1                                    [10/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-auth-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-auth-client ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-auth-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-auth-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-auth-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-auth-client ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-external-client >-----------------
+[INFO] Building iw-external-client 0.2.1                                [11/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-external-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-external-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-external-client ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-external-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-feign-client/iw-external-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-external-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-external-client ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-rocketmq-starter >----------------
+[INFO] Building iw-rocketmq-starter 0.2.1                               [12/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-rocketmq-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 3 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-rocketmq-starter ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-rocketmq-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-rocketmq-starter ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-rocketmq-starter ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-packaging-parent >----------------
+[INFO] Building iw-packaging-parent 0.2.1                               [13/17]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-auth >----------------------
+[INFO] Building iw-auth 0.2.1                                           [14/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-auth ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 4 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-auth ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-auth ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-auth ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-auth ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.itwray.iw.auth.service.impl.MembershipLegacyDictionaryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.162 s -- in com.itwray.iw.auth.service.impl.MembershipLegacyDictionaryTest
+[INFO] Running com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.105 s -- in com.itwray.iw.auth.service.impl.BookkeepingDictionaryServiceTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-points >---------------------
+[INFO] Building iw-points 0.2.1                                         [15/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-points ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 6 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-points ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-points ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-points/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-points ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-points ---
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-eat >-----------------------
+[INFO] Building iw-eat 0.2.1                                            [16/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-eat ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-eat ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-eat ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-eat/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-eat ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-eat ---
+[INFO] No tests to run.
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-bookkeeping >-------------------
+[INFO] Building iw-bookkeeping 0.2.1                                    [17/17]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-bookkeeping ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 8 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-bookkeeping ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-bookkeeping ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-bookkeeping ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 8 source files with javac [debug target 17] to target/test-classes
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java使用或覆盖了已过时的 API。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceTest.java: /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceTest.java使用了未经检查或不安全的操作。
+[INFO] /Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-bookkeeping ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.itwray.iw.bookkeeping.support.BookkeepingDictionaryReadMapperTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.145 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionaryReadMapperTest
+[INFO] Running com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.351 s -- in com.itwray.iw.bookkeeping.support.BookkeepingDictionarySnapshotsTest
+[INFO] Running com.itwray.iw.bookkeeping.support.BookkeepingActionsLoadingTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.418 s -- in com.itwray.iw.bookkeeping.support.BookkeepingActionsLoadingTest
+[INFO] Running com.itwray.iw.bookkeeping.service.impl.BookkeepingMembershipSubscriptionServiceTest
+10:50:21.215 [main] INFO org.hibernate.validator.internal.util.Version -- HV000001: Hibernate Validator 8.0.1.Final
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.374 s -- in com.itwray.iw.bookkeeping.service.impl.BookkeepingMembershipSubscriptionServiceTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for iw-parent 0.2.1:
+[INFO]
+[INFO] iw-parent .......................................... SUCCESS [  0.001 s]
+[INFO] iw-common .......................................... SUCCESS [  0.637 s]
+[INFO] iw-starter ......................................... SUCCESS [  0.000 s]
+[INFO] iw-redis-starter ................................... SUCCESS [  0.350 s]
+[INFO] iw-web ............................................. SUCCESS [  0.495 s]
+[INFO] iw-feign-client .................................... SUCCESS [  0.001 s]
+[INFO] iw-points-client ................................... SUCCESS [  0.057 s]
+[INFO] iw-bookkeeping-client .............................. SUCCESS [  0.043 s]
+[INFO] iw-eat-client ...................................... SUCCESS [  0.032 s]
+[INFO] iw-auth-client ..................................... SUCCESS [  0.063 s]
+[INFO] iw-external-client ................................. SUCCESS [  0.037 s]
+[INFO] iw-rocketmq-starter ................................ SUCCESS [  0.032 s]
+[INFO] iw-packaging-parent ................................ SUCCESS [  0.000 s]
+[INFO] iw-auth ............................................ SUCCESS [  2.498 s]
+[INFO] iw-points .......................................... SUCCESS [  0.073 s]
+[INFO] iw-eat ............................................. SUCCESS [  0.038 s]
+[INFO] iw-bookkeeping ..................................... SUCCESS [  6.469 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  11.081 s
+[INFO] Finished at: 2026-10-21T10:50:21+08:00
+[INFO] ------------------------------------------------------------------------

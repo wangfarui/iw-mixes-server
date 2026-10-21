@@ -24,4 +24,5 @@ public interface BookkeepingMembershipSubscriptionService extends WebService<Boo
      * <p>基于上游调用芳的用户权限，决定是自动续费当前用户还是所有用户</p>
      */
     int autoRenew();
+    List<com.itwray.iw.bookkeeping.model.vo.BookkeepingMembershipFilterOption> filterOptions();
 }

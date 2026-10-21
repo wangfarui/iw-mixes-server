@@ -143,6 +143,58 @@ class BookkeepingDictionaryServiceTest {
         service.initializeFamily(3);
         verify(mapper,never()).insertState(anyInt()); verify(mapper,never()).insert(any());
     }
+    @Test void membershipPersonalPathIgnoresBrokenFamilyAndNeverLocksIt() {
+        when(mapper.currentGroup(7)).thenReturn(999);
+        when(mapper.lockUser(7)).thenReturn(999);
+        when(mapper.reader(7)).thenReturn(null);
+        BaseDictEntity row=row(40,"视频",0,7,0); row.setDictType(4004);
+        when(mapper.listScope(0,0,7,4004)).thenReturn(List.of(row));
+        assertEquals(1,service.options(7,4004).size());
+        assertTrue(service.items(7,Type.MEMBERSHIP_TYPE,Scope.PERSONAL).canManage());
+        verify(mapper,never()).reader(anyInt());
+        verify(mapper,never()).lockGroup(anyInt());
+        verify(mapper,never()).lockRole(anyInt(),anyInt());
+        verify(mapper,never()).lockState(anyInt());
+        verify(mapper,never()).insertState(anyInt());
+        verify(mapper,never()).listScope(eq(1),anyInt(),anyInt(),anyInt());
+    }
+    @Test void membershipRejectsFamilyListCreateOrderAndCopy() {
+        assertThrows(BusinessException.class,()->service.items(7,Type.MEMBERSHIP_TYPE,Scope.FAMILY));
+        assertThrows(BusinessException.class,()->service.create(7,Type.MEMBERSHIP_TYPE,Scope.FAMILY,"视频"));
+        assertThrows(BusinessException.class,()->service.order(7,Type.MEMBERSHIP_TYPE,Scope.FAMILY,List.of(),"x"));
+        BaseDictEntity row=row(40,"视频",0,7,0); row.setDictType(4004);
+        when(mapper.lockOwned(List.of(40),7,3)).thenReturn(List.of(row));
+        assertThrows(BusinessException.class,()->service.copyPersonal(7,List.of(40)));
+        verify(mapper,never()).insert(any());
+    }
+    @Test void membershipRenameAndValidationOnlyLockOwnerAndSource() {
+        BaseDictEntity row=row(40,"视频",0,7,0); row.setDictType(4004);
+        when(mapper.typeOf(40)).thenReturn(4004);
+        when(mapper.lockOwned(List.of(40),7,0)).thenReturn(List.of(row));
+        when(mapper.listScope(0,0,7,4004)).thenReturn(List.of(row));
+        when(mapper.retire(row)).thenReturn(1);
+        doAnswer(c->{ ((BaseDictEntity)c.getArgument(0)).setId(41); return null; }).when(mapper).insert(any());
+        assertEquals(41,service.rename(7,40,"新视频",0).item().id());
+        assertEquals("视频",row.getDictName());
+        assertEquals(row,service.lockSelectable(7,4004,List.of(40)).get(0));
+        row.setDictStatus(0);
+        assertThrows(BusinessException.class,()->service.lockSelectable(7,4004,List.of(40)));
+        row.setDictStatus(1); row.setDictType(4002);
+        assertThrows(BusinessException.class,()->service.lockSelectable(7,4004,List.of(40)));
+        when(mapper.lockOwned(List.of(40),7,0)).thenReturn(List.of());
+        assertThrows(BusinessException.class,()->service.status(7,40,true,0));
+        verify(mapper,never()).lockGroup(anyInt());
+        verify(mapper,never()).lockRole(anyInt(),anyInt());
+    }
+    @Test void membershipNamesCountUnicodeAndDisabledDuplicatesAndOrderVersion() {
+        assertDoesNotThrow(()->service.create(7,Type.MEMBERSHIP_TYPE,Scope.PERSONAL,"🍚".repeat(32)));
+        assertThrows(BusinessException.class,()->service.create(7,Type.MEMBERSHIP_TYPE,Scope.PERSONAL,"🍚".repeat(33)));
+        assertThrows(BusinessException.class,()->service.create(7,Type.MEMBERSHIP_TYPE,Scope.PERSONAL,"　 "));
+        BaseDictEntity row=row(40,"视频",0,7,0);row.setDictType(4004);row.setDictStatus(0);
+        when(mapper.listScope(0,0,7,4004)).thenReturn(List.of(row));
+        assertThrows(BusinessException.class,()->service.create(7,Type.MEMBERSHIP_TYPE,Scope.PERSONAL," 视频 "));
+        assertThrows(BusinessException.class,()->service.order(7,Type.MEMBERSHIP_TYPE,Scope.PERSONAL,List.of(40),"stale"));
+    }
     private static BaseDictEntity row(int id,String name,int scope,int user,int family) {
         BaseDictEntity row=new BaseDictEntity(); row.setId(id); row.setDictName(name); row.setDictType(4002);
         row.setScopeType(scope); row.setUserId(user); row.setFamilyGroupId(family); row.setDictStatus(1);

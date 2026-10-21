@@ -1,0 +1,504 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO]
+[INFO] iw-parent                                                          [pom]
+[INFO] iw-common                                                          [jar]
+[INFO] iw-starter                                                         [pom]
+[INFO] iw-redis-starter                                                   [jar]
+[INFO] iw-web                                                             [jar]
+[INFO] iw-feign-client                                                    [pom]
+[INFO] iw-points-client                                                   [jar]
+[INFO] iw-bookkeeping-client                                              [jar]
+[INFO] iw-eat-client                                                      [jar]
+[INFO] iw-auth-client                                                     [jar]
+[INFO] iw-external-client                                                 [jar]
+[INFO] iw-rocketmq-starter                                                [jar]
+[INFO] iw-packaging-parent                                                [pom]
+[INFO] iw-auth                                                            [jar]
+[INFO] iw-points                                                          [jar]
+[INFO] iw-eat                                                             [jar]
+[INFO] iw-bookkeeping                                                     [jar]
+[INFO] iw-wardrobe                                                        [jar]
+[INFO] iw-core                                                            [jar]
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-parent >---------------------
+[INFO] Building iw-parent 0.2.1                                          [1/19]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-common >---------------------
+[INFO] Building iw-common 0.2.1                                          [2/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-common ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-common/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-common ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 15 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-common ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-common/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-common ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-common ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-common ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-common/target/iw-common-0.2.1.jar
+[INFO]
+[INFO] --------------------< com.itwray.mixes:iw-starter >---------------------
+[INFO] Building iw-starter 0.2.1                                         [3/19]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] -----------------< com.itwray.mixes:iw-redis-starter >------------------
+[INFO] Building iw-redis-starter 0.2.1                                   [4/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-redis-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-redis-starter ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 9 source files with javac [debug target 17] to target/classes
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/src/main/java/com/itwray/iw/starter/redis/RedisUtil.java:[581,53] 最后一个参数使用了不准确的变量类型的 varargs 方法的非 varargs 调用;
+  对于 varargs 调用, 应使用 java.lang.Object
+  对于非 varargs 调用, 应使用 java.lang.Object[], 这样也可以抑制此警告
+[WARNING] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/src/main/java/com/itwray/iw/starter/redis/RedisUtil.java:[603,54] 最后一个参数使用了不准确的变量类型的 varargs 方法的非 varargs 调用;
+  对于 varargs 调用, 应使用 java.lang.Object
+  对于非 varargs 调用, 应使用 java.lang.Object[], 这样也可以抑制此警告
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/src/main/java/com/itwray/iw/starter/redis/RedisUtil.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/src/main/java/com/itwray/iw/starter/redis/RedisUtil.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/src/main/java/com/itwray/iw/starter/redis/RedisUtil.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-redis-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-redis-starter ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-redis-starter ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-redis-starter ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-redis-starter/target/iw-redis-starter-0.2.1.jar
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-web >-----------------------
+[INFO] Building iw-web 0.2.1                                             [5/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-web ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 6 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-web ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 120 source files with javac [debug target 17] to target/classes
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-web ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-web/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-web ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-web ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-web ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-web/target/iw-web-0.2.1.jar
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-feign-client >------------------
+[INFO] Building iw-feign-client 0.2.1                                    [6/19]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] -----------------< com.itwray.mixes:iw-points-client >------------------
+[INFO] Building iw-points-client 0.2.1                                   [7/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-points-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-points-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-points-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 4 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-points-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-points-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-points-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-points-client ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-points-client ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-points-client/target/iw-points-client-0.2.1.jar
+[INFO]
+[INFO] ---------------< com.itwray.mixes:iw-bookkeeping-client >---------------
+[INFO] Building iw-bookkeeping-client 0.2.1                              [8/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-bookkeeping-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-bookkeeping-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-bookkeeping-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 4 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-bookkeeping-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-bookkeeping-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-bookkeeping-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-bookkeeping-client ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-bookkeeping-client ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-bookkeeping-client/target/iw-bookkeeping-client-0.2.1.jar
+[INFO]
+[INFO] -------------------< com.itwray.mixes:iw-eat-client >-------------------
+[INFO] Building iw-eat-client 0.2.1                                      [9/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-eat-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-eat-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-eat-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-eat-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-eat-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-eat-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-eat-client ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-eat-client ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-eat-client/target/iw-eat-client-0.2.1.jar
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-auth-client >-------------------
+[INFO] Building iw-auth-client 0.2.1                                    [10/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-auth-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-auth-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 16 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-auth-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-auth-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-auth-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-auth-client ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-auth-client ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-auth-client/target/iw-auth-client-0.2.1.jar
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-external-client >-----------------
+[INFO] Building iw-external-client 0.2.1                                [11/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-external-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-external-client/src/main/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-external-client ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 18 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-external-client ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-external-client/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-external-client ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-external-client ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-external-client ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-feign-client/iw-external-client/target/iw-external-client-0.2.1.jar
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-rocketmq-starter >----------------
+[INFO] Building iw-rocketmq-starter 0.2.1                               [12/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-rocketmq-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 3 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-rocketmq-starter ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 13 source files with javac [debug target 17] to target/classes
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/main/java/com/itwray/iw/starter/rocketmq/config/RocketMQAutoConfiguration.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/main/java/com/itwray/iw/starter/rocketmq/config/RocketMQAutoConfiguration.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/main/java/com/itwray/iw/starter/rocketmq/config/RocketMQAutoConfiguration.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-rocketmq-starter ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-rocketmq-starter/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-rocketmq-starter ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-rocketmq-starter ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-rocketmq-starter ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-starter/iw-rocketmq-starter/target/iw-rocketmq-starter-0.2.1.jar
+[INFO]
+[INFO] ----------------< com.itwray.mixes:iw-packaging-parent >----------------
+[INFO] Building iw-packaging-parent 0.2.1                               [13/19]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-auth >----------------------
+[INFO] Building iw-auth 0.2.1                                           [14/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-auth ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 4 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-auth ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 152 source files with javac [debug target 17] to target/classes
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[WARNING] 未知的枚举常量 javax.annotation.meta.When.MAYBE
+  原因: 找不到javax.annotation.meta.When的类文件
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-auth ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-auth ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 6 source files with javac [debug target 17] to target/test-classes
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/test/AuthFamilyGroupAccountDeletionTest.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/test/AuthFamilyGroupAccountDeletionTest.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/src/test/java/com/itwray/iw/auth/test/AuthFamilyGroupAccountDeletionTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-auth ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-auth ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-auth/target/iw-auth-0.2.1.jar
+[INFO]
+[INFO] ---------------------< com.itwray.mixes:iw-points >---------------------
+[INFO] Building iw-points 0.2.1                                         [15/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-points ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 6 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-points ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 101 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-points ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-points/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-points ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug target 17] to target/test-classes
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-points ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-points ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-points/target/iw-points-0.2.1.jar
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-eat >-----------------------
+[INFO] Building iw-eat 0.2.1                                            [16/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-eat ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-eat ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 56 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-eat ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-eat/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-eat ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-eat ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-eat ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-eat/target/iw-eat-0.2.1.jar
+[INFO]
+[INFO] ------------------< com.itwray.mixes:iw-bookkeeping >-------------------
+[INFO] Building iw-bookkeeping 0.2.1                                    [17/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-bookkeeping ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 8 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-bookkeeping ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 135 source files with javac [debug target 17] to target/classes
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-bookkeeping ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-bookkeeping ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 8 source files with javac [debug target 17] to target/test-classes
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerIntegrationTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceTest.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceTest.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/src/test/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-bookkeeping ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-bookkeeping ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-bookkeeping/target/iw-bookkeeping-0.2.1.jar
+[INFO]
+[INFO] --------------------< com.itwray.mixes:iw-wardrobe >--------------------
+[INFO] Building iw-wardrobe 0.2.1                                       [18/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-wardrobe ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 0 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-wardrobe ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 88 source files with javac [debug target 17] to target/classes
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/main/java/com/itwray/iw/wardrobe/service/impl/WardrobeImageFileCleanupServiceImpl.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/main/java/com/itwray/iw/wardrobe/service/impl/WardrobeImageFileCleanupServiceImpl.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/main/java/com/itwray/iw/wardrobe/service/impl/WardrobeImageFileCleanupServiceImpl.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-wardrobe ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-wardrobe ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 6 source files with javac [debug target 17] to target/test-classes
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/test/java/com/itwray/iw/wardrobe/service/impl/WardrobeOutfitServiceImplTest.java: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/test/java/com/itwray/iw/wardrobe/service/impl/WardrobeOutfitServiceImplTest.java使用了未经检查或不安全的操作。
+[INFO] /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/src/test/java/com/itwray/iw/wardrobe/service/impl/WardrobeOutfitServiceImplTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-wardrobe ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-wardrobe ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-wardrobe/target/iw-wardrobe-0.2.1.jar
+[INFO]
+[INFO] ----------------------< com.itwray.mixes:iw-core >----------------------
+[INFO] Building iw-core 0.2.1                                           [19/19]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ iw-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ iw-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug target 17] to target/classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ iw-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-core/src/test/resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ iw-core ---
+[INFO] No sources to compile
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ iw-core ---
+[INFO] Tests are skipped.
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ iw-core ---
+[INFO] Building jar: /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-core/target/iw-core-0.2.1.jar
+[INFO]
+[INFO] --- spring-boot-maven-plugin:3.2.12:repackage (default) @ iw-core ---
+[INFO] Replacing main artifact /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-core/target/iw-core-0.2.1.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to /private/tmp/iw-mtype-20261021-r1/build/iw-mixes-server/iw-packaging-parent/iw-core/target/iw-core-0.2.1.jar.original
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for iw-parent 0.2.1:
+[INFO]
+[INFO] iw-parent .......................................... SUCCESS [  0.001 s]
+[INFO] iw-common .......................................... SUCCESS [  1.509 s]
+[INFO] iw-starter ......................................... SUCCESS [  0.000 s]
+[INFO] iw-redis-starter ................................... SUCCESS [  0.868 s]
+[INFO] iw-web ............................................. SUCCESS [  2.273 s]
+[INFO] iw-feign-client .................................... SUCCESS [  0.000 s]
+[INFO] iw-points-client ................................... SUCCESS [  0.574 s]
+[INFO] iw-bookkeeping-client .............................. SUCCESS [  0.544 s]
+[INFO] iw-eat-client ...................................... SUCCESS [  0.392 s]
+[INFO] iw-auth-client ..................................... SUCCESS [  0.492 s]
+[INFO] iw-external-client ................................. SUCCESS [  0.511 s]
+[INFO] iw-rocketmq-starter ................................ SUCCESS [  0.533 s]
+[INFO] iw-packaging-parent ................................ SUCCESS [  0.000 s]
+[INFO] iw-auth ............................................ SUCCESS [  2.938 s]
+[INFO] iw-points .......................................... SUCCESS [  1.982 s]
+[INFO] iw-eat ............................................. SUCCESS [  1.502 s]
+[INFO] iw-bookkeeping ..................................... SUCCESS [  3.540 s]
+[INFO] iw-wardrobe ........................................ SUCCESS [  4.556 s]
+[INFO] iw-core ............................................ SUCCESS [  1.901 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  24.324 s
+[INFO] Finished at: 2026-10-21T10:52:18+08:00
+[INFO] ------------------------------------------------------------------------

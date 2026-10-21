@@ -18,6 +18,10 @@ public class BookkeepingMembershipSubscriptionListDto {
     @Schema(title = "会员类型")
     private Integer membershipType;
 
+    private String membershipTypeName;
+    /** Only PENDING is supported; mutually exclusive with membershipTypeName. */
+    private String membershipTypeState;
+
     /**
      * 记账记录排序类型
      */

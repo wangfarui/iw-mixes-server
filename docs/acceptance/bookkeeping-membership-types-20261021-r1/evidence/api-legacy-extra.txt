@@ -1,0 +1,1 @@
+PASS real legacy list/detail/add/update/delete/sync flag, type catalog, latest/cache all-list and page: 10 requests

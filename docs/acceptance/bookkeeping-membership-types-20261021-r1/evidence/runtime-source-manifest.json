@@ -1,0 +1,1718 @@
+{
+  "runtimeJarSha256": "f3b6ad9c0da6f3489527ba8387cd776bdce995b5cd0cad41aa0f1676cf3f3064",
+  "backendRuntimeSourceMatches": true,
+  "files": [
+    {
+      "path": "iw-web/src/main/resources/logback-spring.xml",
+      "sha256": "1b4d27fb2b867166a3020987e8dc502ce72321e8cc0fb2934defe201122ae861"
+    },
+    {
+      "path": "iw-web/src/main/resources/application.properties",
+      "sha256": "aad66e599136de664f854adeb0922a871b434196c5a581614e5154898ec4686f"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/SwaggerConfig.java",
+      "sha256": "194f034fa5ce18ae1e0be33ac78aa63f89be43e5b7f6f489ad07e534df5ebda4"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/package-info.java",
+      "sha256": "bd024da57dc6c1db7a3d2bb6cc825a32084cd2aae978c973de4ba4773b1eae99"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryNames.java",
+      "sha256": "dd6ce845035e6f39126c56665681be32d8fc2692a6e36b5a0a6d6f4d0928a1c5"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/bookkeeping/DictionaryTagSnapshot.java",
+      "sha256": "264c80ad8904304e72d8fb961876107e124799564a6065dfacb7219c3f7920f7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/bookkeeping/BookkeepingDictionaryAccess.java",
+      "sha256": "769b455bb0b441f563d903a43bb9e57d9268f14d28c72bbf7af066ba73303a63"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/config/IwWebProperties.java",
+      "sha256": "866d4b825ffef8631aa4c61c687fb87ac19511a2ae33bf3bd916f77f208b5028"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/config/IwDaoProperties.java",
+      "sha256": "7c1e75ee4a8bdbab1f59dec70ca68cb47f8d41c23b82b3e3bdca65bc8da0aa66"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/config/IwAliyunProperties.java",
+      "sha256": "df4c7ab8ef16d06b8ff6e87e596d9036de7f18afb6d16863b97bcb3c268fe13e"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/config/IwDbProperties.java",
+      "sha256": "d3db33dbdec11815281c9436de85047c3f4986dc9d807aa8331b5e801dd7f84d"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/config/IwDataSourceConfiguration.java",
+      "sha256": "da2b1a5cdd69d8f63ad5c3f7460612c65f85a848df05792c3422c95e5ec14984"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/config/IwWebAutoConfiguration.java",
+      "sha256": "e5ca6ef0e61082efde6f19d5d4d6400407b77882f7e4fdcf3e5beaf3deebf237"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/constants/WebCommonConstants.java",
+      "sha256": "e4742fe7aad45e4e9a284688db83f540b67d940bb6d0850ed51c27c66c97def7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/dao/BaseBusinessFileDao.java",
+      "sha256": "071600175688b08a4d3c9cbd2f6afdcd1698db1cc96e7b690954f0cbfd5e04c8"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/dao/BaseDictDao.java",
+      "sha256": "383aa89ccb5d39d658d2cb5c8b7ec1d291eea59e5358f7702ee7a8f1b6787848"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/dao/BaseDao.java",
+      "sha256": "dd094861974300725782909dd2f0953eef33943775d1ec8f8824e9f391037fb4"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/dao/BaseDictBusinessRelationDao.java",
+      "sha256": "bc8824d9820539e3586fa82374bebd8d35d757700fc58d0b75207f555593e814"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/mapper/BaseBusinessFileMapper.java",
+      "sha256": "7ac16dce30031138621f9d794e48bb997bfb573e366d29626e770676037b5b14"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/mapper/BaseDictBusinessRelationMapper.java",
+      "sha256": "db856a2d99471b724bf7b1f7276a7e859809535d7182d2eb69963b1cf23c1683"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/mapper/BaseDictMapper.java",
+      "sha256": "2a01cf4c1b5c7850d25c8ead15eb90dd996d8da68e58d4e3bbe0220c42263725"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/annotation/SkipWrapper.java",
+      "sha256": "03f8f671518d366799b50bca9349bc2c72056726fd824cfd20369c971105aae7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/annotation/SharedQueryScope.java",
+      "sha256": "97822bb5e6b3eacf2121ae73ac4d587dc13f20117cbe2b888007a2720a471dfb"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/annotation/IgnorePermission.java",
+      "sha256": "15b0f52f816f016aed06fa656d493a79c489334660198f11f6ba4e34dfed7255"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/UserUtils.java",
+      "sha256": "d0beae3c5830f0af6b094d765a870ea74c2c184850e12614dd1fb4ee6c9838db"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/FileUtils.java",
+      "sha256": "6b90f1a6510716327f079ce85920ba68b1bf4de93f00e4bc4813f5a64bc54652"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/OrderNoUtils.java",
+      "sha256": "8a8d480c9a3420297aa8be9b6e1c2284ae10565e169b50bb99c3e5f39d38459e"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/IpUtils.java",
+      "sha256": "7bbf29ea338248da4c9587a374abd7c186c256d089bc753db1325e9108a40e01"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/UserCurrentGroupUtils.java",
+      "sha256": "197a825d726f651ab833e1ddecba828e846a7cfe852d3bbe2e8118e817fcb409"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/EnvironmentHolder.java",
+      "sha256": "9f7917b9666c42531624ab3ca1555169754785e946085f92ee90e10bd73e9daf"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/ApplicationContextHolder.java",
+      "sha256": "5c842d110ef7dbe6955f08ea8077487b7612c68543af696a4f3e9aac93a31257"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/SpringWebHolder.java",
+      "sha256": "282152c69e0c0df3a42553967bf35554a5d9ad5b4e24fc4409c06e00a0c19ba1"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/HttpUtils.java",
+      "sha256": "e3f43bbd50671946d7a2092d67df25e21976f2e7293b7183d281c9e449d12336"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/utils/UserSharedQueryUtils.java",
+      "sha256": "091d95b6251d43709460fde73c71cacbc2dd10f09fd7daa2c784a236d00f7491"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/controller/WebController.java",
+      "sha256": "e2f2f8db56afca691df22398fba0fea0a69d4632cc52fe5c85b9dbee696412fa"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/support/UserOwnerFillSupport.java",
+      "sha256": "13b77ee2308d433c6e41725e59e2551cb4cebbf06c17b10d93943343d6c24cdb"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/service/UserNameQueryService.java",
+      "sha256": "f2b1e3271e9b7b91158ccd734093eab194f6676ed4af6c38b22b776f925d61de"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/service/FileService.java",
+      "sha256": "50e1a894e5754889e0ab010e8fa0a646f36c02d3b7566eedf69254163119abee"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/service/WebService.java",
+      "sha256": "4d03908dcdff7f16666f93f901f803f9c2ffab0f88ab2f4650b55edf46a5fd2f"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/exception/FeignClientException.java",
+      "sha256": "b1f1518acf8943f42b31ade3ac22eed263d606a2de10f23284029c3674911b90"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/exception/IwServerException.java",
+      "sha256": "85eb1bc07a5f369b50a2776ed605355c625db1c08f8b17b914fe96364b991da6"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/exception/BusinessException.java",
+      "sha256": "ade37f611f45f920c0eac51d0a269af8a7d9afbeb1e8cfeabc8f3a02bcdfc527"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/exception/AuthorizedException.java",
+      "sha256": "bcbff99fdeb30b4a3122a82d21daff70010a2d3bbac741aaeb3210569231ad05"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/exception/IwWebException.java",
+      "sha256": "da7f7c43984c6b72c61d0ba162515eca8f4d8040c6d21a076aac09cd17989e26"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/client/AuthenticationClient.java",
+      "sha256": "15b788372c71069c07cd145a51a7a2c48f009cc9f7fe3f16b20ee6a598f3dc2e"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/client/DingTalkClient.java",
+      "sha256": "1ede2e8107bdf46be14ad7fc14ebf819a3498e318917f992528bf33e2d6ab38a"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/service/impl/FileServiceImpl.java",
+      "sha256": "70277978681d29e40852f6965e3223b26c797a223edd23285a1f2fb8892e73f9"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/service/impl/WebServiceImpl.java",
+      "sha256": "9298fb13aee7a21fc8dfcecf17b02c0d81883a5624c641296fa0d374e18c9e52"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/dto/PageDto.java",
+      "sha256": "e790c3b9bab36a58587b1d191fa74d113a7eb2d42f2c733c6136b942137443eb"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/dto/SharedQueryRequest.java",
+      "sha256": "743ce17990165f16ae0299359b8b82299fc8351b7340d11fd1bad182089fc267"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/dto/UpdateDto.java",
+      "sha256": "b52b6d29c8af840059434f9a8135b596f0b50b7a4fd88fe868f368e2e87015e7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/dto/FileDto.java",
+      "sha256": "323c7d1dfaf741e91a8895ad286f305b0d0b68767a46e7afea8ba1ccf39fa5ab"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/dto/UserDto.java",
+      "sha256": "2d24711fb5592c3cb7f15b5da1795e16514f5d709ac58a6bfde5a6e3a6ee80ba"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/dto/AddDto.java",
+      "sha256": "266f11f637e9c1a02a875010fb06e310c2b04bdcbeeac9ec653b4719959b628e"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/DetailVo.java",
+      "sha256": "2d1325cbc7b305a6256aa8d8fee7c581fa1119a1a9a7447db30788f8407847f6"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/UserOwnerPageVo.java",
+      "sha256": "3238a1ef329ab5c282270cd93ff25644e0dd6d92337d95172b4bfa649236aed1"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/FileVo.java",
+      "sha256": "5aea2d464614a965581e07f5eaca1913add1ddea20202f751d14edf3360bb0c7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/PageVo.java",
+      "sha256": "e908830c9ee55edf8c54b52beac8ecf032fa89b0e54318a3aab082f0c4613c5a"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/AbstractUserOwnerVo.java",
+      "sha256": "921d5586f75e791b65822f818005cfb10f4342342ff77391e20290749cbe4ac9"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/PageRecordVo.java",
+      "sha256": "9c3acecd31b048a2f4ff0e29cf0fc02569bce18f1f2929949bc44a0006a94fa7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/UserOwnerDetailVo.java",
+      "sha256": "eefb86c779f14f0d7c1c8a3b82ac10f28aaa2d4c63fd87fdb322d3c808e5b99c"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/FileRecordVo.java",
+      "sha256": "afa3ea72eaefe21bf1a7ea49f7d1fc8713bcaf27a793edc12a706dd7b5aaceba"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/vo/UserOwnerAware.java",
+      "sha256": "1a8b060ff2ee33d8996ba1fc510688f1eaf5156a6711ccc1e2116ebdcff9ff31"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseDictEntity.java",
+      "sha256": "2e82f869d530e2cdb63862f6402c93746f6093226728cff87edbf04e9046e777"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseEntity.java",
+      "sha256": "b8620a198ff430924f3ba8ef25849903a6816bbc918bfb8e1e54cc21885c5950"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/UserEntity.java",
+      "sha256": "262adec9129f0c4db91b58a371c3c807e0806c2bad30b9cd12246dec4feaee51"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/IdEntity.java",
+      "sha256": "b8c859ca0b29b3179ec8ed9d425ec7dde9d78a6548f88cdf822289b59cf473f9"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseDictBusinessRelationEntity.java",
+      "sha256": "e15f4dc9cb2ac9f8b271281543f1717918ea3d1705ecf3ad721bda20794b0664"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/entity/BaseBusinessFileEntity.java",
+      "sha256": "3d2f110340d8ba58ff431b52fc1fcb9a30fe3e4316a5a24e490f9a2f5ca61ec2"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/BusinessConstantEnum.java",
+      "sha256": "a7362060a01e81a2199b11fdcb51a926c546e0578586a4f661a6a43a309ae448"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/RoleTypeEnum.java",
+      "sha256": "7eae34f65aefe104efd76a08102c487076273ebb69e5f52d9ca34f94dba96674"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/SortTypeEnum.java",
+      "sha256": "2b7c1c8aefa64778b32d72a630e5779d2d2265a756b7b573a3e806e6336c1cdb"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/DictTypeEnum.java",
+      "sha256": "891ba5dd9aef211df1db878c2590cf7eae0a040a3e17aaa96a9201a55ae2ba67"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/BusinessFileTypeEnum.java",
+      "sha256": "855542f33fd9f52ac7ec971623d15b5e9eda831d3656e3cbd55bba7cb9c23939"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/OrderNoEnum.java",
+      "sha256": "3f829f13de0340d3a8f83d839c2f40b71f612d304d4018d572259ecade8f9058"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/DictBusinessTypeEnum.java",
+      "sha256": "64c456c96c866c143c9fd7c24a17609261b4422823b196af818253808549e868"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/RuntimeEnvironmentEnum.java",
+      "sha256": "676d238c6c3966aff64e609514e7e33adacc7224213748a3af5bba59d82bcf86"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/SortWayEnum.java",
+      "sha256": "3a849e28c353ad67d80d19a8947acbc35ebe3533a2f965279f12319a150f8929"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/bo/package-info.java",
+      "sha256": "65e1387111902f4c0d9572bed8ee3ba76e817af0c64fecfaf719178ab87e291f"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/mq/PointsRecordsTopicEnum.java",
+      "sha256": "3c68d575373f04770b4792c658af7320e9c2fc3d6e52fc01a9c4b0e4988d060b"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/mq/RegisterNewUserTopicEnum.java",
+      "sha256": "bb0616db9742a7b8c7a6e693d7270f625b99b39747af22b9656e9dba78429c58"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/mq/FamilyGroupTopicEnum.java",
+      "sha256": "d66dbd000034044918115d8241b72989f794726c5299f15bc0140230d513dc00"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/mq/BookkeepingRecordsTopicEnum.java",
+      "sha256": "4f63125f29654477c1700a852ce40cfa5a43816be4f8dd7e4ab4d67a14ba8d13"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/model/enums/mq/MQDestination.java",
+      "sha256": "5cb246b735d53819ac590b1e8a1658661fd49539e6871c2adc1995960a077a80"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/deserialize/StartLocalDateTimeDeserializer.java",
+      "sha256": "555ea3d816b3029ff9b5f3f0aec131973459b167783f796ef0153e553d7e7688"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/deserialize/AbstractLocalDateDeserializer.java",
+      "sha256": "98ff7fae59b543a091cdc5652128e9e86a743aff3ed33662710549069d1161b0"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/deserialize/IntegerToZeroDeserializer.java",
+      "sha256": "8d72ed5642aba4620cae0ad0a17e1f266ed7f52b4dc62435615bad32de735c5f"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/deserialize/CollectionToCommaSpliceDeserializer.java",
+      "sha256": "5b91941c416bd5203f62c7ee8d82fa28d2fb12b5d8932620668997b590522cea"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/deserialize/EndLocalDateTimeDeserializer.java",
+      "sha256": "db825baa4bc1ec0b401a12339158793f387444d00ccce49d4594381f1c64bd9d"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/serialize/CommaSpliceToCollectionSerializer.java",
+      "sha256": "17b5be58fd126e0b5a3f2e773d1d5874583e3eed283175ee000ffaf3096ee6c3"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/serialize/DefaultImageSerializer.java",
+      "sha256": "913129ef85386b70f093c4b03819f2f9d5381afce141f6e2f33ccd01e70ebd75"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/serialize/PhoneNumberSerializer.java",
+      "sha256": "813b6101fe0c9b41fe2c54e3e320635649925f967f669a4f1b04c2649b8af729"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/serialize/FullImageSerializer.java",
+      "sha256": "d1437ac4b216f6f1836e8a62d02391956f0dfb244f7327cc060bb75d561b6302"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/serialize/EmailAddressSerializer.java",
+      "sha256": "4cd8225d477a555f3d82360653e0b57d09abbd1eca77984c27cb9987b3410b2c"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/json/serialize/ZeroToIntegerSerializer.java",
+      "sha256": "beb4ea6e20a9d0a5d29c7d4d66afae80afb890a29f7be2abe5f55eafcd45de97"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkConfigChangeListener.java",
+      "sha256": "d60c87058426458d2d8622a7916ee154ab55433b690b7950e3bb8c2437fe9a08"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkSendResponse.java",
+      "sha256": "96a1130273084ceee036406f5d6097d6cc1311bdf18c05d1e008d902b8e79005"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkSendRequest.java",
+      "sha256": "47b0742669dd950c85268e01c0721e0bd481d0872ca662728b3c635771aa094c"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkMsgType.java",
+      "sha256": "4f19f750c10b55192634496fe1c0a9656ec9d2adea086e7bf0a2a7272f1ac99f"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkConfiguration.java",
+      "sha256": "aeb54bc364c15d4d662edc93eae45bae9e2346650f8546044201cdb3d15d13b7"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkRobotClient.java",
+      "sha256": "2e9af47ad8948c9539582e7504b510c560fe5b74db15f012242ff415c25502b3"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkHelper.java",
+      "sha256": "c2dd1a12d84510fde0da76fb0acc88ec780c6fa511c23349fbe5d4ea601c2273"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/dingtalk/DingTalkProperties.java",
+      "sha256": "f0d4d8c527ca32e370a8bc573f41a90af0f6fd41f0f275103c0c8ec3ac53ed24"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/tracing/TracingApplicationRunListener.java",
+      "sha256": "20001fd04ba78b653a48963c3bccf518489e6cc9f7859ec6d86833056b639031"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/feign/GeneralResponseDecoder.java",
+      "sha256": "f8a9d85aca926978c53c2ebbf14bd943f4622e82f8ff60c7911844f3681f9242"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/feign/FeignConfiguration.java",
+      "sha256": "23f9cda7f6f785b7eacc5015701583146ab3928d99df2580ac1fde2ba400a490"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/feign/ParameterizedTypeImpl.java",
+      "sha256": "171e4f3a7d838bb2ea357006da7b875ba30b9bec6efafeaa5eebcd5acfabca6e"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/MybatisPlusConfiguration.java",
+      "sha256": "ba366782246a8e4793a9a2a15f15de640ff63a283185b367715a656b2bedccab"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/DefaultMetaObjectHandler.java",
+      "sha256": "ba3c4522b5d2f4b26d00c6fbb4b1cf76d1adb040558d5b6a4ac5f73f47a45f9d"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/UserTableQueryScope.java",
+      "sha256": "9e5289447ed953428fb5987ec9dd2c88a23f3b3841a73ea2c990c0911a3b270d"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/UserCurrentGroupProvider.java",
+      "sha256": "b17f7cc612af35d4da3fac517bc2b7b07ba1f78638095193f13b78baafda8890"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/UserDataPermissionHandler.java",
+      "sha256": "b9d63d170077b8f01f5f57502a37574d58d63af056f16710fa2913aff34f3579"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/UserSharedQueryPolicy.java",
+      "sha256": "6cfb9168e2e554ba4bfa755358391778d4b37d60e32da47ad01dd744e0d2f87e"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/MyBatisApplicationRunListener.java",
+      "sha256": "93fa746338b6a1c44dd5124673f2dc684a6fdd177243c4dee05ce296ede9e86c"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/webmvc/ResponseLoggingFilter.java",
+      "sha256": "bff574ab90dfce8a89965a4cc4ca181aba3676f990d823068255896f29e1c35c"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/webmvc/RequestLoggingFilter.java",
+      "sha256": "a3e9ed71986f3e0281b1fe1d6e01c06e580780e21b0a60207d57482f4df28c1d"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/webmvc/ExceptionHandlerInterceptor.java",
+      "sha256": "a5634f7d531c3b3f0e8e556ddde4aeef61dfc3eb1a723a663fc4462e1342f7cd"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/webmvc/GeneralResponseWrapperAdvice.java",
+      "sha256": "d5d735403253abbae2678b660249239b60915274828de7659e060a7c553eb40d"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/webmvc/WebHandlerInterceptor.java",
+      "sha256": "d51edc04e3f5639d631c5a6a7cd6020b9d4b99ecce41f630d2121adbbe555473"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/webmvc/IwWebMvcConfiguration.java",
+      "sha256": "c8d20b16e72f2d6d40e75055db035c07c00be64d67cf72e96006780b301ec425"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/aop/SharedQueryScopeAspect.java",
+      "sha256": "85abc1107785edbb500fca6324c46183d3e8e072269faf6338de2145561119a1"
+    },
+    {
+      "path": "iw-web/src/main/java/com/itwray/iw/web/core/mybatis/type/handlers/LocalDateTimeTypeHandler.java",
+      "sha256": "3ad797b2f87674716817097e50168ada3065138d044eb399a3fe2dd4f4f4255b"
+    },
+    {
+      "path": "iw-web/src/main/resources/mapper/BaseDictMapper.xml",
+      "sha256": "d85f7ae1daecc5f1aa7afcc49e196d49d6093e91be5dfaaaf8b92705eaf3582f"
+    },
+    {
+      "path": "iw-web/src/main/resources/mapper/BaseBusinessFileMapper.xml",
+      "sha256": "4bc399721ce89e3eb33cf2fa3e9fa41be3cfadae9ab5c3d76f86a194d83da481"
+    },
+    {
+      "path": "iw-web/src/main/resources/META-INF/spring.factories",
+      "sha256": "20047cc9e1ebf82cb4303bc31fd0a1f385cccc65ff16241589690bea213b8106"
+    },
+    {
+      "path": "iw-web/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+      "sha256": "3aed9ee526f65919da120289bcbf2917434e13713de6497d9ccb445cadac16a1"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/resources/application.yml",
+      "sha256": "1c15953e7affb7f6264184ff96bb76572f5625bc71c4914e3f1b865ea8104e23"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/IwAuthApplication.java",
+      "sha256": "a0b0726fbf8f6b2874f25c9026e9498ca29b293af1d2cfc70989152b0c248070"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/AuthUserDao.java",
+      "sha256": "7ac200cd36817bfa83094bce26691cc39a76dfa1e17634bafc33db80cdd3d1f7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/BaseAiTaskDao.java",
+      "sha256": "aea41997573aa94c479490933c546aeff8f543805c6cde2bf7f0c97fe568968d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/BaseApplicationAccountDao.java",
+      "sha256": "53a0e18420b961be017388b2dcc82fda570c5364aae3b49a7777a6804917e33b"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/AuthFamilyMemberDao.java",
+      "sha256": "1934d87d2a7010b6052e9297d4171c9fe4c904572ee957ee5eb3855d38786384"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/BaseWebsiteNavigationDao.java",
+      "sha256": "4f70cdea6ad9b637def8eea9564a9f9435df721527c2a6d6f49b098c5d8478f4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/BaseFileRecordsDao.java",
+      "sha256": "554de59c13651692bbb50d5c33c6be3f0e5ff573aeda15051f75f5c50254b83f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/BaseManagedSecretDao.java",
+      "sha256": "0ca1b291302154077b3d364943518c4dfa870405c6d41b913756345fad7437a6"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/AuthFamilyGroupDao.java",
+      "sha256": "e215b71552acb472a716f3ef8ea48b2f16e035f3d6a8a09599a600389e9faddf"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/dao/AuthFamilyInviteDao.java",
+      "sha256": "59a5db637dc96340fd5e6a19a4d98dcb0ccfda8db69adccabef433039199a7cb"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/AuthFamilyMemberMapper.java",
+      "sha256": "d3e99806e446e381e658610c8f9801f6e638288450663b0b9be63e3af43cf4da"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BaseApplicationAccountMapper.java",
+      "sha256": "152959cbc473454d355d716caae2079dd40dcbf277be9340da3aeffa4d7e6002"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/AuthFamilyGroupMapper.java",
+      "sha256": "25ed3740ae7c9bfa0484a9da026bb3c9ef7a14a6a1eb9048074cc6590f7ff1cc"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BaseAiTaskMapper.java",
+      "sha256": "b9d05ea8db43998de289b6710d0a7730c89319082f63ca6dd6d29b21e5a9bb47"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BaseWebsiteNavigationMapper.java",
+      "sha256": "252282016ad6b0440893c4c590e1272f977a5a85f8230b947c91efa3a87cd782"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/AuthFamilyInviteMapper.java",
+      "sha256": "7d209869d63960dc0e654ec76821ace607912495fe5b45aa7bbc2366ae712c15"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BookkeepingDictionaryMapper.java",
+      "sha256": "9188b3776b7fd6ff0f5f00c6b808f83ae256d19d37e2e795a8e160ae2125dff2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BaseFileRecordsMapper.java",
+      "sha256": "82ffa08dc867824ea5606a315745932159774b1fbd0bfc348b43a1123942946c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/AuthUserMapper.java",
+      "sha256": "138dffd100053b9a5ebd57557b7b2f60991cda5abc775516b35eec9edc01ea52"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/mapper/BaseManagedSecretMapper.java",
+      "sha256": "6e6b29af427af1426db32dc20e32a6ca571dee29749ba7286ff613d9e844b415"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/utils/FamilyGroupUtils.java",
+      "sha256": "d62086d920c78a4948d4bd64a268902e77e6194806b2ba19fa4aa32d9ff6f511"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BaseDictController.java",
+      "sha256": "97ef1eb075ddd5921e0494bd1812710cc9da7281a77415d11076108979887e2a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthRegisterController.java",
+      "sha256": "81b928679fe5e05c2701262a23294ba6efedefe8d14cc413c965e5cc47e9fa55"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthenticationController.java",
+      "sha256": "d8612b87848f0592b4440f304bef8a7443ea5199bbefaafe87b64e5725c515f9"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/InternalWebsiteNavigationController.java",
+      "sha256": "ae155ea87497bccbb9a4ee7acc16c833ad54be4b0cbc9ae3b0b867c81aa45639"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BookkeepingDictionaryController.java",
+      "sha256": "d59f6dba48d9e5229bb6bf6871036943607f37a94c1b360c5370ff88d5d3aad1"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthUserController.java",
+      "sha256": "f1a28ba8c49ac4b316e7bb3c55940fa6a66f7d4185d433b902252f8a40f81436"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/InternalUserController.java",
+      "sha256": "2ec1f869fab69a100d02059396579a3ca2fd86dc2a8805eaf5b10930f953162d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BaseWebsiteNavigationController.java",
+      "sha256": "a7d6937c0003d23910dc01f91678fc0ef371c769ae1919b64c6a3ee93029081d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BaseAiTaskController.java",
+      "sha256": "2b15a69ac189eb6f40b91eab65eb18fefc81214b2d678985da84620cbdec8903"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthFamilyGroupController.java",
+      "sha256": "43fe0b83e9a10c63664b1a74dfd16981f3a112eee314e4a126281a173154f5fb"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/InternalFamilyGroupController.java",
+      "sha256": "ac886d21391915081c93a1e3fd322eb40ecaf60e154efe2b6d90f17dd4e990d6"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthRegisterInviteController.java",
+      "sha256": "8e1c3d6bbb83d560f45d377642e04d210f81df3e02633a43c68dfb9ead9c6de0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthUserSecurityController.java",
+      "sha256": "93c97f8308cc1e3a604faa341c36251cccac20872e7fea309c6545280536703f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BaseFileController.java",
+      "sha256": "57d352e8147cd3534a80944f1a0f2f028c91a8ddd78d5be023e6b3e7590efa81"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/AuthLoginController.java",
+      "sha256": "806d60c67f44e57cab50e26e6350b062337d0a9cc60afedc3d82668e267b5917"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BaseApplicationAccountController.java",
+      "sha256": "03d8010f725180f7463e7cb1a8013c3defd850b444fe0f8c277c468f69ef90b5"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/controller/BaseManagedSecretController.java",
+      "sha256": "9f276cd5e0093511be603f53a59143a22fcc1671a4707de25cc707ede24a4f96"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/AuthRedisKeyEnum.java",
+      "sha256": "d4b7c8a24ee40490b5337567c9ac9cab9ae86f89e767e559f0eec81faf342210"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/job/AuthUserScheduledJob.java",
+      "sha256": "e062b5ab99642f46e805ef1fcc39970fd14c6cb2d66febb7547c9e3758322e5e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/AuthRegisterService.java",
+      "sha256": "98fcdb678cf28634c8edfc0888ad2c90f7acb21f324bb75758de007acd97fc39"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/AuthUserSecurityService.java",
+      "sha256": "8675bb94031c1dbeb743af7ad06ea8f4ee426b1d8949941a6c4936cf3418e71f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/BaseManagedSecretService.java",
+      "sha256": "09db42510e427550c476d1688e4dc8f8db0c7f22f64e1a21fb59b598887075ac"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/AuthVerificationService.java",
+      "sha256": "619b77ea7a325858ecc7d5ac5047086884cc4b37f84c2d084ccb72bdbfcd50f2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/BaseDictService.java",
+      "sha256": "b760feb46a7e2d46068d3d6dc2dba503614b11d1acb17724ea158746d102a55e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/BaseWebsiteNavigationService.java",
+      "sha256": "9dce33ce2fca89246780c11d9c8ff017155e1b0d801be452df2e4753d61af43a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/BaseApplicationAccountService.java",
+      "sha256": "d904401b0ab269bd1717b7ec2adf86ee42bea5405a7725a4b8089dce4de806b0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/BaseAiTaskService.java",
+      "sha256": "3b3a0744a8fdfb05a56d622a62317167428f70303ae1e36c91d22698e1c93565"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/AuthUserService.java",
+      "sha256": "f96746d95222a08c174e8aa63d78cb5a4cd1680c71e5fced7b3c35194d5817a5"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/AuthFamilyGroupService.java",
+      "sha256": "23a98892d304a176069cf10ddf8c7c7871960ff04099af1e59ac0740d5a67b5a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/BaseFileRecordsService.java",
+      "sha256": "00d86be1d2b77c6a829197990279003aac6b53ad66fc26969ae5625e8716ddb2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/AuthRegisterInviteService.java",
+      "sha256": "48ce2551a74c41c13b137f1efef7cdd952092c252ffbbe6abc8c1a64eb64750a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthRegisterInviteServiceImpl.java",
+      "sha256": "dcf5375d5d920ee6d0ff5404a94283563fffa9badc82f940bba2da01aaeab15d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthUserSecurityServiceImpl.java",
+      "sha256": "32eefae722bc0a99852a576e5e83e60669cd47fa05d056a87921cf44904abf71"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseManagedSecretServiceImpl.java",
+      "sha256": "c874a2e9905be74449b3b12e7876434234adfa2fa979674e67e4a45c5f66dca9"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseDictServiceImpl.java",
+      "sha256": "b1282b17bc4ea2fbb6220104533539492994198caf507f9a2dcd26a64b5ee368"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseFileRecordsServiceImpl.java",
+      "sha256": "a380c85b4bd0a775d4cfbf3207c4d78808c78b36571b2198d3787c51857b6564"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthFamilyGroupServiceImpl.java",
+      "sha256": "f5c8a00503f85368fbf8d57fd39e3a687ec69b554381d3e21d18a60c19a463fa"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthRegisterServiceImpl.java",
+      "sha256": "88b0c41e80b6bba2dea0c6d956109b8a7e414bca3fd620f814d3b04033b4d203"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseAiTaskServiceImpl.java",
+      "sha256": "3275b5b45eb17065a61a083145a903dbd78bfeb94867e62770d61a7dd9b77c47"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BookkeepingDictionaryService.java",
+      "sha256": "ac05e35496afb8af88a42f6bf2d278a54ce86abd6f6356427b0e73dac7324a20"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseWebsiteNavigationServiceImpl.java",
+      "sha256": "b8618f23ddbac632b8505a5ccc1a5d6fe0a5bde01248db65a33d7e87b5e272ee"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthVerificationServiceImpl.java",
+      "sha256": "1965732f52315bc385dd8f44e31fd65a988c96143874271bbd989b987750542f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/AuthUserServiceImpl.java",
+      "sha256": "7d31a7a180dfee697674b83f98695fd621ee30d738165f534e16f80cc632187d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/service/impl/BaseApplicationAccountServiceImpl.java",
+      "sha256": "645da62321bcba7e43cc1773693a1892bf48d3fdcd75878dfa5dc9b5da7efb1c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ManagedSecretUpdateDto.java",
+      "sha256": "7b338f8298e518e129388cf73401e94e8f42080653460e27fc39ba7fa42469e8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ManagedSecretAddDto.java",
+      "sha256": "8591258ddb4da8dbf853fe106ac6398fed0cb5d23099d8d5896496bb9420b9dd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyMemberDefaultSharedUpdateDto.java",
+      "sha256": "0b45f74888109acdb9b5853269d861b3799d762b36735a600c5227599a7e7087"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/LoginPasswordDto.java",
+      "sha256": "ce31fcf3e3cf8bbfb39d13ce4d5b2a9a2d189a75b42b35b43434e947a8395e1d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/RegisterFormDto.java",
+      "sha256": "101cb436b315cbf24e270593534e3ae2a3ff05af975d9d9498e637cc01d7f385"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyMemberRoleAssignDto.java",
+      "sha256": "1a83334fb22d052bbc720a1b04b778e4c93117ec60c9509d0fceec36a41572cd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserUsernameEditDto.java",
+      "sha256": "68b6a0bb70e8fb58ecac70e02bfb631ddd31b28c7c596e73370fd6c91aad3e2d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/WebsiteNavigationUpdateDto.java",
+      "sha256": "108af6ea781a6890f7daee58777b20f9fb9b31195838c5aab03ee0f7c93ce453"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/WebsiteNavigationPageDto.java",
+      "sha256": "34b6640936498fc42606363d27850d9de8e89839c158668721b0affe03849342"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserInfoEditDto.java",
+      "sha256": "e7631b9268a9f7fc74b349d321c1e1906e9565f0b9a122b0fd7074d707cbce28"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserPasswordEditDto.java",
+      "sha256": "0513bff954b2e7182d2788983b9a1355bd6b64cc59187b6cee500dbcea63a2bd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserPasswordSecurityEditDto.java",
+      "sha256": "093c02b702496a50ebbd815c13eba3905ae2bfd5555ef82cc5c4980ab3e02dfa"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/LoginVerificationCodeDto.java",
+      "sha256": "72be62d205cb1f71bd28adf6589809dfabf3de40963493a939e2192a7caa85c0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/DictAddDto.java",
+      "sha256": "d2d9725a9b9fcb4adae7e0e4c7d2e90c71c7768e29ccefb7f0491cec04b73677"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ManagedSecretRevealDto.java",
+      "sha256": "71b3e52d36988258bda9dbde8a8cbff1360d9786796ff94c3d90e0bb8ad935bf"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ApplicationAccountUpdateDto.java",
+      "sha256": "8dd1a38e9f2c642578cf54aa14861d9bdee9c717e0a8de838191f6ada35dc6db"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyGroupTransferDto.java",
+      "sha256": "4e20eae8efb05e7c6b4200795c3af72d9381e78c38f5bd881f78de148fbd9072"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/AiTaskTopUpdateDto.java",
+      "sha256": "14d6818b50bc34831cea63c1ba97d1ac03b3ed7cfb9520be11f1644307d34c4e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserContactCodeSendDto.java",
+      "sha256": "2fd19fb8284b991ec47289dc939675e02d034aa0867639ca1df88896f110a66a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/RegisterInviteConfigUpdateDto.java",
+      "sha256": "2dbdd6c70723cce3fd5982080186bc21ec860bc5a20377bdd55e168e775e392f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyMemberQueryScopeUpdateDto.java",
+      "sha256": "07145b3544b2083ae061f9ec915dbf3034b818673adb1f6d87c43dff269e391e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyInviteGenerateDto.java",
+      "sha256": "8ff0b3e0ec1e2176b6568ab9310ccd1743b981fd567a1a64095a9405a99af517"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/AiTaskUpdateDto.java",
+      "sha256": "f2875025c573c1f7d054eebcf43b7d86f553049b1c20ef712327e157df994f65"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ManagedSecretPageDto.java",
+      "sha256": "a287f591759567a38b8792e1876f22583931afb5ca0937e4ca5f8c9c273ceb2e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ApplicationAccountPageDto.java",
+      "sha256": "0902d90402cf52934e0023ede440d0ccecdb524d5d1d4f3ff2bd28ece631bb4d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ManagedSecretFieldDto.java",
+      "sha256": "d4c9455f5fb81d992fd2721cbda2f56dcc600e1748820a126f4d66c5b4e605d3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/LoginInviteRegisterDto.java",
+      "sha256": "d43fdba210ff552303f930cd5019161d37b13f21805327a3fba12c82a569028c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserContactUnbindDto.java",
+      "sha256": "570effe6753a3e17d580a4a8baf5158327b2bfdfb042fe01afd5bed495e4ae30"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyGroupJoinDto.java",
+      "sha256": "8a4929fb37dc73fb2c1c8bacefd6c7b80ce38bb0b07b0db23568615223bf41b2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserSecurityCodeSendDto.java",
+      "sha256": "6dd9b39e66d223141d544b3e97fc490678626efd42e93bfecadcbb0831d1d67e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/DictPageDto.java",
+      "sha256": "00695bc87a82d87a39491304108019a75707cc28dfe82bf37f7c4d57b94be922"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ApplicationAccountAddDto.java",
+      "sha256": "bba8a17d8fd30486a77bf18091ce064a87ae7cc58faba71f0bbbf79d06248935"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/AiTaskPageDto.java",
+      "sha256": "9791043b3038eb0d37d4c134f1cfa4e8e9f234e96570ac00ccf102fc1646ffe2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserAccountDeletionDto.java",
+      "sha256": "be57c62459e26233a2c57d7ce73e37d0c15ebd8753c08abbd9abc53e11185e0c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/ApplicationAccountRefreshPasswordDto.java",
+      "sha256": "eac3424c2513a48fbc15225e038ce1f92151b7f71324626773dc25034693ec3d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserSecurityVerifyDto.java",
+      "sha256": "c7f37564e0e45d11b9cab6df3601437491b2f2dcdd25a398aa38ecc252c33654"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/AiTaskAddDto.java",
+      "sha256": "3c6d8787b1a82b4d170f8373055c05e2d48d3903271ee4f3a83aafb1d1781653"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/UserContactUpdateDto.java",
+      "sha256": "c30417f9d64ed4d33cab5c73f4520be1fa827cb531d2023c3af922a99a86e10c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyGroupUpdateDto.java",
+      "sha256": "1149825edcc79211cea6155869da9d61798958dca942945d9a358670a0b0f3e6"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/AiTaskActiveUpdateDto.java",
+      "sha256": "68f2eeeb8713ec206aa5dc41786f04cf8392b2c22d3bbe6adb4a10164307cec5"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/WebsiteNavigationAddDto.java",
+      "sha256": "f911219eeaa1ddc4d2090aa80b0263feb002bb707e74dcaf70a17ce658379648"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/DictUpdateDto.java",
+      "sha256": "8c9d1660c9e9cb03cd259bc892d9e4e294c4f1ecee0c130b76f2fe154e1675c8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyGroupAddDto.java",
+      "sha256": "c160115ff4cb7ec39feb932e3b6c09c2b2b760dfd2a35954b4064ce9f263ce77"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/dto/FamilyMemberRemoveDto.java",
+      "sha256": "e4b9b8acc398d670c2e3047dca3f910372461a92269436ff876ba6b921dd49fe"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/DictTypeVo.java",
+      "sha256": "09d25b4cb185ec8013bec6fb7be07d224ae2989d14f441ee273053a310d221dc"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/UserInfoVo.java",
+      "sha256": "7c4006664faaf56dfb24f575a8b1e8729ae88140b0a6a67ca5b3bee8d2e06da4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/WebsiteNavigationDetailVo.java",
+      "sha256": "99afae8711dc7e943b598b65ad68eef8f000f0419466ef8f4687913a59a5da41"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/ManagedSecretFieldVo.java",
+      "sha256": "aa8b586336a78088bfa1d86da2396d07360b574649f10ac5c2d3fcd9c22e853e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/ApplicationAccountPageVo.java",
+      "sha256": "0ebb6416e53e00f245b4c4c81d9ca414ee2cc5c7818cb82b5db4addcd4b64e79"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/AiTaskDetailVo.java",
+      "sha256": "7410d8ad3b2989d3311c51060dafa096088aa43253438dd6ec31e01c30c4273c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/FamilyMemberVo.java",
+      "sha256": "81b567571ff5d2ae227bb5d7e2a61bcc8b337c523e26eb5526e9eeb05a56e731"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/WebsiteNavigationPageVo.java",
+      "sha256": "36737a74db2db468a314ce6dc5ef7f26e3c15e8556adc0a7dda59ea9e56993c0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/DictAllListVo.java",
+      "sha256": "157026bdf7e5d12a8c405a1f05e768309139ca3beefe5e038d8129ab3771933c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/AiTaskPageVo.java",
+      "sha256": "f3193798f7543d67793cefe23a21bd10a49e586fbe123c93a690b103f22d4e88"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/FamilyGroupDetailVo.java",
+      "sha256": "36960164b8de319d09a09588075d738b34e2ff6702f504448712bb1d143e4100"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/ManagedSecretDetailVo.java",
+      "sha256": "634ebf5b78c67807bb20c500819ac24c64dca7725ac571316dbff92357f99ff0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/DictPageVo.java",
+      "sha256": "f74fe09eb0b8b84af251ca1090df8d1509bbd123bfc701e55f2f4a4d942ee3da"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/ApplicationAccountDetailVo.java",
+      "sha256": "f474eed7f9a5d932d6223e4704cbd943b40a65f50f61ffe336a641b782fa727e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/FamilyInviteVo.java",
+      "sha256": "1bb683c357a9c1c0ffe581283534647bd209ed9f3a1464874c8df49ff0334c9a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/ManagedSecretPageVo.java",
+      "sha256": "afcce70dbfc69535abf4696d1c9322460ace57079aee53f4370bdcaa2c01819f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/DictDetailVo.java",
+      "sha256": "2598f74a5d9c1ba7b4312a758c578a0992393833781762d97baaaa9f3dc861d9"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/RegisterInviteStatusVo.java",
+      "sha256": "8c888c72e8497c68e53699a517112c696084f2f7f24a1da6f4317d66dd10f1f7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/ManagedSecretRevealVo.java",
+      "sha256": "23650ec959c82d3d5f20d5a9dd18b854e1d46d0e3257fcd3815fc0e0cbda15a4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/vo/UserSecurityTicketVo.java",
+      "sha256": "0bcaedbb68de3c025053d6d1d87abefeba297baf3f720ec158c6dd74f7584ca1"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/BaseManagedSecretEntity.java",
+      "sha256": "b8080453d16c7e32fb9794589711cbc5614101e56d28c874e2ee08b7be63109a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/AuthFamilyInviteEntity.java",
+      "sha256": "0ed33c9454286cb8d821a8e1b2267efc324352d8410df6b790a23e418fe10716"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/BaseFileRecordsEntity.java",
+      "sha256": "314361abecaab8316f7ff1759509555615f1e46ad8824a55a9d4d5de2263cdd8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/AuthUserEntity.java",
+      "sha256": "6d4a116380948431bc05da109464032de7bacf319c99999da41373e3db67195a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/BaseWebsiteNavigationEntity.java",
+      "sha256": "bab4680a3f936b85692190a5ee3b207c2fe146afb12524aa06cf9e5fda3f210c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/AuthFamilyGroupEntity.java",
+      "sha256": "ef2a0b3122408eafd74b22ffb0b8a00c8a37e9911d5bdf7f573dae482d7ce614"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/AuthFamilyMemberEntity.java",
+      "sha256": "ce9ed24a9d29a6396c6720b7b54a75614e38d40ff73b5c14e642d33110430dd1"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/BaseApplicationAccountEntity.java",
+      "sha256": "731c0b358088f90f74c4369250734a824dd0759f6b6db1e1751e8cdb97ea49f8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/entity/BaseAiTaskEntity.java",
+      "sha256": "1037a49dd7970ffbaac0e75ff49f5cb6b55b1ff0ddc13f87bab744076e517896"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/FamilyMemberStatusEnum.java",
+      "sha256": "049fa24d7100b33f8f9d3373ba9ddadf85a0f08e14b7ec7d530b207368b41c96"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/VerificationCodeActionEnum.java",
+      "sha256": "ef3cd4136a15161269a774dad3da0f2d73b5372d6d2e6158abc4a91e1ebbc2ac"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/AiToolTypeEnum.java",
+      "sha256": "3d3f94e237a0c469fff032e26795d6cda5b4d90ab357d872badd8bc96b765561"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/UserSecurityVerificationMethodEnum.java",
+      "sha256": "94dafb98599d472e1f215c6331fb764e1bcfc5b35924053fd46dab22896665d3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/FamilyInviteStatusEnum.java",
+      "sha256": "038b8523cbcef41bc71afec4eed34dca03f0b90baa2336311b0455be433c259a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/UserGenderEnum.java",
+      "sha256": "469ea5d540caab578c99fe17254a1ccbf83479e9f4e335d860580be24c7c916d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/AiSessionStatusEnum.java",
+      "sha256": "67784dacb912bb2b49d748765a0e9025b5352858f35eef32db8befb5660b4431"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/UserContactTypeEnum.java",
+      "sha256": "1ef35ad32e9c3e4d0610b1c32dc8f9dc48594281bb37f1f1096b45a3e24fce81"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/UserSecurityOperationEnum.java",
+      "sha256": "4c9bfd610978d1b09222a3ad35b3e0855b1584d3b7632c9c01c567b35189707a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/FamilyMemberRoleEnum.java",
+      "sha256": "da5907f9a5a8884d590f32ce63f3ddd5d577b72e8042ab7358ac4eeee6ae62f3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/AiTaskStatusEnum.java",
+      "sha256": "eb6052fbf879f26fe428ddb419b826c344520d56d14183526c5e884148629f32"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/enums/UserLoginWayEnum.java",
+      "sha256": "cd26e0da8b3ee8921f02a92160a361714a82c57d6ded593ba0a21e4629b853d8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/bo/UserSecurityTicketBo.java",
+      "sha256": "8baab1cd08f6605b2377e4e99a7843abbbbd81a709da87d3f8d42ac829653cf7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/java/com/itwray/iw/auth/model/bo/RegisterInvitePendingBo.java",
+      "sha256": "83b5901693f7a466e856905a060bf566359a6abbe9f4e4b2434c5b7eca15082f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/resources/mapper/BookkeepingDictionaryMapper.xml",
+      "sha256": "b40bcdc2aec3ffecaf9cb57763659d663159d215ef17c94f8d43209f7066870c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/resources/mapper/AuthUserMapper.xml",
+      "sha256": "eb9a02f2424ff2fe915e38168c904060b670b38f20fb8efe5d52e3ab78120cc7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/resources/mapper/BaseApplicationAccountMapper.xml",
+      "sha256": "5fcfbd9c170a90682c4a8557d5dca4f59e812f825b85c5a7c9d2f2ae10fa177c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-auth/src/main/resources/mapper/BaseWebsiteNavigationMapper.xml",
+      "sha256": "c34306babd2f52e5412902eefcce156fdcb073101a16760ac4588cb0b4efb799"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/application-backup.yml",
+      "sha256": "51e9709ac53355dc5cb805222c7163bf40f352beb54ed12d198565cdbf714d79"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/application.yml",
+      "sha256": "336c8394274c588b82e224026b4085c7ca8c148008a0ed48782b86140dab603f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/IwBookkeepingApplication.java",
+      "sha256": "9822115038e2c211784af507883d85491c65e87c6929e440ab6eca50642c374f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingActionsDao.java",
+      "sha256": "9d33c2b807c9a12b8264ae14eab449fc36b1ab2776fa5fbc6bf2e5ab163e29d8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingMembershipSubscriptionDao.java",
+      "sha256": "fd38b96861306f6d1d7ca13271b9cc5565f833ba89afdeaba02fdcf281841d0a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingWalletDao.java",
+      "sha256": "ac093f43b9a4813efacf130cb76b6c546cae49da84f892c663affeef05b1c901"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingRecordsDao.java",
+      "sha256": "6a4276c00093b4f1a8ba32ac4741aa93a4c234ec5010ae9b791c556ab36e96a0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingWalletRecordsDao.java",
+      "sha256": "20138fa93ebe6aad8c3070409ab2e13f8b33b50d4f1a2d47023f484ebe9fc473"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingVoiceParseLogDao.java",
+      "sha256": "fde04767e3c843e877669de5efbd1df76c1e3719db98ce8419b2ed8e6959db90"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/dao/BookkeepingBudgetDao.java",
+      "sha256": "0a02fd788bafeaaf30712ea6616284d82e648fba4873135ad11aeec966e47a31"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingRecordsMapper.java",
+      "sha256": "6ee7c7f58e792ebefeb27c5b288da6f3f4a168e79e90dccbd5a018273b50133e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingActionsMapper.java",
+      "sha256": "62a9a1e9393f497eb1507ba6577d5d6148733941a8efac8e6d2f2eaecd356a0e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingWalletRecordsMapper.java",
+      "sha256": "9b48af9eaa7bbd16906496b7bdd2a079dcea014adc4114df98dfec1fb6ebc60d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingVoiceParseLogMapper.java",
+      "sha256": "5828bc341098a392fc1fd424c947ce638af12971a89611ba9ab046668f10b7a9"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingRecordsYearlyStatisticsMapper.java",
+      "sha256": "e6fa1f6e6198147919605ad25e381bef60427bd5bb0523ceee09e433b7715837"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingMembershipSubscriptionMapper.java",
+      "sha256": "0dc947b6f61b14864841d74d4fc509bb628714ab229898b08b750ae830b2d389"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingWalletMapper.java",
+      "sha256": "c87d5e6685cca17b35edd117b536ff11a5145bbd75f5d6578bbef4ddb13c4582"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/mapper/BookkeepingBudgetMapper.java",
+      "sha256": "150208763313a744629612029c3ccfe8e2c740484793adde2fe51d3eb2ff7a5d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/utils/MembershipBillingCycleUtils.java",
+      "sha256": "038b2f4f2533b2229504e73b0440791e72c6f84cb22f059f5fdc8f97824442b1"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/utils/BookkeepingStatisticsUtils.java",
+      "sha256": "b24fcb6fece869e65de40ad5495ad1a8599c06e170bab58313cee2926e2c090a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingBudgetController.java",
+      "sha256": "0e817d0cb0dd524650e1a58b44cd85cb031558cfeea63ef096aead9ef3482274"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingConsumeController.java",
+      "sha256": "fedc85219bafc5f9dbbd7f5d11c2c57ee6f53d2750ba4233aafb345d26a4f078"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingRecordsController.java",
+      "sha256": "6e566bd38674cae1d982b1657758ffc383655d8dd7e708900695fb5493a53db3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingWalletController.java",
+      "sha256": "31f495861e63b19e6057a7f76b9134e548a28d2e1444dec2ddabc0879fde003c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingWalletRecordsController.java",
+      "sha256": "998da70c10fa61afc4420507b91e2443d5fe2c910246986317daffc858af7c05"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingActionsController.java",
+      "sha256": "237ce0bdb9dbb58a5aceac8525af3df50f4729d31ddea54da937ed5480a6c4a7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingIncomeController.java",
+      "sha256": "29c96543160392c48603a470504352d28160014edfa1533f388060e981280a7f"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingMembershipSubscriptionController.java",
+      "sha256": "dd6f28facba113c56a113fd9a5c70a94c418eab1d9e61018150120987d4cead3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/controller/BookkeepingAssistantController.java",
+      "sha256": "ee8988c1e7c71ae39ab2dc10bacc4aec70553e631d6cf5764c575cd1523fc716"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingDictionarySnapshots.java",
+      "sha256": "ee5cf92788b7dcaace448c09b33931372f60b92d99c9b20df94c54e29e27c305"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingCategoryFilter.java",
+      "sha256": "ef9eb77780fe2010818a4257cc1fab2d8887a3720e346fb264f2b5bc6ad3a1ee"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingQueryScope.java",
+      "sha256": "d0ab3bb40a9fbd8012938bcf4dae0fbdd070a193c2b18c5e1263d0e26f9ed085"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingPayerPolicy.java",
+      "sha256": "179d0f2ce7351ed36cafd02e7f1bffa10f6d4156ed99b44172a397affb3af339"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingExpenseFillSupport.java",
+      "sha256": "79f27cfdb70276c5152c654b73c4977f4ecb7bb9ef74165aeb533b70daee5da4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/support/BookkeepingWalletLedger.java",
+      "sha256": "23895e663635be021836b91e89ebae9b9ace87e411948e6c1548932e1a5a1177"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/BookkeepingRedisKeyEnum.java",
+      "sha256": "58429b291fd224de8c2b7ec5ef5056d84dc749814e85492e2af12ac20a62a49d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/job/BookkeepingBudgetScheduledJob.java",
+      "sha256": "98affa3a1e9694405f8501730f4523fbeb1d82f091e57908ef69bf031b51246e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingActionsService.java",
+      "sha256": "1eef225b0f456c2f013ec8203eaeffb4276a6e37c0d906b2ae743835401caadc"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingMembershipSubscriptionService.java",
+      "sha256": "2faa9175255076400d8e9c1660c0184897d9d530c4d5d5bed5efbfc836d16f38"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingAssistantService.java",
+      "sha256": "a6ca975560bc84b9fad9c61747cd1848478ee2a8fd57e78eb07fe0bfc6954f98"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingConsumeService.java",
+      "sha256": "ff200e5d0b754a8f9a9ab4f4c455652182573a17f13dbbbeb19b32d58e132fb4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingWalletRecordsService.java",
+      "sha256": "9d2876d77f3108d44ba1b6ca84efd5ccd37b7680b8ef4ec719bc5ee70f7d33fd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingRecordsService.java",
+      "sha256": "6c8fd7846575a3ee6e13153637d864e2a8bebc1ab88c5af950d41c8b88fcbb6e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingAssistantRemoteService.java",
+      "sha256": "ff9964d3814212b7646d584720f2234ce28a67bf22de12b846d35c73f91680bc"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingWalletService.java",
+      "sha256": "92cd7eda48a458a05539657f78d756dc875a26cdd39682a63aaeeafd9e9acef6"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingIncomeService.java",
+      "sha256": "bb74b2db3f57077523c0649724ee3ac5c941303bc1ccf14bdcaf5597a8ac7b69"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/BookkeepingBudgetService.java",
+      "sha256": "88bd70793aa8c542feab741c8348601b948657b363bae76220c69c552332668b"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingBudgetServiceImpl.java",
+      "sha256": "cd28387bae6d411d731bfa2b5b8a107f9f2761e6908b1f3b2994de020734f235"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingConsumeServiceImpl.java",
+      "sha256": "5e3b2977f0056580a8485605c505220606827988f705168d64c1433e38cc8fe1"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingIncomeServiceImpl.java",
+      "sha256": "5b2119f17e5fa3beaa3f7cc8ebe9cae735b418fa10594790bbb6e4fe52011f60"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingRecordsFamilyGroupConsumerServiceImpl.java",
+      "sha256": "fe4b0b60e76432ab3279a32159321414f058c97cd12dbc5cb2b2293860458f66"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantServiceImpl.java",
+      "sha256": "9b3b7bcc156c00b3b4c18f16c0601b66d7c74fa472d0e79668e231575de9f544"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingRecordsServiceImpl.java",
+      "sha256": "2d84022b0d8fb1345e0692b25f49ba823a6a5e356d4919bc538b81a6bee7a5c4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingAssistantRemoteServiceImpl.java",
+      "sha256": "df4070ca9ddb687d3ba2e5d00a895ca1f395095773a734e8f5df5b69e8f47dae"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/TaskBookkeepingAdapter.java",
+      "sha256": "780331411478d50b74ae2dcccef0539d126cdffb4af0c57312787ede6ca89017"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingWalletInitService.java",
+      "sha256": "a21ea336f6b3751505516f9899cd8f19849b43f7792f8f619e05bddb049997b5"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingWalletServiceImpl.java",
+      "sha256": "df548890565a228f25ba2ff460ba85284a2c19bae4cf86b78d4e9ca2ee511bd9"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingMembershipSubscriptionServiceImpl.java",
+      "sha256": "4a9dbc3a7ab885a40e1c9a5c01f803f1cbf178fb09554d85d8dfa56c8fc17c3e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingActionsServiceImpl.java",
+      "sha256": "2b98a624c5cc5f766a1a25b677934afd615a6d5394e3fe2b4996eb8ca9635f10"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/service/impl/BookkeepingWalletRecordsServiceImpl.java",
+      "sha256": "1394e2cd03a3abb3e1ab798ba0b9dcd7e5432a87e32dd648f6e3e650c9367525"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingIncomeStatisticsDto.java",
+      "sha256": "27214bec6315fdc05f6c8ef4e4ad9cbe77fcd8b15dd7b96df868e710972c464c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordsYearStatisticsQueryDto.java",
+      "sha256": "8d6a56eb2976f1d5fb23b1878b458e709c533eacf6a08597643edd17ebbe9680"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordUpdateDto.java",
+      "sha256": "1cc53d52d83f7ebc1184c0cfec005df0df92fc1f47b0f707de5f336076410eec"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingConsumeCategoryStatisticsDto.java",
+      "sha256": "91e3c0a2805ff42cb1481525cc93c9bcd4b265772849dbf343f630e8b06f3411"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingMembershipSubscriptionFields.java",
+      "sha256": "4f8089e574bae8f9e49e3740e5871bf0590fcc97d7275a80d99415b6b4d2c31d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetAddDto.java",
+      "sha256": "8d24294ff3fdaab59ff86200200fd20e80e22f08d4ab54d909346d01e723298a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingMembershipSubscriptionAddDto.java",
+      "sha256": "d0f9faaa39af79f8a468e80202ef51d5c5393b24fb3dbc4d64c47d75ee347f71"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingWalletAmountUpdateDto.java",
+      "sha256": "1c6145d9c20994d2c45c6d5406295d0eb63a6d212b3a063b55f090c2d069ed72"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingBudgetUpdateDto.java",
+      "sha256": "249628194ff5d24805045d3662564a84d142d50d29077a85383b3e31501114bb"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordAddDto.java",
+      "sha256": "af7568126e4d07adf175faf321543d1e2400de7106df5cd91794514ef2cd18cc"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordPageDto.java",
+      "sha256": "cedd0f524aa339438caa6418fc7e34c1292cdbc66cb9b378448c6ca4f6f5218b"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingDictionaryChangesDto.java",
+      "sha256": "7b43604facd10d98c4f02c68a8e72d147521eb7cf3b3223f139f68b347c042b8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingMembershipSubscriptionListDto.java",
+      "sha256": "1c5b32074504a099151f3e6b4e25e9e75237b9600e2ee0b5be52680f1ac5fc94"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingActionsAddDto.java",
+      "sha256": "1a90b3eec6c9451f5b3e32623bf5614b5939eb906f96f6051d376abe8ad076f7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingConsumeStatisticsDto.java",
+      "sha256": "3899b46a61eca39f5ade2663a8300acbfd5c42bb90c8436f4677c9bcc970a3fd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordListDto.java",
+      "sha256": "23520414e0804d038000fe2ec9b552331fe0acef40ee5a09ed0c709ec56c4994"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingStatisticsDto.java",
+      "sha256": "a1de0d750042b9ceb809ff4106aef399c973299f3e8e45a8fe5652911b74a60a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingRecordsStatisticsDto.java",
+      "sha256": "e664039589b706374ab03a2efe3ec51f91f6b3b122e9a47e55eeda32303fe507"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingWalletRecordsPageDto.java",
+      "sha256": "3e9a5d35ed60195ad4c85d1fd37c74d17e69b2a10fd5c09307105523ac7a0cbd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingAssistantConfirmExpenseDto.java",
+      "sha256": "d767a3fce2b672c934fff710c8b0a42d0cd8946741c23d62c77d0fb768385d96"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingMembershipSubscriptionUpdateDto.java",
+      "sha256": "3370755c99ece49b0e99592369eafff772e92f51ec9e210806f75e2be0947fc6"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/dto/BookkeepingActionsUpdateDto.java",
+      "sha256": "6a7c4849f80cd1cc9d1961f63a44c8c884c10a5473c5e02389e699a0acaed784"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingWalletDetailVo.java",
+      "sha256": "4ae8756dbbaa894e06ca2118a1404f069a2598176a3331b4a7ed9ffa6aaa8208"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingWalletRecordsPageVo.java",
+      "sha256": "c4040b43e5b2bca3b2d24f0c86719b205520db39b6479865ff67d4a77b8a7e3e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingAssistantParseExpenseVo.java",
+      "sha256": "be81d07a35a504d8fed8bb9fb2e431a21925a55334a7c9b19b7978c36a213d08"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingMembershipSubscriptionDetailVo.java",
+      "sha256": "e516a5984f13b98ea8b7f04b7e2545c0d56e4ed7eb5c2fb428931b0f73204676"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingAssistantConfirmExpenseVo.java",
+      "sha256": "24103c492710fc3df1ebe774464145a46af1934e36d5e1904296741b719fb7a7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingActionsDetailVo.java",
+      "sha256": "8948b613cc03b9f78997e00ed137026829a45e6aeb0c0b4e011b61723a1deeb5"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordPageVo.java",
+      "sha256": "9c5cf4385b3741adda51b54f116fda429040f44cc3a9b0f7b015387764008fd9"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordDetailVo.java",
+      "sha256": "e834262b45e148a5d3072dbcfd11253003bda42ce89e38fa18a498b432cfb046"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingMembershipSubscriptionListVo.java",
+      "sha256": "657443a30eb2f08f85f3ff2bb35b171190bbda05905510392cba0fb32126dae2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingAssistantExpenseDraftVo.java",
+      "sha256": "c205edb21fb512e4aaa0b2c2b32e3d53a5577c7889c424561f27ed15d752e899"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingStatisticsTotalVo.java",
+      "sha256": "675cb7d526044d6694df7c73d4e513d2673d03a9a53471c8409b049d774abcdf"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingMembershipFilterOption.java",
+      "sha256": "59857a2226e3836806259f86c7037964e28b818c87f8a06929bee33ed744f948"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingExpenseAware.java",
+      "sha256": "187a97d5a1d076f668e93d1dd1104f03768410176b58852ea19982778bff528e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetStatisticsVo.java",
+      "sha256": "b776230f584c74c0456e5e73328a277cb8a394b9d249579c292e39bc86c8eb1c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingStatisticsRankVo.java",
+      "sha256": "62b8bf6c5bfb25fde128f1c1c4ed55ea83119ad83f6d6743661072fea3896c24"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingBudgetDetailVo.java",
+      "sha256": "750c10368702fdac586ce242b63fed340c827997be530cda4cfeb2d4e9522537"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingRecordsStatisticsVo.java",
+      "sha256": "69785d356d0986f7ba529dea35bd358c8ab14e5b4be4365b7e4e8e357c81f4b2"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/BookkeepingConsumeStatisticsCategoryVo.java",
+      "sha256": "6790ab49d17d690570393cee7c672f519334754866423572ff8a3e36a1461355"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingBudgetEntity.java",
+      "sha256": "76a91c9ec1b6bf8b945280e4053171a25865ab60e17ee19945b44f93e84aece5"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingWalletEntity.java",
+      "sha256": "8e40ec6121e2349dc998ce6966e94a64d326f3f73618318a5a4093d08684a9a8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingMembershipSubscriptionEntity.java",
+      "sha256": "1a6ce191b2f6f56b61a27e03813b94d7e853e5e38598b7ab5be5cadd12424234"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingActionsEntity.java",
+      "sha256": "635e5facb0cb4952e284b67388c038036ab82f33b4572bd5b6d446090d6d1302"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingWalletRecordsEntity.java",
+      "sha256": "570f3f571ca8021bcd55c77fee0c0ad388d861faead971b8781a27b1e82b404b"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingVoiceParseLogEntity.java",
+      "sha256": "044ee7244c0325a1eca29b102526b583dc5b6c85b4c2282e87c3012b36903723"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/entity/BookkeepingRecordsEntity.java",
+      "sha256": "2c6f1962628c331ab402856f63146803a8ed4f6e45202a1e0351403c8c25af9d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/BookkeepingAssistantConfirmStatusEnum.java",
+      "sha256": "670babf278abcf242de0cb4ff52b0a1adae76aa40e0d443b80839215289290eb"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/BookkeepingAssistantParseStatusEnum.java",
+      "sha256": "952947c556c2d64c7b15b02510f2d001e319c98fc28c478ce9d9cada1a83d1cf"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/BookkeepingRecordsSortTypeEnum.java",
+      "sha256": "5eb3d6178d527768860065046cd90dfc9b6b2dba0c57450472b50a455640d45a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/BudgetTypeEnum.java",
+      "sha256": "8a198fdb04a4178c8f61bb5decec2dedd0fa0134c3a38d507f6fb5cf754d8e92"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/MembershipSubscriptionExpiryTypeEnum.java",
+      "sha256": "9b01721503f14e734fc0b94472e013c2ed464e52a372d208d1b938fe5889be0a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/WalletRecordsChangeTypeEnum.java",
+      "sha256": "6c2e2170f4d0420b26687a8ea9a4cf467c560667d5d8ca1577493fc3c235a1a7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/MembershipSubscriptionSortTypeEnum.java",
+      "sha256": "97e22da3238f13b371e5a92362381351f4e946531c72e3a66e8dc500a0a051dd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/BookkeepingRecordTypeDefaultEnum.java",
+      "sha256": "b3e4d729b4b5a2d99d22358496467bacb32001215e6665d514a947526afc3dc8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/enums/BookkeepingStatisticsTypeEnum.java",
+      "sha256": "3d0372161e8fe64ec8780d572992179bebbfe5ad7cc280a2f2cce2aa60f6d65e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/bo/BookkeepingRecordsImportBo.java",
+      "sha256": "fbcf7d7d20096d7ab530028966174b0c9378ef2c6fe56bec621f9ae34364a34a"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/bo/BookkeepingBarChartStatisticsBo.java",
+      "sha256": "004a8689404eee4a621563cecf7941256e696f26c52fbfb9d9b009df983c8851"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/bo/RecordsStatisticsBo.java",
+      "sha256": "b7849778f714a9b8b1beed8ffe6004294473d5803bd7f00a14267e8008fb9dc7"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/income/BookkeepingRecordsIncomeTopVo.java",
+      "sha256": "3313aa4aa8a47872d4ce95f11851aaeda182d27777c0defcddbc061417cfd19e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/income/BookkeepingRecordsIncomeSummaryVo.java",
+      "sha256": "bd4e1bb9c24035627f690b9d250a92a44817396daed2e6717b1433666d671804"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/income/BookkeepingRecordsYearStatisticsIncomeVo.java",
+      "sha256": "70bf667bcde5373e921c6cc27c3a74bff083be23a9f14219d212557bdc20618c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/income/BookkeepingRecordsIncomeCategoriesVo.java",
+      "sha256": "d5e1b1b9eebc881b834c4c678391af3197d698ab858b054cab4f9aab19aba88b"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/income/BookkeepingRecordsIncomeInsightsVo.java",
+      "sha256": "03b009ea33bf05e9f500f1415a650de3083591474b9f06f442af814b9a0efbd0"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/consume/BookkeepingRecordsConsumeSummaryVo.java",
+      "sha256": "9634d7861fdd8b7bf0465121b933e7762c2af09815cc431fac34493a1b7f8165"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/consume/BookkeepingRecordsConsumeInsightsVo.java",
+      "sha256": "0c17e9ffb7157230d4c2cab477c2efc32514ae6c924dcd0da2e353a0c666415c"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/consume/BookkeepingRecordsConsumeTagsVo.java",
+      "sha256": "fe1428e70cd7be742c8bc64c64029289326383be43ab1e7e8a3b2e38156b2468"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/consume/BookkeepingRecordsConsumeTopVo.java",
+      "sha256": "641075bc3ad08d742fdfbcada989767da72ba9173d94feb5135249efd92a72ef"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/consume/BookkeepingRecordsConsumeCategoriesVo.java",
+      "sha256": "b2ff64f09808b56388b36ca164fa97afed0053ea4c5afc83c10c78bdc97f2ea8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/consume/BookkeepingRecordsYearStatisticsConsumeVo.java",
+      "sha256": "4d1e84772daac3b423c8e683a49e7d8ef06d83cadec0cac3a289ba27cd41aa91"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/overview/BookkeepingRecordsOverviewSummaryVo.java",
+      "sha256": "4f09c8136a16394f626728c6b8b2960dab8b2df55010f14e8dc82f14c5de5484"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/overview/BookkeepingRecordsOverviewHabitsVo.java",
+      "sha256": "da16948e0dc629ae0c6260547f6f37da98578c12e3f34d9aa366c0a9ba8af201"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/overview/BookkeepingRecordsOverviewMonthlyVo.java",
+      "sha256": "3afbefc0ac580c79c89044e05bd6a5df20ce747cd342d5aaba20eff6075536b4"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/model/vo/yearly/overview/BookkeepingRecordsYearStatisticsOverviewVo.java",
+      "sha256": "e9fde2a5b7d21a216b21ff7c2a44c46ffa2e270f9f199293174abc2b848ee016"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/excel/listener/BookkeepingRecordsImportDataListener.java",
+      "sha256": "6c6befc7a947b3281c9f34d19100bf722f0307dd98b5d0bb5e9aa11685e3e8e3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/excel/converter/BookkeepingRecordCategoryConverter.java",
+      "sha256": "d92c15be848d754c3e37bc1b31d356857e96cc279047513319bfdba17a694022"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/java/com/itwray/iw/bookkeeping/core/mybatis/BookkeepingCurrentGroupProvider.java",
+      "sha256": "43a808132ee1dee61ec6969bdd6d215d9244db2da4a62a97908af396881a6fcd"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingActionsMapper.xml",
+      "sha256": "8d79e0261f461660a102196eabd0922c95fec34cb20d491377b1b6ed32381ac3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsMapper.xml",
+      "sha256": "83b2bb66cf0dadbfabdf5538b62c55711cb0a9f06e24ad2aa47850fc1c5e524d"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingBudgetMapper.xml",
+      "sha256": "68c6ce7b7d415786a36cbcf2f35960bc233190bf90ba19c69fa19db96c1de77e"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingWalletMapper.xml",
+      "sha256": "b5d1d87f39f16a312774837f9eb9988df52b8852f4f12961ebbe884ff27c24d3"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingMembershipSubscriptionMapper.xml",
+      "sha256": "9961dc6c0e5b8fd59eda387b8f9ba685dc6ef46e23d9a734718ce26a8ebbce96"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingRecordsYearlyStatisticsMapper.xml",
+      "sha256": "c436154b7227dffb7ec4e7cf9845af40a0e702e245539f409b0176c7ab171042"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingVoiceParseLogMapper.xml",
+      "sha256": "6c8238c5a701ad40151900fc2b841a4cddc810564fbe55e6de77982aff36aea8"
+    },
+    {
+      "path": "iw-packaging-parent/iw-bookkeeping/src/main/resources/mapper/BookkeepingWalletRecordsMapper.xml",
+      "sha256": "3eb378f76054a2c0c60edb3fc21ac5fb5972107cdd5523089fe1aa034c9f86ad"
+    }
+  ]
+}
