@@ -36,4 +36,9 @@ public class WardrobeOutfitPageDto extends PageDto {
 
     @Schema(title = "排序类型(recentWear,leastWear,mostWear,createTime)")
     private String sortType;
+    private String categoryFilterKey;
+    private String itemStyleFilterKey;
+    private String colorFilterKey;
+    private String sceneFilterKey;
+    private String styleFilterKey;
 }

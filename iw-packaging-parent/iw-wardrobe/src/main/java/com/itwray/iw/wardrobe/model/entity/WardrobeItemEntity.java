@@ -71,4 +71,22 @@ public class WardrobeItemEntity extends UserEntity<Integer> {
 
     /** 最近维护衣物资料的用户。 */
     private Integer updateUserId;
+
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer categorySourceId;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String categoryNameSnapshot;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer categoryMatchKindSnapshot;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer itemStyleSourceId;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String itemStyleNameSnapshot;
+    private Integer dictionarySnapshotStatus;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private Integer colorSourceId;
+    @com.baomidou.mybatisplus.annotation.TableField(exist=false)
+    private java.util.List<String> wardrobeSceneNames;
+    @com.baomidou.mybatisplus.annotation.TableField(exist=false)
+    private java.util.List<String> wardrobeStyleNames;
 }

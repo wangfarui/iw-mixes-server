@@ -1,0 +1,252 @@
+-- Isolated fixtures only. Connect to database iw_wardrobe_test on your disposable local MySQL instance.
+DELIMITER $$
+CREATE PROCEDURE wardrobe_test_guard()
+BEGIN
+ IF DATABASE()<>'iw_wardrobe_test' OR EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='base_dict') THEN
+ SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='STOP: fixture requires an empty disposable iw_wardrobe_test database'; END IF;
+END$$
+DELIMITER ;
+CALL wardrobe_test_guard();
+DROP PROCEDURE wardrobe_test_guard;
+CREATE TABLE base_dict (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,parent_id INT UNSIGNED NOT NULL DEFAULT 0,dict_type SMALLINT UNSIGNED NOT NULL,
+ dict_code SMALLINT UNSIGNED NOT NULL DEFAULT 0,dict_name VARCHAR(32) NOT NULL,dict_status TINYINT NOT NULL DEFAULT 1,
+ sort INT NOT NULL DEFAULT 0,user_id INT UNSIGNED NOT NULL DEFAULT 0,scope_type TINYINT NOT NULL DEFAULT 0,
+ family_group_id INT UNSIGNED NOT NULL DEFAULT 0,previous_id INT UNSIGNED NULL,revision INT UNSIGNED NOT NULL DEFAULT 0,
+ deleted TINYINT NOT NULL DEFAULT 0,create_time DATETIME DEFAULT CURRENT_TIMESTAMP,update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+ active_name_key VARBINARY(128) GENERATED ALWAYS AS (CASE WHEN dict_type IN (4001,4002,4011) AND deleted=0 THEN CONVERT(dict_name USING binary) ELSE NULL END) STORED,
+ UNIQUE KEY uk_dict_previous(previous_id),UNIQUE KEY uk_bookkeeping_dict_name(scope_type,family_group_id,user_id,dict_type,active_name_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE auth_user(id INT UNSIGNED PRIMARY KEY,family_group_id INT UNSIGNED NOT NULL DEFAULT 0,deleted TINYINT NOT NULL DEFAULT 0);
+CREATE TABLE auth_family_group(id INT UNSIGNED PRIMARY KEY,status TINYINT NOT NULL DEFAULT 1,deleted TINYINT NOT NULL DEFAULT 0);
+CREATE TABLE auth_family_member(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,group_id INT UNSIGNED,user_id INT UNSIGNED,role TINYINT,status TINYINT DEFAULT 1,deleted TINYINT DEFAULT 0,UNIQUE KEY(group_id,user_id));
+INSERT INTO auth_user(id,family_group_id) VALUES(11001,12001),(11002,12001),(11003,12001),(11004,12001),(11005,0);
+INSERT INTO auth_family_group(id) VALUES(12001);
+INSERT INTO auth_family_member(group_id,user_id,role) VALUES(12001,11001,1),(12001,11002,2),(12001,11003,3),(12001,11004,4);
+INSERT INTO base_dict(id,parent_id,dict_type,dict_code,dict_name,sort) VALUES
+(1,0,5002,1,'上装',1),(2,0,5002,3,'连衣裙',2),(3,1,5006,101,'T恤',1),(4,2,5006,301,'连衣裙',2),
+(5,0,5003,1,'黑色',1),(6,0,5003,2,'白色',2),(7,0,5004,1,'通勤',1),(8,0,5004,2,'运动',2),(9,0,5005,1,'简约',1),(10,0,5005,2,'休闲',2);
+INSERT INTO base_dict(parent_id,dict_type,dict_code,dict_name,dict_status,sort,user_id,scope_type,family_group_id,revision,deleted)
+SELECT 0,t.dict_type,t.dict_code,t.dict_name,1,t.sort,u.id,0,0,0,0 FROM auth_user u CROSS JOIN base_dict t WHERE t.user_id=0 AND t.dict_type BETWEEN 5002 AND 5005;
+INSERT INTO base_dict(parent_id,dict_type,dict_code,dict_name,dict_status,sort,user_id,scope_type,family_group_id,revision,deleted)
+SELECT p.id,5006,t.dict_code,t.dict_name,1,t.sort,u.id,0,0,0,0 FROM auth_user u CROSS JOIN base_dict t JOIN base_dict tp ON tp.id=t.parent_id
+JOIN base_dict p ON p.user_id=u.id AND p.dict_type=5002 AND p.dict_code=tp.dict_code WHERE t.user_id=0 AND t.dict_type=5006;
+create table wardrobe_item
+(
+    id             int unsigned auto_increment             not null comment 'id',
+    item_name      varchar(64)   default ''                not null comment '衣物名称',
+    item_image     varchar(255)  default ''                not null comment '衣物图片',
+    category       tinyint       default 0                 not null comment '衣物品类(1上装 2下装 3连衣裙 4内衣 5袜子 6鞋履 7配饰 8帽子 9包袋 10首饰 11其他)',
+    item_style     smallint unsigned default 0             not null comment '衣物款式',
+    color_name     varchar(32)   default ''                not null comment '颜色名称',
+    color_hex      varchar(16)   default ''                not null comment '颜色hex',
+    season_tags    varchar(64)   default ''                not null comment '季节标签',
+    scene_tags     varchar(128)  default ''                not null comment '场景标签',
+    style_tags     varchar(128)  default ''                not null comment '风格标签',
+    brand          varchar(64)   default ''                not null comment '品牌',
+    size           varchar(32)   default ''                not null comment '尺码',
+    material       varchar(64)   default ''                not null comment '材质',
+    purchase_channel varchar(64) default ''                not null comment '购买渠道',
+    storage_location varchar(64) default ''                not null comment '存放位置',
+    purchase_date  date                                   null comment '购买日期',
+    price          decimal(10,2) default 0                 not null comment '价格',
+    custom_tags    varchar(255)  default ''                not null comment '自定义标签',
+    status         tinyint       default 1                 not null comment '状态(1在穿 2闲置 5已淘汰)',
+    wear_count     int unsigned  default 0                 not null comment '穿着次数',
+    last_wear_date date                                   null comment '最近穿着日期',
+    remark         varchar(255)  default ''                not null comment '备注',
+    create_user_id int unsigned                             null comment '创建人用户ID',
+    update_user_id int unsigned                             null comment '最近维护人用户ID',
+    deleted        tinyint(1)    default 0                 not null comment '是否删除',
+    create_time    datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time    datetime      default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id        int unsigned  default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_user_status (user_id, status),
+    key idx_user_id (user_id, id),
+    key idx_category (category),
+    key idx_item_style (item_style),
+    key idx_last_wear_date (last_wear_date)
+) comment '衣柜衣物表';
+
+create table wardrobe_outfit
+(
+    id             int unsigned auto_increment             not null comment 'id',
+    outfit_name    varchar(64)   default ''                not null comment '搭配名称',
+    cover_image    varchar(255)  default ''                not null comment '搭配封面',
+    season_tags    varchar(64)   default ''                not null comment '季节标签',
+    scene_tags     varchar(128)  default ''                not null comment '场景标签',
+    style_tags     varchar(128)  default ''                not null comment '风格标签',
+    custom_tags    varchar(255)  default ''                not null comment '自定义标签',
+    color_summary  varchar(128)  default ''                not null comment '颜色摘要',
+    item_count     tinyint       default 0                 not null comment '衣物数量',
+    wear_count     int unsigned  default 0                 not null comment '穿着次数',
+    last_wear_date date                                   null comment '最近穿着日期',
+    status         tinyint       default 1                 not null comment '状态(1正常 2归档)',
+    remark         varchar(255)  default ''                not null comment '备注',
+    deleted        tinyint(1)    default 0                 not null comment '是否删除',
+    create_time    datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time    datetime      default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id        int unsigned  default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_user_status (user_id, status),
+    key idx_last_wear_date (last_wear_date)
+) comment '衣柜搭配表';
+
+create table wardrobe_outfit_item
+(
+    id          int unsigned auto_increment             not null comment 'id',
+    outfit_id   int unsigned                            not null comment '搭配id',
+    item_id     int unsigned                            not null comment '衣物id',
+    item_name   varchar(64)   default ''                not null comment '衣物名称快照',
+    item_image  varchar(255)  default ''                not null comment '衣物图片快照',
+    category    tinyint       default 0                 not null comment '衣物品类快照',
+    item_style  smallint unsigned default 0             not null comment '衣物款式快照',
+    sort        tinyint       default 0                 not null comment '排序',
+    deleted     tinyint(1)    default 0                 not null comment '是否删除',
+    create_time datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time datetime      default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id     int unsigned  default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_outfit_id (outfit_id),
+    key idx_item_id (item_id),
+    key idx_user_id (user_id)
+) comment '衣柜搭配衣物表';
+
+create table wardrobe_wear_record
+(
+    id           int unsigned auto_increment             not null comment 'id',
+    wear_date    date                                    not null comment '穿着日期',
+    outfit_id    int unsigned  default 0                 not null comment '搭配id',
+    outfit_name  varchar(64)   default ''                not null comment '搭配名称快照',
+    scene_tags   varchar(128)  default ''                not null comment '场景标签',
+    weather_text varchar(64)   default ''                not null comment '天气',
+    mood_text    varchar(64)   default ''                not null comment '心情',
+    record_type  tinyint       default 2                 not null comment '记录类型(1计划 2已穿)',
+    item_count   tinyint       default 0                 not null comment '衣物数量',
+    remark       varchar(255)  default ''                not null comment '备注',
+    deleted      tinyint(1)    default 0                 not null comment '是否删除',
+    create_time  datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time  datetime      default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id      int unsigned  default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_wear_date (wear_date),
+    key idx_outfit_id (outfit_id),
+    key idx_user_id (user_id)
+) comment '衣柜穿着记录表';
+
+create table wardrobe_wear_record_item
+(
+    id          int unsigned auto_increment             not null comment 'id',
+    record_id   int unsigned                            not null comment '穿着记录id',
+    item_id     int unsigned                            not null comment '衣物id',
+    item_name   varchar(64)   default ''                not null comment '衣物名称快照',
+    item_image  varchar(255)  default ''                not null comment '衣物图片快照',
+    category    tinyint       default 0                 not null comment '衣物品类快照',
+    item_style  smallint unsigned default 0             not null comment '衣物款式快照',
+    sort        tinyint       default 0                 not null comment '排序',
+    deleted     tinyint(1)    default 0                 not null comment '是否删除',
+    create_time datetime      default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time datetime      default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id     int unsigned  default 0                 not null comment '用户id',
+    primary key (id),
+    key idx_record_id (record_id),
+    key idx_item_id (item_id),
+    key idx_user_id (user_id)
+) comment '衣柜穿着记录衣物表';
+
+create table wardrobe_image_optimization_task
+(
+    id                  int unsigned auto_increment              not null comment 'id',
+    task_id             varchar(64)                              not null comment '业务任务id',
+    item_id             int unsigned                             not null comment '衣物id',
+    requester_user_id   int unsigned default 0                   not null comment '实际任务发起用户id',
+    fingerprint         char(64)                                 not null comment '任务指纹',
+    source_image_url    varchar(512) default ''                  not null comment '不可变源图URL',
+    user_prompt         varchar(1024) default ''                 not null comment '用户补充要求',
+    normalized_prompt   text                                     null comment '服务端归一化提示词',
+    rule_version        varchar(64) default ''                   not null comment '优化规则版本',
+    input_snapshot      text                                     null comment '输入元数据快照JSON',
+    status              varchar(32) default 'queued'             not null comment 'queued/running/succeeded/failed/cancelled',
+    current_attempt_no  int unsigned default 1                   not null comment '当前attempt号',
+    result_image_url    varchar(512) default ''                  not null comment '当前生成结果URL',
+    error_code          varchar(64) default ''                   not null comment '错误摘要码',
+    error_message       varchar(512) default ''                  not null comment '错误信息',
+    result_deleted_time datetime                                 null comment '结果被用户删除时间',
+    complete_time       datetime                                 null comment '完成时间',
+    active_item_key     varchar(64) generated always as
+        (case when deleted = 0 and status in ('queued', 'running') then concat(user_id, ':', item_id) else null end) stored,
+    deleted             tinyint(1) default 0                     not null comment '是否删除',
+    create_time         datetime default CURRENT_TIMESTAMP       not null comment '创建时间',
+    update_time         datetime default CURRENT_TIMESTAMP       not null comment '更新时间',
+    user_id             int unsigned default 0                   not null comment '用户id',
+    primary key (id),
+    unique key uk_task_id (task_id),
+    unique key uk_user_item_fingerprint (user_id, item_id, fingerprint),
+    unique key uk_active_item (active_item_key),
+    key idx_user_item (user_id, item_id),
+    key idx_status (status),
+    key idx_user_id (user_id)
+) comment '衣柜图片优化任务表';
+
+create table wardrobe_image_optimization_attempt
+(
+    id                int unsigned auto_increment        not null comment 'id',
+    task_id           varchar(64)                        not null comment '业务任务id',
+    attempt_no        int unsigned default 1             not null comment 'attempt号',
+    operator_user_id  int unsigned default 0             not null comment '本次尝试发起用户id',
+    status            varchar(32) default 'queued'       not null comment 'queued/running/succeeded/failed/cancelled',
+    claim_token       varchar(64) default ''             not null comment '执行认领令牌',
+    claim_expire_time datetime                           null comment '认领租约到期时间',
+    start_time        datetime                           null comment '开始时间',
+    deadline_time     datetime                           null comment '截止时间',
+    provider          varchar(64) default ''             not null comment '外部能力提供方',
+    model             varchar(128) default ''            not null comment '实际模型',
+    result_image_url  varchar(512) default ''            not null comment '上传后的结果URL',
+    result_mime_type  varchar(64) default ''             not null comment '结果MIME类型',
+    revised_prompt    varchar(1024) default ''           not null comment '供应商修订提示词',
+    error_code        varchar(64) default ''             not null comment '错误摘要码',
+    error_message     varchar(512) default ''            not null comment '错误信息',
+    complete_time     datetime                           null comment '完成时间',
+    deleted           tinyint(1) default 0               not null comment '是否删除',
+    create_time       datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time       datetime default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id           int unsigned default 0             not null comment '用户id',
+    primary key (id),
+    unique key uk_task_attempt (task_id, attempt_no),
+    key idx_runnable (status, claim_expire_time),
+    key idx_deadline (status, deadline_time),
+    key idx_user_id (user_id)
+) comment '衣柜图片优化执行attempt表';
+
+create table wardrobe_image_file_cleanup
+(
+    id                   int unsigned auto_increment        not null comment 'id',
+    task_id              varchar(64) default ''             not null comment '关联业务任务id',
+    item_id              int unsigned                       null comment '关联衣物id',
+    attempt_no           int unsigned                       null comment '关联attempt号',
+    file_url             varchar(512)                       not null comment '待删除OSS文件URL',
+    reason               varchar(64) default ''             not null comment '清理原因',
+    status               varchar(32) default 'pending'      not null comment 'pending/retrying/succeeded/manual_required',
+    retry_count          int unsigned default 0             not null comment '失败次数',
+    next_retry_time      datetime                           not null comment '下次重试时间',
+    last_attempt_time    datetime                           null comment '最后尝试时间',
+    last_error           varchar(512) default ''            not null comment '最后错误',
+    claim_token          varchar(64) default ''             not null comment '清理认领令牌',
+    claim_expire_time    datetime                           null comment '认领租约到期时间',
+    manual_required_time datetime                           null comment '转人工时间',
+    complete_time        datetime                           null comment '完成时间',
+    deleted              tinyint(1) default 0               not null comment '是否删除',
+    create_time          datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time          datetime default CURRENT_TIMESTAMP not null comment '更新时间',
+    user_id              int unsigned default 0             not null comment '用户id',
+    primary key (id),
+    unique key uk_file_url (file_url),
+    key idx_runnable (status, next_retry_time, claim_expire_time),
+    key idx_user_id (user_id)
+) comment '衣柜图片OSS清理任务表';
+INSERT INTO wardrobe_item(id,user_id,item_name,category,item_style,color_name,scene_tags,style_tags) VALUES
+(13001,11001,'测试衣物A',1,101,'黑色','1,2','1'),(13002,11004,'测试衣物B',3,301,'白色','1','2');
+INSERT INTO wardrobe_outfit(id,user_id,outfit_name,item_count) VALUES(14001,11001,'测试搭配',2);
+INSERT INTO wardrobe_outfit_item(id,user_id,outfit_id,item_id,item_name,category,item_style,sort) VALUES
+(15001,11001,14001,13001,'测试衣物A',1,101,1),(15002,11001,14001,13002,'测试衣物B',3,301,2);

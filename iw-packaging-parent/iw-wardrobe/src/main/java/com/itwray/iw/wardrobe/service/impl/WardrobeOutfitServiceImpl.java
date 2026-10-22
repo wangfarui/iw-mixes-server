@@ -25,6 +25,7 @@ import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
 import com.itwray.iw.web.exception.BusinessException;
+import com.itwray.iw.web.utils.UserUtils;
 import com.itwray.iw.web.model.vo.PageVo;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Lazy;
@@ -51,6 +52,11 @@ import java.util.stream.Collectors;
  */
 @Service
 public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService snapshots;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.itwray.iw.wardrobe.dictionary.WardrobeDetailEditor detailEditor;
+
 
     private static final int OUTFIT_STATUS_ACTIVE = 1;
     private static final int CATEGORY_TOP = 1;
@@ -94,10 +100,15 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     @Override
     @Transactional
     public Integer add(WardrobeOutfitAddDto dto) {
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "sceneTags", "styleTags");
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         List<WardrobeItemEntity> itemList = this.querySelectedItems(dto.getItemIds());
         WardrobeOutfitEntity entity = BeanUtil.copyProperties(dto, WardrobeOutfitEntity.class);
         this.fillOutfitDefaults(entity, itemList);
+        var prepared = snapshots.prepareHead(UserUtils.getUserId(), true, dto.getDictionarySelection(), dto.getDictionaryChanges(), dto.getDictionaryContext(), true);
+        entity.setDictionarySnapshotStatus(1);
         wardrobeOutfitDao.save(entity);
+        snapshots.save("OUTFIT", entity.getId(), prepared);
         this.saveOutfitItems(entity.getId(), itemList);
         return entity.getId();
     }
@@ -105,18 +116,25 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     @Override
     @Transactional
     public void update(WardrobeOutfitUpdateDto dto) {
-        wardrobeOutfitDao.queryById(dto.getId());
-        List<WardrobeItemEntity> itemList = this.querySelectedItems(dto.getItemIds());
-        WardrobeOutfitEntity entity = BeanUtil.copyProperties(dto, WardrobeOutfitEntity.class);
-        this.fillOutfitDefaults(entity, itemList);
-        wardrobeOutfitDao.updateById(entity);
-        outfitItemDao.lambdaUpdate().eq(WardrobeOutfitItemEntity::getOutfitId, dto.getId()).remove();
-        this.saveOutfitItems(dto.getId(), itemList);
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "sceneTags", "styleTags");
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
+        WardrobeOutfitEntity current = wardrobeOutfitDao.queryById(dto.getId());
+        if (dto.getItemIds() != null) throw new BusinessException("编辑明细请刷新后使用新选择方式");
+        var prepared = snapshots.prepareHead(UserUtils.getUserId(), false, dto.getDictionarySelection(), dto.getDictionaryChanges(), dto.getDictionaryContext(), true);
+        int count = detailEditor.replace(com.itwray.iw.wardrobe.mapper.WardrobeDetailMapper.Kind.OUTFIT,
+                dto.getId(), UserUtils.getUserId(), dto.getItems(), dto.getItemSetVersion());
+        WardrobeOutfitEntity entity = BeanUtil.copyProperties(current, WardrobeOutfitEntity.class);
+        BeanUtil.copyProperties(dto, entity, cn.hutool.core.bean.copier.CopyOptions.create().ignoreNullValue());
+        if (StringUtils.isBlank(entity.getOutfitName())) throw new BusinessException("搭配名称不能为空");
+        entity.setSceneTags(current.getSceneTags()); entity.setStyleTags(current.getStyleTags());
+        entity.setItemCount(count); entity.setDictionarySnapshotStatus(1);
+        wardrobeOutfitDao.updateById(entity); snapshots.save("OUTFIT", entity.getId(), prepared);
     }
 
     @Override
     @Transactional
     public void delete(Integer id) {
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         wardrobeOutfitDao.queryById(id);
         outfitItemDao.lambdaUpdate().eq(WardrobeOutfitItemEntity::getOutfitId, id).remove();
         wardrobeOutfitDao.removeById(id);
@@ -125,17 +143,16 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     @Override
     @Transactional
     public Integer copy(Integer id) {
-        WardrobeOutfitDetailVo detailVo = this.detail(id);
-        WardrobeOutfitAddDto dto = new WardrobeOutfitAddDto();
-        dto.setOutfitName(detailVo.getOutfitName() + " 副本");
-        dto.setCoverImage(detailVo.getCoverImage());
-        dto.setSeasonTags(detailVo.getSeasonTags());
-        dto.setSceneTags(detailVo.getSceneTags());
-        dto.setStyleTags(detailVo.getStyleTags());
-        dto.setCustomTags(detailVo.getCustomTags());
-        dto.setRemark(detailVo.getRemark());
-        dto.setItemIds(detailVo.getItemList().stream().map(WardrobeOutfitItemVo::getItemId).toList());
-        return this.add(dto);
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
+        WardrobeOutfitEntity source = wardrobeOutfitDao.queryById(id);
+        WardrobeOutfitEntity target = BeanUtil.copyProperties(source, WardrobeOutfitEntity.class);
+        target.setId(null); target.setWearCount(0); target.setLastWearDate(null);
+        String name = source.getOutfitName();
+        target.setOutfitName(name.substring(0, Math.min(name.length(), 60)) + " 副本");
+        wardrobeOutfitDao.save(target);
+        target.setItemCount(detailEditor.copy(com.itwray.iw.wardrobe.mapper.WardrobeDetailMapper.Kind.OUTFIT, id, target.getId(), UserUtils.getUserId()));
+        wardrobeOutfitDao.updateById(target);
+        snapshots.copyTags("OUTFIT", id, target.getId()); return target.getId();
     }
 
     @Override
@@ -147,9 +164,12 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
                 .like(StringUtils.isNotBlank(dto.getStyle()), WardrobeOutfitEntity::getStyleTags, dto.getStyle())
                 .like(StringUtils.isNotBlank(dto.getCustomTag()), WardrobeOutfitEntity::getCustomTags, dto.getCustomTag())
                 .eq(Objects.nonNull(dto.getStatus()), WardrobeOutfitEntity::getStatus, dto.getStatus());
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.tag(queryWrapper, dto.getSceneFilterKey(), "SCENE", com.itwray.iw.wardrobe.dictionary.WardrobeOptionsController.BusinessType.OUTFIT);
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.tag(queryWrapper, dto.getStyleFilterKey(), "STYLE", com.itwray.iw.wardrobe.dictionary.WardrobeOptionsController.BusinessType.OUTFIT);
         this.applySort(queryWrapper, dto.getSortType());
         PageVo<WardrobeOutfitPageVo> pageVo = wardrobeOutfitDao.page(dto, queryWrapper, WardrobeOutfitPageVo.class);
         this.fillOutfitItems(pageVo.getRecords());
+        snapshots.attachAll(pageVo.getRecords(), "OUTFIT");
         return pageVo;
     }
 
@@ -159,6 +179,8 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         List<WardrobeOutfitItemVo> itemList = this.queryOutfitItemVos(id);
         this.fillItemAvailability(itemList);
         detailVo.setItemList(itemList);
+        detailVo.setItemSetVersion(com.itwray.iw.wardrobe.dictionary.WardrobeDetailEditor.version(itemList));
+        snapshots.attachAll(List.of(detailVo), "OUTFIT");
         return detailVo;
     }
 
@@ -171,7 +193,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         }
         Map<Integer, List<WardrobeItemEntity>> categoryMap = rankSuggestCandidates(
                 candidates, dto, LocalDate.now()).stream()
-                .collect(Collectors.groupingBy(WardrobeItemEntity::getCategory, LinkedHashMap::new, Collectors.toList()));
+                .collect(Collectors.groupingBy(WardrobeOutfitServiceImpl::matchKind, LinkedHashMap::new, Collectors.toList()));
         WardrobeItemEntity lockedItem = this.resolveLockedItem(dto.getLockedItemId());
 
         List<List<WardrobeItemEntity>> suggestionItems = this.buildSuggestionItemSets(categoryMap, lockedItem, limit);
@@ -188,6 +210,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
 
     @Override
     public WardrobeMarkWornVo markWorn(WardrobeMarkWornDto dto) {
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         return wearRecordService.markWorn(dto);
     }
 
@@ -260,6 +283,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             relation.setItemImage(item.getItemImage());
             relation.setCategory(item.getCategory());
             relation.setItemStyle(item.getItemStyle());
+            snapshots.copyScalar(relation, item);
             relation.setSort(i + 1);
             relationList.add(relation);
         }
@@ -307,7 +331,8 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
     }
 
     private WardrobeOutfitItemVo toOutfitItemVo(WardrobeOutfitItemEntity entity) {
-        return BeanUtil.copyProperties(entity, WardrobeOutfitItemVo.class);
+        WardrobeOutfitItemVo vo = BeanUtil.copyProperties(entity, WardrobeOutfitItemVo.class);
+        vo.setDetailId(entity.getId()); return vo;
     }
 
     private WardrobeOutfitItemVo toOutfitItemVo(WardrobeItemEntity entity) {
@@ -317,6 +342,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
         vo.setItemStyle(entity.getItemStyle());
+        snapshots.copyScalar(vo, entity);
         return vo;
     }
 
@@ -333,6 +359,13 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         queryWrapper.orderByDesc(WardrobeItemEntity::getId);
         List<WardrobeItemEntity> itemList = wardrobeItemDao.list(queryWrapper);
         wardrobeItemImageService.applyCoverImages(itemList);
+        var tags = snapshots.tagsFor("ITEM", itemList.stream().map(WardrobeItemEntity::getId).toList());
+        java.util.Map<Integer,java.util.List<com.itwray.iw.wardrobe.mapper.WardrobeSnapshotMapper.StoredTag>> byId = tags.stream().collect(Collectors.groupingBy(com.itwray.iw.wardrobe.mapper.WardrobeSnapshotMapper.StoredTag::businessId));
+        for (var item : itemList) {
+            var stored = byId.getOrDefault(item.getId(), List.of());
+            item.setWardrobeSceneNames(stored.stream().filter(t -> t.dictType() == 5004).map(t -> t.nameSnapshot()).toList());
+            item.setWardrobeStyleNames(stored.stream().filter(t -> t.dictType() == 5005).map(t -> t.nameSnapshot()).toList());
+        }
         return itemList;
     }
 
@@ -360,10 +393,10 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
         if (containsAnyExactTag(item.getSeasonTags(), dto.getSeason())) {
             score += SCORE_SEASON_MATCH;
         }
-        if (containsAnyExactTag(item.getSceneTags(), dto.getScene())) {
+        if (item.getWardrobeSceneNames() != null ? item.getWardrobeSceneNames().contains(dto.getScene()) : containsAnyExactTag(item.getSceneTags(), dto.getScene())) {
             score += SCORE_SCENE_MATCH;
         }
-        if (containsAnyExactTag(item.getStyleTags(), dto.getStyle())) {
+        if (item.getWardrobeStyleNames() != null ? item.getWardrobeStyleNames().contains(dto.getStyle()) : containsAnyExactTag(item.getStyleTags(), dto.getStyle())) {
             score += SCORE_STYLE_MATCH;
         }
         if (Boolean.TRUE.equals(dto.getPreferIdle()) && WardrobeItemStatusEnum.isIdle(item.getStatus())) {
@@ -450,12 +483,12 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             Map<Integer, List<WardrobeItemEntity>> categoryMap,
             WardrobeItemEntity lockedItem,
             int limit) {
-        if (lockedItem != null && Objects.equals(lockedItem.getCategory(), CATEGORY_DRESS)) {
+        if (lockedItem != null && Objects.equals(matchKind(lockedItem), CATEGORY_DRESS)) {
             return List.of();
         }
-        List<WardrobeItemEntity> tops = lockedItem != null && Objects.equals(lockedItem.getCategory(), CATEGORY_TOP)
+        List<WardrobeItemEntity> tops = lockedItem != null && Objects.equals(matchKind(lockedItem), CATEGORY_TOP)
                 ? List.of(lockedItem) : categoryMap.getOrDefault(CATEGORY_TOP, List.of());
-        List<WardrobeItemEntity> bottoms = lockedItem != null && Objects.equals(lockedItem.getCategory(), CATEGORY_BOTTOM)
+        List<WardrobeItemEntity> bottoms = lockedItem != null && Objects.equals(matchKind(lockedItem), CATEGORY_BOTTOM)
                 ? List.of(lockedItem) : categoryMap.getOrDefault(CATEGORY_BOTTOM, List.of());
         if (tops.isEmpty() || bottoms.isEmpty()) {
             return List.of();
@@ -478,11 +511,11 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             WardrobeItemEntity lockedItem,
             int limit) {
         if (lockedItem != null) {
-            if (Objects.equals(lockedItem.getCategory(), CATEGORY_DRESS)) {
+            if (Objects.equals(matchKind(lockedItem), CATEGORY_DRESS)) {
                 return List.of(List.of(lockedItem));
             }
-            if (Objects.equals(lockedItem.getCategory(), CATEGORY_TOP)
-                    || Objects.equals(lockedItem.getCategory(), CATEGORY_BOTTOM)) {
+            if (Objects.equals(matchKind(lockedItem), CATEGORY_TOP)
+                    || Objects.equals(matchKind(lockedItem), CATEGORY_BOTTOM)) {
                 return List.of();
             }
         }
@@ -514,7 +547,7 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
                                Map<Integer, List<WardrobeItemEntity>> categoryMap,
                                int category,
                                int offset) {
-        if (selected.values().stream().anyMatch(item -> Objects.equals(item.getCategory(), category))) {
+        if (selected.values().stream().anyMatch(item -> Objects.equals(matchKind(item), category))) {
             return;
         }
         List<WardrobeItemEntity> items = categoryMap.get(category);
@@ -559,5 +592,8 @@ public class WardrobeOutfitServiceImpl implements WardrobeOutfitService {
             reasons.add("按少穿优先和分类完整度生成");
         }
         return String.join("；", reasons);
+    }
+    private static Integer matchKind(WardrobeItemEntity item) {
+        return item.getCategoryMatchKindSnapshot() == null ? item.getCategory() : item.getCategoryMatchKindSnapshot();
     }
 }

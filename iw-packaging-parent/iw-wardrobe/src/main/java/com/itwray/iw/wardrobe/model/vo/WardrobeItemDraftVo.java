@@ -86,4 +86,6 @@ public class WardrobeItemDraftVo {
 
     @Schema(title = "来源，ai/candidate")
     private String source;
+    private com.fasterxml.jackson.databind.JsonNode dictionarySelection;
+    private java.util.Map<String,String> dictionaryContext;
 }

@@ -44,4 +44,8 @@ public class WardrobeOutfitPageVo {
     private Integer status;
 
     private List<WardrobeOutfitItemVo> itemList;
+    private java.util.List<com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.Tag> sceneSnapshots;
+    private java.util.List<com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.Tag> styleSnapshots;
+    private java.util.Map<String,Object> dictionarySnapshot;
+    private String itemSetVersion;
 }

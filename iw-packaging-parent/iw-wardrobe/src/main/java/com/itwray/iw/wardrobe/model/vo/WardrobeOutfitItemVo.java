@@ -30,4 +30,12 @@ public class WardrobeOutfitItemVo {
 
     /** available、deleted、transferred。 */
     private String availability;
+
+    private Integer categorySourceId;
+    private String categoryNameSnapshot;
+    private Integer categoryMatchKindSnapshot;
+    private Integer itemStyleSourceId;
+    private String itemStyleNameSnapshot;
+    private Integer dictionarySnapshotStatus;
+    private Integer detailId;
 }

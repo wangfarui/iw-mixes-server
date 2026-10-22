@@ -22,6 +22,7 @@ import com.itwray.iw.wardrobe.service.WardrobeItemService;
 import com.itwray.iw.wardrobe.service.WardrobeOutfitService;
 import com.itwray.iw.wardrobe.service.WardrobeWearRecordService;
 import com.itwray.iw.web.exception.BusinessException;
+import com.itwray.iw.web.utils.UserUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,11 @@ import java.util.stream.Collectors;
  */
 @Service
 public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService snapshots;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.itwray.iw.wardrobe.dictionary.WardrobeDetailEditor detailEditor;
+
 
     private static final int RECORD_TYPE_PLAN = 1;
     private static final int RECORD_TYPE_WORN = 2;
@@ -77,6 +83,8 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     }
 
     private Integer add(WardrobeWearRecordAddDto dto, Boolean allowPartial) {
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "sceneTags");
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         LocalDate wearDate = Objects.requireNonNullElse(dto.getWearDate(), LocalDate.now());
         Integer recordType = Objects.requireNonNullElse(dto.getRecordType(), RECORD_TYPE_WORN);
         List<WardrobeOutfitItemVo> itemList = this.resolveRecordItems(dto.getOutfitId(), dto.getItemIds(), allowPartial);
@@ -93,7 +101,10 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         entity.setMoodText(StringUtils.defaultString(dto.getMoodText()));
         entity.setRemark(StringUtils.defaultString(dto.getRemark()));
         entity.setItemCount(itemList.size());
+        var prepared = snapshots.prepareHead(UserUtils.getUserId(), true, dto.getDictionarySelection(), dto.getDictionaryChanges(), dto.getDictionaryContext(), false);
+        entity.setDictionarySnapshotStatus(1);
         wearRecordDao.save(entity);
+        snapshots.save("WEAR_RECORD", entity.getId(), prepared);
         this.saveRecordItems(entity.getId(), itemList);
         if (Objects.equals(recordType, RECORD_TYPE_WORN)) {
             this.increaseWearCount(entity.getOutfitId(), itemList, wearDate);
@@ -104,25 +115,37 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     @Override
     @Transactional
     public void update(WardrobeWearRecordUpdateDto dto) {
-        wearRecordDao.queryById(dto.getId());
-        List<WardrobeOutfitItemVo> itemList = this.resolveRecordItems(dto.getOutfitId(), dto.getItemIds(), Boolean.FALSE);
-        if (itemList.isEmpty()) {
-            throw new BusinessException("请至少选择一件衣物");
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "sceneTags");
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
+        WardrobeWearRecordEntity current = wearRecordDao.queryById(dto.getId());
+        var prepared = snapshots.prepareHead(UserUtils.getUserId(), false, dto.getDictionarySelection(), dto.getDictionaryChanges(), dto.getDictionaryContext(), false);
+        WardrobeWearRecordEntity entity = BeanUtil.copyProperties(current, WardrobeWearRecordEntity.class);
+        BeanUtil.copyProperties(dto, entity, cn.hutool.core.bean.copier.CopyOptions.create().ignoreNullValue());
+        if (Boolean.TRUE.equals(dto.getReplaceOutfit())) {
+            if (dto.getItems() != null) throw new BusinessException("请选择搭配或直接选择衣物，不能同时使用");
+            if (dto.getOutfitId() == null || dto.getOutfitId() <= 0) throw new BusinessException("请选择新搭配");
+            var rows = this.resolveRecordItems(dto.getOutfitId(), null, Boolean.FALSE);
+            wearRecordItemDao.lambdaUpdate().eq(WardrobeWearRecordItemEntity::getRecordId, dto.getId()).remove();
+            this.saveRecordItems(dto.getId(), rows); entity.setItemCount(rows.size());
+            entity.setOutfitName(this.resolveOutfitName(dto.getOutfitId()));
+        } else {
+            if (dto.getItemIds() != null) throw new BusinessException("编辑明细请刷新后使用新选择方式");
+            if (dto.getOutfitId() != null && !Objects.equals(dto.getOutfitId(), current.getOutfitId()) && dto.getItems() == null)
+                throw new BusinessException("更换搭配需要明确重新选择");
+            int count = detailEditor.replace(com.itwray.iw.wardrobe.mapper.WardrobeDetailMapper.Kind.WEAR_RECORD,
+                    dto.getId(), UserUtils.getUserId(), dto.getItems(), dto.getItemSetVersion());
+            entity.setItemCount(count);
+            if (dto.getItems() != null) { entity.setOutfitId(0); entity.setOutfitName(""); }
+            else { entity.setOutfitId(current.getOutfitId()); entity.setOutfitName(current.getOutfitName()); }
         }
-        WardrobeWearRecordEntity entity = BeanUtil.copyProperties(dto, WardrobeWearRecordEntity.class);
-        entity.setWearDate(Objects.requireNonNullElse(dto.getWearDate(), LocalDate.now()));
-        entity.setRecordType(Objects.requireNonNullElse(dto.getRecordType(), RECORD_TYPE_PLAN));
-        entity.setOutfitId(Objects.requireNonNullElse(dto.getOutfitId(), 0));
-        entity.setOutfitName(this.resolveOutfitName(dto.getOutfitId()));
-        entity.setItemCount(itemList.size());
-        wearRecordDao.updateById(entity);
-        wearRecordItemDao.lambdaUpdate().eq(WardrobeWearRecordItemEntity::getRecordId, dto.getId()).remove();
-        this.saveRecordItems(dto.getId(), itemList);
+        entity.setSceneTags(current.getSceneTags()); entity.setDictionarySnapshotStatus(1);
+        wearRecordDao.updateById(entity); snapshots.save("WEAR_RECORD", entity.getId(), prepared);
     }
 
     @Override
     @Transactional
     public void delete(Integer id) {
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         wearRecordDao.queryById(id);
         wearRecordItemDao.lambdaUpdate().eq(WardrobeWearRecordItemEntity::getRecordId, id).remove();
         wearRecordDao.removeById(id);
@@ -132,23 +155,27 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     public WardrobeWearRecordVo detail(Integer id) {
         WardrobeWearRecordVo vo = BeanUtil.copyProperties(wearRecordDao.queryById(id), WardrobeWearRecordVo.class);
         vo.setItemList(this.queryRecordItemVos(id));
+        vo.setItemSetVersion(com.itwray.iw.wardrobe.dictionary.WardrobeDetailEditor.version(vo.getItemList()));
+        snapshots.attachAll(List.of(vo), "WEAR_RECORD");
         return vo;
     }
 
     @Override
     @Transactional
     public Integer copy(WardrobeWearRecordCopyDto dto) {
-        WardrobeWearRecordVo source = this.detail(dto.getId());
-        WardrobeWearRecordAddDto addDto = new WardrobeWearRecordAddDto();
-        addDto.setWearDate(dto.getTargetDate());
-        addDto.setOutfitId(source.getOutfitId());
-        addDto.setItemIds(source.getItemList().stream().map(WardrobeOutfitItemVo::getItemId).toList());
-        addDto.setSceneTags(source.getSceneTags());
-        addDto.setWeatherText(source.getWeatherText());
-        addDto.setMoodText(source.getMoodText());
-        addDto.setRecordType(Objects.requireNonNullElse(dto.getRecordType(), source.getRecordType()));
-        addDto.setRemark(source.getRemark());
-        return this.add(addDto);
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
+        WardrobeWearRecordEntity source = wearRecordDao.queryById(dto.getId());
+        WardrobeWearRecordEntity target = BeanUtil.copyProperties(source, WardrobeWearRecordEntity.class);
+        target.setId(null); target.setWearDate(dto.getTargetDate());
+        target.setRecordType(Objects.requireNonNullElse(dto.getRecordType(), source.getRecordType()));
+        wearRecordDao.save(target);
+        target.setItemCount(detailEditor.copy(com.itwray.iw.wardrobe.mapper.WardrobeDetailMapper.Kind.WEAR_RECORD,
+                dto.getId(), target.getId(), UserUtils.getUserId()));
+        wearRecordDao.updateById(target);
+        snapshots.copyTags("WEAR_RECORD", dto.getId(), target.getId());
+        if (Objects.equals(target.getRecordType(), RECORD_TYPE_WORN))
+            this.increaseWearCount(target.getOutfitId(), this.queryRecordItemVos(target.getId()), target.getWearDate());
+        return target.getId();
     }
 
     @Override
@@ -166,6 +193,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
                 .map(entity -> BeanUtil.copyProperties(entity, WardrobeWearRecordVo.class))
                 .toList();
         this.fillRecordItems(recordList);
+        snapshots.attachAll(recordList, "WEAR_RECORD");
         return recordList;
     }
 
@@ -179,6 +207,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
                 .map(entity -> BeanUtil.copyProperties(entity, WardrobeWearRecordVo.class))
                 .toList();
         this.fillRecordItems(recordList);
+        snapshots.attachAll(recordList, "WEAR_RECORD");
         return recordList;
     }
 
@@ -194,12 +223,15 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
                 .map(entity -> BeanUtil.copyProperties(entity, WardrobeWearRecordVo.class))
                 .toList();
         this.fillRecordItems(recordList);
+        snapshots.attachAll(recordList, "WEAR_RECORD");
         return recordList;
     }
 
     @Override
     @Transactional
     public WardrobeMarkWornVo markWorn(WardrobeMarkWornDto dto) {
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "sceneTags");
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         List<WardrobeOutfitItemVo> unavailableItems = dto.getOutfitId() == null || dto.getOutfitId() <= 0
                 ? List.of() : this.queryUnavailableOutfitItems(dto.getOutfitId());
         WardrobeMarkWornVo result = new WardrobeMarkWornVo();
@@ -217,7 +249,12 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         addDto.setMoodText(dto.getMoodText());
         addDto.setRemark(dto.getRemark());
         addDto.setRecordType(RECORD_TYPE_WORN);
+        boolean preserveOutfitScene = dto.getDictionarySelection() == null && dto.getOutfitId() != null && dto.getOutfitId() > 0;
+        addDto.setDictionarySelection(dto.getDictionarySelection() == null
+                ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode() : dto.getDictionarySelection());
+        addDto.setDictionaryContext(dto.getDictionaryContext() == null ? snapshots.currentContext(UserUtils.getUserId()) : dto.getDictionaryContext());
         result.setRecordId(this.add(addDto, dto.getAllowPartial()));
+        if (preserveOutfitScene) snapshots.copyScenes("OUTFIT", dto.getOutfitId(), "WEAR_RECORD", result.getRecordId());
         result.setConfirmationRequired(false);
         return result;
     }
@@ -225,6 +262,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
     @Override
     @Transactional
     public void markRecordWorn(Integer id) {
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, UserUtils.getUserId(), null);
         WardrobeWearRecordEntity entity = wearRecordDao.queryById(id);
         if (Objects.equals(entity.getRecordType(), RECORD_TYPE_WORN)) {
             return;
@@ -312,6 +350,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
             relation.setItemImage(item.getItemImage());
             relation.setCategory(item.getCategory());
             relation.setItemStyle(item.getItemStyle());
+            snapshots.copyScalar(relation, item);
             relation.setSort(i + 1);
             relationList.add(relation);
         }
@@ -356,7 +395,9 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
         vo.setItemStyle(entity.getItemStyle());
+        snapshots.copyScalar(vo, entity);
         vo.setSort(entity.getSort());
+        vo.setDetailId(entity.getId());
         return vo;
     }
 
@@ -367,7 +408,9 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
         vo.setItemStyle(entity.getItemStyle());
+        snapshots.copyScalar(vo, entity);
         vo.setSort(entity.getSort());
+        vo.setDetailId(entity.getId());
         return vo;
     }
 
@@ -378,6 +421,7 @@ public class WardrobeWearRecordServiceImpl implements WardrobeWearRecordService 
         vo.setItemImage(entity.getItemImage());
         vo.setCategory(entity.getCategory());
         vo.setItemStyle(entity.getItemStyle());
+        snapshots.copyScalar(vo, entity);
         return vo;
     }
 }

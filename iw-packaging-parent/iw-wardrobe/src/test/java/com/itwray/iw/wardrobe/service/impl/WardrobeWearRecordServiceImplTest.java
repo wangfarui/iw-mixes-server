@@ -28,6 +28,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class WardrobeWearRecordServiceImplTest {
+    @org.junit.jupiter.api.BeforeEach
+    void authenticateFixture() { com.itwray.iw.web.utils.UserUtils.setUserId(42); }
+    @org.junit.jupiter.api.AfterEach
+    void clearFixture() { com.itwray.iw.web.utils.UserUtils.clearContext(); }
 
     @Test
     void deletedHistoricalItemReturnsStructuredConfirmationWithoutSaving() {
@@ -49,6 +53,7 @@ class WardrobeWearRecordServiceImplTest {
         when(itemService.queryHistoricalActiveOwnerIds(List.of(7))).thenReturn(Map.of());
         WardrobeWearRecordServiceImpl service = new WardrobeWearRecordServiceImpl(
                 recordDao, recordItemDao, outfitDao, outfitItemDao, itemService, outfitService);
+        WardrobeServiceTestSupport.snapshotBoundary(service);
         WardrobeMarkWornDto request = new WardrobeMarkWornDto();
         request.setOutfitId(9);
 
@@ -80,6 +85,7 @@ class WardrobeWearRecordServiceImplTest {
         when(itemService.queryHistoricalActiveOwnerIds(List.of(7))).thenReturn(Map.of(7, 13));
         WardrobeWearRecordServiceImpl service = new WardrobeWearRecordServiceImpl(
                 recordDao, recordItemDao, outfitDao, outfitItemDao, itemService, outfitService);
+        WardrobeServiceTestSupport.snapshotBoundary(service);
         WardrobeMarkWornDto request = new WardrobeMarkWornDto();
         request.setOutfitId(9);
 
@@ -113,6 +119,7 @@ class WardrobeWearRecordServiceImplTest {
         when(itemService.queryHistoricalActiveOwnerIds(List.of(7, 8))).thenReturn(Map.of());
         WardrobeWearRecordServiceImpl service = new WardrobeWearRecordServiceImpl(
                 recordDao, recordItemDao, outfitDao, outfitItemDao, itemService, outfitService);
+        WardrobeServiceTestSupport.snapshotBoundary(service);
         WardrobeMarkWornDto request = new WardrobeMarkWornDto();
         request.setOutfitId(9);
         request.setAllowPartial(true);
@@ -142,6 +149,7 @@ class WardrobeWearRecordServiceImplTest {
         when(itemService.queryHistoricalActiveOwnerIds(List.of(7))).thenReturn(Map.of());
         WardrobeWearRecordServiceImpl service = new WardrobeWearRecordServiceImpl(
                 recordDao, recordItemDao, outfitDao, outfitItemDao, itemService, outfitService);
+        WardrobeServiceTestSupport.snapshotBoundary(service);
         WardrobeMarkWornDto request = new WardrobeMarkWornDto();
         request.setOutfitId(9);
 

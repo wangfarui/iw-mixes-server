@@ -46,4 +46,5 @@ public class WardrobeOutfitEntity extends UserEntity<Integer> {
     private Integer status;
 
     private String remark;
+    private Integer dictionarySnapshotStatus;
 }

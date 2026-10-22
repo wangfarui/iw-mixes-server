@@ -253,7 +253,7 @@ class WardrobeOutfitServiceImplTest {
 
     private WardrobeOutfitServiceImpl service(WardrobeItemDao itemDao,
                                               WardrobeItemAccessService accessService) {
-        return new WardrobeOutfitServiceImpl(
+        WardrobeOutfitServiceImpl service = new WardrobeOutfitServiceImpl(
                 mock(WardrobeOutfitDao.class),
                 mock(WardrobeOutfitItemDao.class),
                 itemDao,
@@ -262,6 +262,8 @@ class WardrobeOutfitServiceImplTest {
                 mock(WardrobeItemService.class),
                 accessService
         );
+        WardrobeServiceTestSupport.snapshotBoundary(service);
+        return service;
     }
 
     private WardrobeItemEntity item(int id, int category, int status,

@@ -84,4 +84,10 @@ public class WardrobeItemAddDto implements AddDto {
     @Size(max = 255, message = "备注不能超过255个字符")
     @Schema(title = "备注")
     private String remark;
+
+    /** Present only on create; names are resolved by the server. */
+    private com.fasterxml.jackson.databind.JsonNode dictionarySelection;
+    /** JSON absence and null intentionally have different meanings. */
+    private com.fasterxml.jackson.databind.JsonNode dictionaryChanges;
+    private java.util.Map<String,String> dictionaryContext;
 }

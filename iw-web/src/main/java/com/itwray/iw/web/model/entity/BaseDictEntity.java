@@ -62,4 +62,8 @@ public class BaseDictEntity extends UserEntity<Integer> {
     private Integer previousId;
     private Integer revision;
 
+    /** Stable wardrobe category root; never reused as an old dictionary code. */
+    private Integer wardrobeCategoryLineageId;
+    private Integer wardrobeMatchKind;
+
 }

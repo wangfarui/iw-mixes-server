@@ -37,6 +37,7 @@ class WardrobeItemServiceImplTest {
                 mock(WardrobeImageOptimizationTaskService.class),
                 accessService
         );
+        WardrobeServiceTestSupport.snapshotBoundary(service);
         WardrobeItemAddDto request = new WardrobeItemAddDto();
         request.setItemName("蓝色外套");
         request.setOwnerUserId(13);
@@ -66,6 +67,7 @@ class WardrobeItemServiceImplTest {
         when(itemDao.updateByIdAndOwner(any(WardrobeItemEntity.class), any(Integer.class))).thenReturn(true);
         WardrobeItemServiceImpl service = new WardrobeItemServiceImpl(
                 itemDao, imageService, taskService, accessService);
+        WardrobeServiceTestSupport.snapshotBoundary(service);
         WardrobeItemUpdateDto request = new WardrobeItemUpdateDto();
         request.setId(7);
         request.setOwnerUserId(14);

@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
 @Service
 public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService snapshots;
+
     private static final int OUTFIT_STATUS_ACTIVE = 1;
     private static final int RECORD_TYPE_PLAN = 1;
     private static final int RECORD_TYPE_WORN = 2;
@@ -96,12 +99,12 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
         vo.setTotalValue(totalValue);
         vo.setAvgItemPrice(activeItems.isEmpty() ? BigDecimal.ZERO : totalValue.divide(BigDecimal.valueOf(activeItems.size()), 2, RoundingMode.HALF_UP));
         vo.setAvgCostPerWear(totalWearCount <= 0 ? BigDecimal.ZERO : totalValue.divide(BigDecimal.valueOf(totalWearCount), 2, RoundingMode.HALF_UP));
-        vo.setCategoryStats(this.buildCodeStats(activeItems.stream().map(WardrobeItemEntity::getCategory).toList()));
-        vo.setItemStyleStats(this.buildCodeStats(activeItems.stream().map(WardrobeItemEntity::getItemStyle).toList()));
+        vo.setCategoryStats(buildClassificationStats(activeItems, false));
+        vo.setItemStyleStats(buildClassificationStats(activeItems, true));
         vo.setColorStats(this.buildColorStats(activeItems));
         vo.setSeasonStats(this.buildTagStats(activeItems.stream().map(WardrobeItemEntity::getSeasonTags).toList()));
-        vo.setSceneStats(this.buildTagStats(activeItems.stream().map(WardrobeItemEntity::getSceneTags).toList()));
-        vo.setStyleStats(this.buildTagStats(activeItems.stream().map(WardrobeItemEntity::getStyleTags).toList()));
+        vo.setSceneStats(this.buildSnapshotTagStats(activeItems, 5004));
+        vo.setStyleStats(this.buildSnapshotTagStats(activeItems, 5005));
         vo.setStatusStats(this.buildStatusStats());
         vo.setBrandStats(this.buildTextStats(activeItems.stream().map(WardrobeItemEntity::getBrand).toList(), 8));
         vo.setStorageStats(this.buildTextStats(activeItems.stream().map(WardrobeItemEntity::getStorageLocation).toList(), 8));
@@ -129,6 +132,25 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
                 .toList());
         vo.setRecentRecords(wearRecordService.recent(5));
         return vo;
+    }
+
+    private record Classification(String category, Integer kind, String style) { }
+    private List<WardrobeStatisticItemVo> buildClassificationStats(List<WardrobeItemEntity> items, boolean styles) {
+        Map<Classification,Long> counts = items.stream()
+                .filter(item -> !styles || StringUtils.isNotBlank(item.getItemStyleNameSnapshot()))
+                .collect(Collectors.groupingBy(item -> new Classification(
+                        StringUtils.defaultIfBlank(item.getCategoryNameSnapshot(), "未设置"),
+                        item.getCategoryMatchKindSnapshot(), styles ? item.getItemStyleNameSnapshot() : ""), LinkedHashMap::new, Collectors.counting()));
+        List<String> kinds = List.of("上装", "下装", "连衣裙", "内衣", "袜子", "鞋履", "配饰", "帽子", "包袋", "首饰", "其他");
+        return counts.entrySet().stream().sorted(Map.Entry.<Classification,Long>comparingByValue().reversed()).map(entry -> {
+            Classification key = entry.getKey();
+            boolean ambiguous = counts.keySet().stream().anyMatch(other -> other.category.equals(key.category)
+                    && other.style.equals(key.style) && !Objects.equals(other.kind, key.kind));
+            String label = key.category;
+            if (ambiguous) label += "（" + (key.kind != null && key.kind >= 1 && key.kind <= 11 ? kinds.get(key.kind - 1) : "未归类") + "）";
+            if (styles) label += " / " + key.style;
+            return new WardrobeStatisticItemVo(label, entry.getValue().intValue());
+        }).toList();
     }
 
     private List<WardrobeStatisticItemVo> buildCodeStats(List<Integer> codeList) {
@@ -195,5 +217,12 @@ public class WardrobeStatisticsServiceImpl implements WardrobeStatisticsService 
         }
         LocalDate lastWearDate = item.getLastWearDate();
         return lastWearDate == null || lastWearDate.isBefore(LocalDate.now().minusDays(60));
+    }
+    private List<WardrobeStatisticItemVo> buildSnapshotTagStats(List<WardrobeItemEntity> items, int type) {
+        var tags = snapshots.tagsFor("ITEM", items.stream().map(WardrobeItemEntity::getId).toList());
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<String> names = new ArrayList<>();
+        for (var tag : tags) if (tag.dictType() == type && seen.add(tag.businessId() + ":" + tag.nameSnapshot())) names.add(tag.nameSnapshot());
+        return buildTextStats(names, Integer.MAX_VALUE);
     }
 }

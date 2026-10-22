@@ -44,6 +44,9 @@ import java.util.Set;
 @Service
 public class WardrobeItemServiceImpl implements WardrobeItemService {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService snapshots;
+
     private final WardrobeItemDao wardrobeItemDao;
     private final WardrobeItemImageService wardrobeItemImageService;
     private final WardrobeImageOptimizationTaskService optimizationTaskService;
@@ -62,12 +65,16 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     @Override
     @Transactional
     public Integer add(WardrobeItemAddDto dto) {
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "category", "itemStyle", "colorName", "sceneTags", "styleTags");
         WardrobeItemEntity entity = BeanUtil.copyProperties(dto, WardrobeItemEntity.class);
         entity.setUserId(accessService.resolveOwnerForSave(dto.getOwnerUserId()));
+        snapshots.lockItemForWrite(UserUtils.getUserId(), null, entity.getUserId(), null);
         entity.setCreateUserId(UserUtils.getUserId());
         entity.setUpdateUserId(UserUtils.getUserId());
+        var prepared = snapshots.prepareItem(entity, null, dto.getDictionarySelection(), dto.getDictionaryChanges(), dto.getDictionaryContext());
         this.fillItemDefaults(entity);
         wardrobeItemDao.save(entity);
+        snapshots.save("ITEM", entity.getId(), prepared);
         return entity.getId();
     }
 
@@ -82,41 +89,51 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         }
         Integer ownerUserId = accessService.resolveOwnerForSave(dto.getOwnerUserId());
         Integer operatorUserId = UserUtils.getUserId();
+        snapshots.lockItemForWrite(operatorUserId, null, ownerUserId, null);
+        java.util.Map<WardrobeItemEntity,com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.Prepared> prepared = new java.util.IdentityHashMap<>();
         List<WardrobeItemEntity> entityList = dto.getItemList()
                 .stream()
                 .map(item -> {
+                    com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(item, "category", "itemStyle", "colorName", "sceneTags", "styleTags");
                     WardrobeItemEntity entity = BeanUtil.copyProperties(item, WardrobeItemEntity.class);
                     entity.setUserId(ownerUserId);
                     entity.setCreateUserId(operatorUserId);
                     entity.setUpdateUserId(operatorUserId);
+                    prepared.put(entity, snapshots.prepareItem(entity, null, item.getDictionarySelection(), item.getDictionaryChanges(), item.getDictionaryContext()));
                     this.fillItemDefaults(entity);
                     return entity;
                 })
                 .toList();
         wardrobeItemDao.saveBatch(entityList);
+        entityList.forEach(entity -> snapshots.save("ITEM", entity.getId(), prepared.get(entity)));
         return entityList.stream().map(WardrobeItemEntity::getId).toList();
     }
 
     @Override
     @Transactional
     public void update(WardrobeItemUpdateDto dto) {
+        com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.rejectLegacyValues(dto, "category", "itemStyle", "colorName", "sceneTags", "styleTags");
         WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(dto.getId(), accessService.resolveFamilyOwnerIds());
         accessService.requireManage(current);
-        Integer nextOwnerUserId = accessService.resolveOwnerForSave(dto.getOwnerUserId());
+        Integer nextOwnerUserId = accessService.resolveOwnerForSave(dto.getOwnerUserId() == null ? current.getUserId() : dto.getOwnerUserId());
+        current = snapshots.lockItemForWrite(UserUtils.getUserId(), current.getUserId(), nextOwnerUserId, dto.getId());
         if (!Objects.equals(current.getUserId(), nextOwnerUserId)) {
             optimizationTaskService.assertOwnerChangeAllowed(dto.getId(), current.getUserId());
         }
-        if (!StringUtils.equals(StringUtils.defaultString(current.getItemImage()),
+        if (dto.getItemImage() != null && !StringUtils.equals(StringUtils.defaultString(current.getItemImage()),
                 StringUtils.defaultString(dto.getItemImage()))) {
             optimizationTaskService.assertSourceImageChangeAllowed(dto.getId(), current.getUserId(), dto.getItemImage());
         }
-        WardrobeItemEntity entity = BeanUtil.copyProperties(dto, WardrobeItemEntity.class);
+        WardrobeItemEntity entity = BeanUtil.copyProperties(current, WardrobeItemEntity.class);
+        BeanUtil.copyProperties(dto, entity, cn.hutool.core.bean.copier.CopyOptions.create().ignoreNullValue());
         entity.setUserId(nextOwnerUserId);
         entity.setUpdateUserId(UserUtils.getUserId());
+        var prepared = snapshots.prepareItem(entity, current, dto.getDictionarySelection(), dto.getDictionaryChanges(), dto.getDictionaryContext());
         this.fillItemDefaults(entity);
         if (!wardrobeItemDao.updateByIdAndOwner(entity, current.getUserId())) {
             throw new BusinessException("衣物所属人已变化，请刷新后重试");
         }
+        snapshots.save("ITEM", entity.getId(), prepared);
         if (!Objects.equals(current.getUserId(), nextOwnerUserId)) {
             wardrobeItemImageService.transferOwnership(dto.getId(), current.getUserId(), nextOwnerUserId);
             optimizationTaskService.transferOwnership(dto.getId(), current.getUserId(), nextOwnerUserId);
@@ -128,6 +145,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
     public void delete(Integer id) {
         WardrobeItemEntity current = wardrobeItemDao.queryByIdInOwnerIds(id, accessService.resolveFamilyOwnerIds());
         accessService.requireManage(current);
+        current = snapshots.lockItemForWrite(UserUtils.getUserId(), current.getUserId(), current.getUserId(), id);
         optimizationTaskService.cancelForItemDeletion(id, current.getUserId());
         wardrobeItemImageService.deleteOptimizedImage(id, current.getUserId());
         if (!wardrobeItemDao.removeByIdAndOwner(id, current.getUserId())) {
@@ -172,6 +190,11 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
                 .le(Objects.nonNull(dto.getPurchaseEndDate()), WardrobeItemEntity::getPurchaseDate, dto.getPurchaseEndDate())
                 .in(WardrobeItemEntity::getUserId, visibleOwnerIds)
                 .eq(dto.getOwnerUserId() != null, WardrobeItemEntity::getUserId, dto.getOwnerUserId());
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.scalar(queryWrapper, dto.getCategoryFilterKey(), "CATEGORY");
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.scalar(queryWrapper, dto.getItemStyleFilterKey(), "ITEM_STYLE");
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.scalar(queryWrapper, dto.getColorFilterKey(), "COLOR");
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.tag(queryWrapper, dto.getSceneFilterKey(), "SCENE", com.itwray.iw.wardrobe.dictionary.WardrobeOptionsController.BusinessType.ITEM);
+        com.itwray.iw.wardrobe.dictionary.WardrobeHistoryFilters.tag(queryWrapper, dto.getStyleFilterKey(), "STYLE", com.itwray.iw.wardrobe.dictionary.WardrobeOptionsController.BusinessType.ITEM);
         if (dto.getOwnerUserId() != null && !visibleOwnerIds.contains(dto.getOwnerUserId())) {
             throw new BusinessException("不能查看该成员的衣物");
         }
@@ -193,6 +216,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         PageVo<WardrobeItemPageVo> pageVo = wardrobeItemDao.page(dto, queryWrapper, this::toItemPageVo);
         this.fillItemImages(pageVo.getRecords());
         this.fillCapabilities(pageVo.getRecords());
+        snapshots.attachAll(pageVo.getRecords(), "ITEM");
         return pageVo;
     }
 
@@ -205,6 +229,7 @@ public class WardrobeItemServiceImpl implements WardrobeItemService {
         detailVo.setOriginalImage(detailVo.getItemImage());
         this.fillItemImages(List.of(detailVo));
         this.fillCapabilities(List.of(detailVo));
+        snapshots.attachAll(List.of(detailVo), "ITEM");
         return detailVo;
     }
 

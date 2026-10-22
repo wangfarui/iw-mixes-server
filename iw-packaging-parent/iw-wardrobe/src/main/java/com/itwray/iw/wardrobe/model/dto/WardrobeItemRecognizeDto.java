@@ -23,4 +23,6 @@ public class WardrobeItemRecognizeDto {
 
     @Schema(title = "是否调用外部AI，false时只生成本地草稿")
     private Boolean useAi;
+    private Integer ownerUserId;
+    private java.util.Map<String,String> dictionaryContext;
 }

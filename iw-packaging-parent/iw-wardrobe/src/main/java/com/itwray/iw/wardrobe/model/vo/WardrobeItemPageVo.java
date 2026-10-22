@@ -87,4 +87,15 @@ public class WardrobeItemPageVo {
     private Integer wearCount;
 
     private LocalDate lastWearDate;
+
+    private Integer categorySourceId;
+    private String categoryNameSnapshot;
+    private Integer categoryMatchKindSnapshot;
+    private Integer itemStyleSourceId;
+    private String itemStyleNameSnapshot;
+    private Integer dictionarySnapshotStatus;
+    private Integer colorSourceId;
+    private java.util.List<com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.Tag> sceneSnapshots;
+    private java.util.List<com.itwray.iw.wardrobe.dictionary.WardrobeSnapshotService.Tag> styleSnapshots;
+    private java.util.Map<String,Object> dictionarySnapshot;
 }

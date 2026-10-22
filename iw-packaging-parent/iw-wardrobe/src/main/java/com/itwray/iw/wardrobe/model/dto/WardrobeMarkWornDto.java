@@ -42,4 +42,6 @@ public class WardrobeMarkWornDto {
 
     @Schema(title = "确认后仅记录仍可用的衣物")
     private Boolean allowPartial;
+    private com.fasterxml.jackson.databind.JsonNode dictionarySelection;
+    private java.util.Map<String,String> dictionaryContext;
 }

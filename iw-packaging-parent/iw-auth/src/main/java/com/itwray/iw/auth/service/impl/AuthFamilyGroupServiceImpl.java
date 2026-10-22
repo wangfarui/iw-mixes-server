@@ -62,6 +62,9 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     private final AuthUserDao authUserDao;
 
     @Autowired
+    private WardrobeDictionaryService wardrobeDictionaryService;
+
+    @Autowired
     private BookkeepingDictionaryMapper bookkeepingDictionaryMapper;
 
     @Autowired
@@ -108,6 +111,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
                 .update();
 
         bookkeepingDictionaryService.initializeFamily(groupEntity.getId());
+        wardrobeDictionaryService.initializeFamily(groupEntity.getId());
         return groupEntity.getId();
     }
 

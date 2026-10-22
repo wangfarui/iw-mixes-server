@@ -61,6 +61,9 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     @Autowired
     private BookkeepingDictionaryMapper bookkeepingDictionaryMapper;
 
+    @Autowired
+    private WardrobeDictionaryService wardrobeDictionaryService;
+
     /**
      * 操作管理员字典 分布式锁Key
      * <p>全局锁</p>
@@ -82,7 +85,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         boolean adminUser = this.isAdminUser(UserUtils.getUserId());
         return Arrays.stream(DictTypeEnum.values())
                 // 如果是管理员用户, 则默认所有字典为true. 如果不是管理员用户, 则只返回非管理员字典
-                .filter(t -> !DictionaryNames.isBookkeeping(t.getCode()))
+                .filter(t -> !DictionaryNames.isBookkeeping(t.getCode()) && !com.itwray.iw.web.wardrobe.WardrobeDictionaryAccess.supports(t.getCode()))
                 .filter(t -> !t.isAdminDict() || adminUser)
                 .map(t -> new DictTypeVo(t.getCode(), t.getName()))
                 .collect(Collectors.toList());
@@ -108,7 +111,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         if (latest == null || !latest) {
             Map<Object, Object> dictMapCache = RedisUtil.getHashEntries(this.obtainDictRedisKeyByUser());
             if (!dictMapCache.isEmpty()) {
-                dictMapCache.keySet().removeIf(key -> List.of("4001", "4002", "4004", "4011").contains(String.valueOf(key)));
+                dictMapCache.keySet().removeIf(key -> List.of("4001", "4002", "4004", "4011", "5002", "5003", "5004", "5005", "5006").contains(String.valueOf(key)));
                 return (Map) dictMapCache;
             }
         }
@@ -116,7 +119,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         Map<String, List<DictAllListVo>> dictMap = getBaseDao().lambdaQuery()
                 .eq(BaseDictEntity::getScopeType, 0)
                 .eq(BaseDictEntity::getFamilyGroupId, 0)
-                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4004, 4011)
+                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006)
                 .eq(BaseDictEntity::getDictStatus, EnableEnum.ENABLE.getCode())
                 .list()
                 .stream()
@@ -290,7 +293,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         boolean adminUser = this.isAdminUser(UserUtils.getUserId());
         queryWrapper.eq(BaseDictEntity::getScopeType, 0)
                 .eq(BaseDictEntity::getFamilyGroupId, 0)
-                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4004, 4011)
+                .notIn(BaseDictEntity::getDictType, 4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006)
                 .eq(dto.getDictType() != null, BaseDictEntity::getDictType, dto.getDictType())
                 .eq(dto.getDictCode() != null, BaseDictEntity::getDictCode, dto.getDictCode())
                 .eq(dto.getDictStatus() != null, BaseDictEntity::getDictStatus, dto.getDictStatus())
@@ -346,6 +349,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     }
 
     private static void rejectMigrated(Integer type) {
+        if (com.itwray.iw.web.wardrobe.WardrobeDictionaryAccess.supports(type))
+            throw new BusinessException("请在衣柜穿搭的衣柜设置中管理选项");
         if (DictionaryNames.isBookkeeping(type)) {
             throw new BusinessException("记账分类、标签与会员类型请通过记账设置维护，请更新客户端后重试");
         }
@@ -410,6 +415,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         // Replayed registration and repair must never resurrect renamed/deleted business options.
         boolean firstRegistration = registration && bookkeepingDictionaryMapper.countPersonalHistory(userId) == 0;
         List<BaseDictEntity> templateDictList = this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict()).stream()
+                .filter(row -> !com.itwray.iw.web.wardrobe.WardrobeDictionaryAccess.supports(row.getDictType()))
                 .filter(row -> !DictionaryNames.isBookkeeping(row.getDictType())
                         || (firstRegistration && (!Objects.equals(row.getDictType(),4004) || bookkeepingDictionaryMapper.countMembershipHistory(userId)==0))).toList();
         Map<DictUniqueKey, BaseDictEntity> templateDictMap = this.toDictUniqueMap(templateDictList);
@@ -518,7 +524,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         Map<DictUniqueKey, BaseDictEntity> userDictMap = this.toDictUniqueMap(userDictList);
         int updateCount = 0;
         for (BaseDictEntity userDict : userDictList) {
-            if (DictionaryNames.isBookkeeping(userDict.getDictType())) continue;
+            if (DictionaryNames.isBookkeeping(userDict.getDictType()) || com.itwray.iw.web.wardrobe.WardrobeDictionaryAccess.supports(userDict.getDictType())) continue;
             BaseDictEntity templateDict = templateDictMap.get(this.buildDictUniqueKey(userDict));
             if (templateDict == null || NumberUtils.isNullOrZero(templateDict.getParentId())) {
                 continue;
@@ -736,6 +742,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     public void doConsume(UserAddBo bo) {
         // 初始化字典数据
         this.initDictData(bo);
+        wardrobeDictionaryService.initializePersonal(bo.getUserId());
 
         // 字典数据初始化完成之后, 发送 依赖字典数据 的消息
         MQProducerHelper.send(RegisterNewUserTopicEnum.DEPEND_DICT, bo);
