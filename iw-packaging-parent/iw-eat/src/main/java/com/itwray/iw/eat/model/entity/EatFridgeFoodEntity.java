@@ -41,10 +41,20 @@ public class EatFridgeFoodEntity extends UserEntity<Integer> {
      */
     private Integer category;
 
+    private Integer categorySourceId;
+
+    private String categoryNameSnapshot;
+
     /**
      * 食材分区
      */
     private Integer section;
+
+    private Integer sectionSourceId;
+
+    private String sectionNameSnapshot;
+
+    private Integer dictionarySnapshotStatus;
 
     /**
      * 数量

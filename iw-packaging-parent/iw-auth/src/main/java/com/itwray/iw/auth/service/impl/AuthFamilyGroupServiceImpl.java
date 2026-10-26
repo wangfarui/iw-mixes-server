@@ -65,6 +65,9 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
     private WardrobeDictionaryService wardrobeDictionaryService;
 
     @Autowired
+    private KitchenDictionaryService kitchenDictionaryService;
+
+    @Autowired
     private BookkeepingDictionaryMapper bookkeepingDictionaryMapper;
 
     @Autowired
@@ -112,6 +115,7 @@ public class AuthFamilyGroupServiceImpl extends WebServiceImpl<AuthFamilyGroupDa
 
         bookkeepingDictionaryService.initializeFamily(groupEntity.getId());
         wardrobeDictionaryService.initializeFamily(groupEntity.getId());
+        kitchenDictionaryService.initializeFamily(groupEntity.getId());
         return groupEntity.getId();
     }
 

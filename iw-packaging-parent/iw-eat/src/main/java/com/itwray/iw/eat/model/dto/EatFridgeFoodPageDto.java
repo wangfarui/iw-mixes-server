@@ -27,8 +27,20 @@ public class EatFridgeFoodPageDto extends PageDto {
     @Schema(title = "食材分类")
     private Integer category;
 
+    @Schema(title = "食材分类名称快照")
+    private String categoryNameSnapshot;
+
+    @Schema(title = "筛选未设置分类")
+    private Boolean emptyCategory;
+
     @Schema(title = "食材分区")
     private Integer section;
+
+    @Schema(title = "食材分区名称快照")
+    private String sectionNameSnapshot;
+
+    @Schema(title = "筛选未设置分区")
+    private Boolean emptySection;
 
     @Schema(title = "过期开始日期")
     @JsonFormat(pattern = DateUtils.DATE_FORMAT)
