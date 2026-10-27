@@ -57,6 +57,9 @@ public class BaseApplicationAccountServiceImpl extends WebServiceImpl<BaseApplic
 
     private final AuthUserDao authUserDao;
 
+    @Autowired
+    private AccountCategoryService categories;
+
     private AuthVerificationService authVerificationService;
 
     @Autowired
@@ -78,6 +81,11 @@ public class BaseApplicationAccountServiceImpl extends WebServiceImpl<BaseApplic
     @Override
     @Transactional
     public Integer add(ApplicationAccountAddDto dto) {
+        int user=UserUtils.getUserId();
+        categories.lockOwner(user);
+        validateFields(dto);
+        if(dto.getType()==null) dto.setType(0);
+        categories.validateSelection(user,dto.getType(),null);
         String encryptHex = this.encrypt(dto.getPassword());
         dto.setPassword(encryptHex);
         return super.add(dto);
@@ -86,6 +94,12 @@ public class BaseApplicationAccountServiceImpl extends WebServiceImpl<BaseApplic
     @Override
     @Transactional
     public void update(ApplicationAccountUpdateDto dto) {
+        int user=UserUtils.getUserId();
+        categories.lockOwner(user);
+        BaseApplicationAccountEntity old=owned(dto.getId());
+        validateFields(dto);
+        if(dto.getType()==null) dto.setType(0);
+        categories.validateSelection(user,dto.getType(),old.getType());
         if (Boolean.TRUE.equals(dto.getUpdatePassword())) {
             String encryptHex = this.encrypt(dto.getPassword());
             dto.setPassword(encryptHex);
@@ -93,29 +107,75 @@ public class BaseApplicationAccountServiceImpl extends WebServiceImpl<BaseApplic
             dto.setPassword(null);
         }
         super.update(dto);
+
     }
 
     @Override
     public PageVo<ApplicationAccountPageVo> page(ApplicationAccountPageDto dto) {
         LambdaQueryWrapper<BaseApplicationAccountEntity> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(dto.getType() != null, BaseApplicationAccountEntity::getType, dto.getType())
-                .like(dto.getName() != null, BaseApplicationAccountEntity::getName, dto.getName())
-                .like(dto.getAddress() != null, BaseApplicationAccountEntity::getAddress, dto.getAddress());
+        queryWrapper.eq(BaseApplicationAccountEntity::getUserId,UserUtils.getUserId())
+                .eq(dto.getType()!=null,BaseApplicationAccountEntity::getType,dto.getType())
+                .like(StringUtils.isNotBlank(dto.getName()),BaseApplicationAccountEntity::getName,StringUtils.trim(dto.getName()))
+                .like(StringUtils.isNotBlank(dto.getAddress()),BaseApplicationAccountEntity::getAddress,StringUtils.trim(dto.getAddress()));
+        if(Boolean.TRUE.equals(dto.getUnclassified())) queryWrapper.and(q -> q.isNull(BaseApplicationAccountEntity::getType).or().eq(BaseApplicationAccountEntity::getType,0));
+        if(StringUtils.isNotBlank(dto.getKeyword())) {
+            String keyword=dto.getKeyword().trim();
+            queryWrapper.and(q -> q.like(BaseApplicationAccountEntity::getName,keyword).or().like(BaseApplicationAccountEntity::getAddress,keyword));
+        }
         queryWrapper.orderByDesc(BaseApplicationAccountEntity::getId);
-        return getBaseDao().page(dto, queryWrapper, ApplicationAccountPageVo.class);
+        PageVo<ApplicationAccountPageVo> page=getBaseDao().page(dto,queryWrapper,ApplicationAccountPageVo.class);
+        java.util.Map<Integer,String> names=categoryNames();
+        page.getRecords().forEach(row -> row.setTypeName(typeName(names,row.getType())));
+        return page;
+    }
+
+    @Override
+    public ApplicationAccountDetailVo detail(Integer id) {
+        ApplicationAccountDetailVo vo=cn.hutool.core.bean.BeanUtil.copyProperties(owned(id),ApplicationAccountDetailVo.class);
+        vo.setTypeName(typeName(categoryNames(),vo.getType()));
+        return vo;
+    }
+
+    @Override
+    @Transactional
+    public void delete(Integer id) {
+        categories.lockOwner(UserUtils.getUserId()); owned(id); super.delete(id);
+    }
+
+    private BaseApplicationAccountEntity owned(Integer id) {
+        BaseApplicationAccountEntity row=getBaseDao().lambdaQuery().eq(BaseApplicationAccountEntity::getId,id)
+            .eq(BaseApplicationAccountEntity::getUserId,UserUtils.getUserId()).one();
+        if(row==null) throw new BusinessException("账号不存在或无权访问");
+        return row;
+    }
+
+    private java.util.Map<Integer,String> categoryNames() {
+        java.util.Map<Integer,String> names=new java.util.HashMap<>();
+        categories.items(UserUtils.getUserId()).items().forEach(c -> names.put(c.code(),c.name()));
+        return names;
+    }
+    private String typeName(java.util.Map<Integer,String> names,Integer type) {
+        return type==null||type==0?"未分类":names.getOrDefault(type,"分类已失效");
+    }
+    private void validateFields(ApplicationAccountAddDto dto) {
+        dto.setName(StringUtils.trimToEmpty(dto.getName()));
+        dto.setAddress(StringUtils.trimToEmpty(dto.getAddress()));
+        dto.setAccount(StringUtils.trimToEmpty(dto.getAccount()));
+        if(StringUtils.isAllBlank(dto.getName(),dto.getAddress(),dto.getAccount()))
+            throw new BusinessException("应用名称、应用地址、账号至少填写一项");
     }
 
     @Override
     public String viewPassword(Integer id) {
-        BaseApplicationAccountEntity accountEntity = getBaseDao().queryById(id);
+        BaseApplicationAccountEntity accountEntity = owned(id);
         if (StringUtils.isBlank(accountEntity.getPassword())) {
             return CommonConstants.EMPTY;
         }
         try {
             return this.decrypt(accountEntity.getPassword());
         } catch (Exception e) {
-            log.error("viewPassword解密异常, encryptPd: " + accountEntity.getPassword(), e);
-            return CommonConstants.EMPTY;
+            log.error("viewPassword解密异常, accountId: {}", id);
+            throw new BusinessException("密码读取失败，请稍后重试");
         }
     }
 
@@ -144,6 +204,7 @@ public class BaseApplicationAccountServiceImpl extends WebServiceImpl<BaseApplic
         } else if (CollUtil.isNotEmpty(dto.getIdList())) {
             updateEntityList = getBaseDao().lambdaQuery()
                     .in(BaseApplicationAccountEntity::getId, dto.getIdList())
+                    .eq(BaseApplicationAccountEntity::getUserId, UserUtils.getUserId())
                     .select(BaseApplicationAccountEntity::getId, BaseApplicationAccountEntity::getPassword)
                     .list();
         } else {

@@ -23,6 +23,14 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 public class ResponseLoggingFilter extends OncePerRequestFilter {
 
+    /** Account payloads and password responses must never be written to HTTP body logs. */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.equals("/application/account") || path.startsWith("/application/account/")
+                || path.equals("/auth-service/application/account") || path.startsWith("/auth-service/application/account/");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {

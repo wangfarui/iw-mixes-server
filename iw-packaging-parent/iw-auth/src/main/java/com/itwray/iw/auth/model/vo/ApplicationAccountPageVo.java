@@ -23,6 +23,9 @@ public class ApplicationAccountPageVo implements PageRecordVo {
 
     @Schema(title = "应用分类")
     private Integer type;
+
+    @Schema(title = "应用分类名称（含停用分类）")
+    private String typeName;
     @Schema(title = "应用名称")
     private String name;
 

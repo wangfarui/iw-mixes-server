@@ -16,6 +16,12 @@ import lombok.EqualsAndHashCode;
 @Schema(name = "应用账号信息分页DTO")
 public class ApplicationAccountPageDto extends PageDto {
 
+    @Schema(title = "搜索应用名称或地址")
+    private String keyword;
+
+    @Schema(title = "仅查询未分类")
+    private Boolean unclassified;
+
     @Schema(title = "应用分类")
     private Integer type;
 
