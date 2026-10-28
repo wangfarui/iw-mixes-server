@@ -15,6 +15,7 @@
 
     <modules>
         <module>iw-core</module>
+        <module>iw-life</module>
         <module>iw-auth</module>
         <module>iw-eat</module>
         <module>iw-bookkeeping</module>
