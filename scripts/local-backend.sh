@@ -12,6 +12,7 @@ usage() {
 # 同时启动 iw-external 和 iw-core，用于前端访问 http://localhost:18000
 scripts/local-backend.sh all
 
+# 可用 IW_CORE_JAR / IW_EXTERNAL_JAR 显式指定已构建 JAR，避免混选历史包
 # 也可以分别启动
 scripts/local-backend.sh start external
 scripts/local-backend.sh start core
@@ -243,7 +244,19 @@ tail_log_on_failure() {
 
 find_service_jar() {
   local target="$1"
-  local name module target_dir
+  local name module target_dir explicit_jar
+  case "$target" in
+    core) explicit_jar="${IW_CORE_JAR:-}" ;;
+    external) explicit_jar="${IW_EXTERNAL_JAR:-}" ;;
+  esac
+  if [ -n "${explicit_jar:-}" ]; then
+    if [ ! -f "$explicit_jar" ] || [[ "$explicit_jar" != /* ]]; then
+      echo "Explicit service JAR must be an existing absolute file." >&2
+      return 1
+    fi
+    echo "$explicit_jar"
+    return
+  fi
   name="$(service_name "$target")"
   module="$(service_module "$target")"
   target_dir="${PROJECT_ROOT}/${module}/target"
@@ -252,9 +265,16 @@ find_service_jar() {
     return 0
   fi
 
-  find "$target_dir" -maxdepth 1 -type f -name "${name}-*.jar" ! -name "*.original" \
-    | sort \
-    | tail -n 1
+  # Use the artifact that was actually built most recently, not the lexically largest version.
+  local candidate latest=""
+  for candidate in "$target_dir"/"${name}-"*.jar; do
+    [ -f "$candidate" ] || continue
+    if [ -z "$latest" ] || [ "$candidate" -nt "$latest" ]; then
+      latest="$candidate"
+    fi
+  done
+  [ -z "$latest" ] || printf '%s\n' "$latest"
+  return 0
 }
 
 build_service() {
