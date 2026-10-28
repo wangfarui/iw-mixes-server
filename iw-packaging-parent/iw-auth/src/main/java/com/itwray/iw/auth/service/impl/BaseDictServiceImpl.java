@@ -56,6 +56,9 @@ import java.util.stream.Collectors;
 public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMapper, BaseDictEntity,
         DictAddDto, DictUpdateDto, DictDetailVo, Integer> implements BaseDictService, RocketMQClientListener<UserAddBo> {
 
+    @Autowired
+    private com.itwray.iw.auth.settings.SystemOptionsService systemOptionsService;
+
     private AuthUserDao authUserDao;
 
     @Autowired
@@ -92,6 +95,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         return Arrays.stream(DictTypeEnum.values())
                 // 如果是管理员用户, 则默认所有字典为true. 如果不是管理员用户, 则只返回非管理员字典
                 .filter(t -> !java.util.Objects.equals(t.getCode(),2010))
+                .filter(t -> !com.itwray.iw.auth.settings.SystemOptionDefinitions.retired(t.getCode()))
                 .filter(t -> !DictionaryNames.isBookkeeping(t.getCode())
                         && !com.itwray.iw.web.wardrobe.WardrobeDictionaryAccess.supports(t.getCode())
                         && !com.itwray.iw.web.kitchen.KitchenDictionaryAccess.supports(t.getCode()))
@@ -102,7 +106,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
     @Override
     public List<DictListVo> getDictList(Integer dictType) {
-        rejectMigrated(dictType);
+        if (!com.itwray.iw.auth.settings.SystemOptionDefinitions.supports(dictType)) rejectMigrated(dictType);
         return getBaseDao().lambdaQuery()
                 .eq(BaseDictEntity::getScopeType, 0)
                 .eq(BaseDictEntity::getFamilyGroupId, 0)
@@ -303,6 +307,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         queryWrapper.eq(BaseDictEntity::getScopeType, 0)
                 .eq(BaseDictEntity::getFamilyGroupId, 0)
                 .notIn(BaseDictEntity::getDictType, 2010, 4001, 4002, 4004, 4011, 3010, 3011, 5002, 5003, 5004, 5005, 5006)
+                .notIn(BaseDictEntity::getDictType, 1001, 2001, 3001, 5001, 3002, 3003, 3004, 4003, 4005, 4006)
                 .eq(dto.getDictType() != null, BaseDictEntity::getDictType, dto.getDictType())
                 .eq(dto.getDictCode() != null, BaseDictEntity::getDictCode, dto.getDictCode())
                 .eq(dto.getDictStatus() != null, BaseDictEntity::getDictStatus, dto.getDictStatus())
@@ -318,7 +323,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
 
     @Override
     public GeneralResponse<Long> getDictVersion() {
-        Long version = AuthRedisKeyEnum.USER_DICT_VERSION.getStringValue(Long.class, UserUtils.getUserId());
+        Number storedVersion = AuthRedisKeyEnum.USER_DICT_VERSION.getStringValue(Number.class, UserUtils.getUserId());
+        Long version = storedVersion == null ? null : storedVersion.longValue();
         if (version == null) {
             long currentVersion = System.currentTimeMillis();
             AuthRedisKeyEnum.USER_DICT_VERSION.setStringValue(currentVersion, UserUtils.getUserId());
@@ -328,27 +334,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     }
 
     @Override
-    @Transactional
     public Integer repairUserVisibleDictData() {
-        if (!this.isSuperAdminUser(UserUtils.getUserId())) {
-            throw new BusinessException("权限不足");
-        }
-
-        RedisLockUtil.lock(OPERATE_ADMIN_DICT_LOCK_KEY);
-        try {
-            int insertCount = this.repairAdminDictTemplateData();
-            List<AuthUserEntity> userEntityList = authUserDao.getBaseMapper().queryAllUser();
-            for (AuthUserEntity userEntity : userEntityList) {
-                int userInsertCount = this.copyMissingVisibleDictData(userEntity.getId());
-                insertCount += userInsertCount;
-                if (userInsertCount > 0) {
-                    this.refreshUserDictCacheVersion(userEntity.getId());
-                }
-            }
-            return insertCount;
-        } finally {
-            RedisLockUtil.unlock(OPERATE_ADMIN_DICT_LOCK_KEY);
-        }
+        throw new BusinessException("请更新客户端，通过修复业务选项预览并确认后操作");
     }
 
     @Override
@@ -358,6 +345,8 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     }
 
     private static void rejectMigrated(Integer type) {
+        if (com.itwray.iw.auth.settings.SystemOptionDefinitions.retired(type))
+            throw new BusinessException("系统固定选项请通过对应业务设置查看与同步，不支持自由修改");
         if(java.util.Objects.equals(type,2010)) throw new BusinessException("应用分类请从账号管理维护，请更新客户端后重试");
         if (com.itwray.iw.web.kitchen.KitchenDictionaryAccess.supports(type))
             throw new BusinessException("冰箱食材分类与分区请通过冰箱设置维护，请更新客户端后重试");
@@ -427,6 +416,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
         // Replayed registration and repair must never resurrect renamed/deleted business options.
         boolean firstRegistration = registration && bookkeepingDictionaryMapper.countPersonalHistory(userId) == 0;
         List<BaseDictEntity> templateDictList = this.queryTemplateDictList(DictTypeEnum.getUserVisibleDict()).stream()
+                .filter(row -> !com.itwray.iw.auth.settings.SystemOptionDefinitions.retired(row.getDictType()))
                 .filter(row -> !java.util.Objects.equals(row.getDictType(),2010) || (registration && accountCategoryMapper.history(userId)==0))
                 .filter(row -> !com.itwray.iw.web.wardrobe.WardrobeDictionaryAccess.supports(row.getDictType()))
                 .filter(row -> !com.itwray.iw.web.kitchen.KitchenDictionaryAccess.supports(row.getDictType()))
@@ -757,6 +747,7 @@ public class BaseDictServiceImpl extends WebServiceImpl<BaseDictDao, BaseDictMap
     @Transactional
     public void doConsume(UserAddBo bo) {
         // 初始化字典数据
+        systemOptionsService.initialize(bo.getUserId());
         this.initDictData(bo);
         wardrobeDictionaryService.initializePersonal(bo.getUserId());
         kitchenDictionaryService.initializePersonal(bo.getUserId());
