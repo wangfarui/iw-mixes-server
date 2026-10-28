@@ -38,7 +38,7 @@ ssh -J root@47.120.xx.xx root@172.22.61.87
 | `iw-core` systemd unit | 内网 Java 机器 | `/etc/systemd/system/iw-core.service` | 定义 `iw-core` 启动命令、工作目录和 `EnvironmentFile` |
 | `iw-external` systemd unit | 外网机器 | `/etc/systemd/system/iw-external.service` | 定义 `iw-external` 启动命令、工作目录和 `EnvironmentFile` |
 | 当前 Jar 软链接 | 两台机器分别存在 | `/opt/iw-mixes-server/<service>/<service>.jar` | systemd 实际启动的 Jar 软链接 |
-| 历史发布包 | 两台机器分别存在 | `/opt/iw-mixes-server/releases/<service>/` | GitHub Actions 发布后保留的最近 Jar |
+| 历史发布包 | 两台机器分别存在 | `/opt/iw-mixes-server/releases/<service>/` | 本地发布脚本发布后保留的最近 Jar |
 | OOM dump | 两台机器分别存在 | `/var/log/iw-mixes/*.hprof` | Java 内存溢出时生成，普通运行日志不在这里 |
 | 完整 Nginx 配置 | 外网机器 | `/etc/nginx/nginx.conf` | 当前生产若使用完整配置文件，就改这个 |
 | 拆分 Nginx 配置 | 外网机器 | `/etc/nginx/conf.d/iw-mixes-server.conf` | 仅在采用拆分 conf.d 方式时使用；不要和完整配置重复启用 |
@@ -466,23 +466,19 @@ systemctl restart iw-core
 journalctl -u iw-core -n 200 --no-pager
 ```
 
-## GitHub Actions 发布失败排查
+## 本地发布脚本故障排查
 
-GitHub Actions 中部署失败时，优先看失败 job 的最后一个 deploy step。服务器上可配合查看：
-
-```bash
-journalctl -u iw-core -n 100 --no-pager
-journalctl -u iw-external -n 100 --no-pager
-```
-
-如果是 SSH 连接失败，先在本地验证：
+生产统一通过 `scripts/deploy-prod-local.sh` 发布，GitHub Actions 已废弃。在后端仓库根目录检查：
 
 ```bash
-ssh iw-public 'whoami'
-ssh iw-core 'whoami'
+bash scripts/deploy-prod-local.sh status core
+ssh aliyun87 'journalctl -u iw-core -n 100 --no-pager'
+ssh aliyun183 'journalctl -u iw-external -n 100 --no-pager'
 ```
 
-如果本地可以但 Actions 不行，检查 GitHub Secrets 中的 `IW_DEPLOY_SSH_KEY` 是否是私钥全文，并确认对应公钥同时存在于外网机器和内网机器发布用户的 `~/.ssh/authorized_keys`。
+若使用自定义 SSH 别名，替换为本次发布实际指定的主机。核对发布输出的 `Artifact` 路径和 SHA-256；接口缺失时检查线上当前 JAR 是否包含对应业务库。脚本现在先 `clean package`，且拒绝多个候选包，避免文件名字典序选择旧包。
+
+若 SSH 连接失败，先以实际主机别名运行 `ssh <主机别名> 'whoami'`，检查本地 SSH 配置和访问权限。`status` 显示 active 后，仍需验证业务请求。生活工具的具体检查见 [LIFE_TOOLS_RELEASE.md](LIFE_TOOLS_RELEASE.md)。
 
 ## 日志空间
 

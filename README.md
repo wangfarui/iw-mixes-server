@@ -95,88 +95,21 @@ JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17
 
 ## 发布
 
-发布配置见 [deploy/README.md](deploy/README.md)。生产日志和故障排查命令见 [deploy/OPERATIONS.md](deploy/OPERATIONS.md)。默认方案是 GitHub Actions 构建 Jar，通过 SSH 发布到外网机器和内网机器，并由 systemd 托管服务。
+生产发布统一使用 [scripts/deploy-prod-local.sh](scripts/deploy-prod-local.sh)。GitHub Actions 发布方式已废弃。
 
-### 发布链路
-
-GitHub Actions 工作流在 [.github/workflows/deploy-prod.yml](.github/workflows/deploy-prod.yml)。
-
-发布链路：
-
-1. `build`：在 GitHub runner 上使用 JDK 17 执行 Maven package，构建 `iw-core.jar` 和 `iw-external.jar`。
-2. `deploy-external`：通过 SSH 直连外网机器，上传 `iw-external.jar`，执行 `deploy/scripts/deploy-jar.sh iw-external ...`。
-3. `deploy-core`：通过外网机器作为 SSH 跳板连接内网机器，上传 `iw-core.jar`，执行 `deploy/scripts/deploy-jar.sh iw-core ...`。
-
-`deploy/scripts/deploy-jar.sh` 会把 Jar 安装到 `/opt/iw-mixes-server/releases/<service>/`，更新 `/opt/iw-mixes-server/<service>/<service>.jar` 软链接，然后执行：
+在本仓库根目录执行：
 
 ```bash
-systemctl restart <service>
+bash scripts/deploy-prod-local.sh deploy core
+bash scripts/deploy-prod-local.sh status core
 ```
 
-因此发布某个服务时会短暂重启该服务。未选择发布的服务不会被停止或重启。
+目标可选 `core`、`external`、`all`。脚本直接构建当前本地工作区，未提交修改也参与构建；提交和推送不是构建前提，但发布前应核对工作区范围。
 
-### GitHub Secrets
+脚本使用 JDK 17、固定 Maven `/usr/local/maven/apache-maven-3.8.6/bin/mvn`、本地仓库 `/usr/local/maven/repository` 和临时中性 settings。发现环境变量或 `.mvn` 配置中的仓库冲突时停止。
 
-仓库需要配置这些 Actions Secrets：
+构建执行 `clean package`，清理历史版本 JAR。目标目录必须恰好有一个可发布 JAR，否则在上传前停止；上传前输出实际路径和 SHA-256。默认 SSH 主机为 core 的 `aliyun87` 和 external 的 `aliyun183`，可通过 `IW_LOCAL_CORE_HOST`、`IW_LOCAL_EXTERNAL_HOST` 覆盖。
 
-```text
-IW_DEPLOY_SSH_KEY
-IW_PUBLIC_HOST
-IW_PUBLIC_USER
-IW_PUBLIC_PORT
-IW_CORE_HOST
-IW_CORE_USER
-IW_CORE_PORT
-```
+脚本上传后调用 `deploy/scripts/deploy-jar.sh`，更新服务 JAR 软链接并重启所选服务。`restart` 只重启现有包，更新代码必须使用 `deploy`。服务 active 仅说明进程存活，发布后还需验证业务接口。
 
-当前生产拓扑建议：
-
-```text
-IW_PUBLIC_HOST = 外网机器公网 IP 或域名
-IW_PUBLIC_USER = root 或部署用户
-IW_PUBLIC_PORT = 22
-
-IW_CORE_HOST = 172.22.61.87
-IW_CORE_USER = root 或部署用户
-IW_CORE_PORT = 22
-```
-
-`IW_DEPLOY_SSH_KEY` 对应的公钥必须同时存在于外网机器和内网机器发布用户的 `~/.ssh/authorized_keys` 中。内网机器不需要公网 IP，Actions 通过外网机器 `ProxyJump` 进入。
-
-### 手动触发发布
-
-在 GitHub 页面进入：
-
-```text
-Actions -> Deploy iw-mixes-server -> Run workflow
-```
-
-`Service to deploy` 可选：
-
-- `all`：构建后发布 `iw-core` 和 `iw-external`。
-- `core`：只发布并重启 `iw-core`，不会停止或重启 `iw-external`。
-- `external`：只发布并重启 `iw-external`，不会停止或重启 `iw-core`。
-
-无论选择哪个目标，`build` 都会构建两个 Jar；区别只在后续部署 job 是否执行。
-
-### Tag 自动发布
-
-推送符合 `server-v*` 的 tag 会自动触发 Actions，并等价于发布 `all`，即同时发布 `iw-core` 和 `iw-external`：
-
-```bash
-git tag server-v0.2.1
-git push origin server-v0.2.1
-```
-
-如果只想发布单个服务，不要用 tag 触发；请在 GitHub Actions 页面手动选择 `core` 或 `external`。
-
-### 发布前检查
-
-发布前建议至少执行：
-
-```bash
-JAVA_HOME="$(/usr/libexec/java_home -v 17)" PATH="$(/usr/libexec/java_home -v 17)/bin:$PATH" \
-  mvn -pl iw-packaging-parent/iw-core,iw-packaging-parent/iw-external -am -DskipTests compile
-```
-
-确认本地变更已提交并推送到 GitHub 后，再手动运行 workflow 或推送 `server-v*` tag。
+完整说明见 [deploy/README.md](deploy/README.md)，生活工具本次修复流程见 [deploy/LIFE_TOOLS_RELEASE.md](deploy/LIFE_TOOLS_RELEASE.md)，日志排查见 [deploy/OPERATIONS.md](deploy/OPERATIONS.md)。

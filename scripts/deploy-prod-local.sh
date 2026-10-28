@@ -7,10 +7,15 @@ CORE_HOST="${IW_LOCAL_CORE_HOST:-aliyun87}"
 EXTERNAL_HOST="${IW_LOCAL_EXTERNAL_HOST:-aliyun183}"
 REMOTE_TMP_DIR="${IW_LOCAL_REMOTE_TMP_DIR:-/tmp/iw-mixes-server-local-deploy}"
 JAVA_VERSION="${IW_LOCAL_JAVA_VERSION:-17}"
-MVN_BIN="${MVN_BIN:-mvn}"
+MVN_BIN="/usr/local/maven/apache-maven-3.8.6/bin/mvn"
+MAVEN_REPOSITORY="/usr/local/maven/repository"
+MAVEN_SETTINGS_FILE=""
 SSH_CONFIG_FILE=""
 
 cleanup() {
+  if [ -n "$MAVEN_SETTINGS_FILE" ] && [ -f "$MAVEN_SETTINGS_FILE" ]; then
+    rm -f "$MAVEN_SETTINGS_FILE"
+  fi
   if [ -n "$SSH_CONFIG_FILE" ] && [ -f "$SSH_CONFIG_FILE" ]; then
     rm -f "$SSH_CONFIG_FILE"
   fi
@@ -83,11 +88,33 @@ setup_java() {
   fi
 }
 
+check_maven_repository() {
+  local source value entry configured
+  for source in MAVEN_OPTS MAVEN_ARGS JAVA_TOOL_OPTIONS JDK_JAVA_OPTIONS ".mvn/maven.config" ".mvn/jvm.config"; do
+    case "$source" in
+      .mvn/*)
+        [ -f "$ROOT_DIR/$source" ] || continue
+        value="$(cat "$ROOT_DIR/$source")"
+        ;;
+      *) value="${!source:-}" ;;
+    esac
+    # Do not evaluate configuration as shell code. Inspect every repository assignment.
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      configured="${entry#*=}"
+      [ "$configured" = "$MAVEN_REPOSITORY" ] || fail "conflicting maven.repo.local in ${source}: ${configured}"
+    done < <(printf '%s\n' "$value" | grep -Eo "maven\\.repo\\.local=[^[:space:]\"']+" || true)
+  done
+}
+
 build_modules() {
   local target="$1"
   local modules
 
   setup_java
+  check_maven_repository
+  MAVEN_SETTINGS_FILE="$(mktemp)"
+  printf '<settings><localRepository>%s</localRepository></settings>\n' "$MAVEN_REPOSITORY" > "$MAVEN_SETTINGS_FILE"
 
   case "$target" in
     all)
@@ -102,7 +129,8 @@ build_modules() {
   esac
 
   echo "==> Building ${target}: ${modules}"
-  (cd "$ROOT_DIR" && "$MVN_BIN" -pl "$modules" -am -DskipTests package)
+  # Clean removes historical versioned JARs before selecting the release artifact.
+  (cd "$ROOT_DIR" && "$MVN_BIN" -s "$MAVEN_SETTINGS_FILE" "-Dmaven.repo.local=$MAVEN_REPOSITORY" -pl "$modules" -am -DskipTests clean package)
 }
 
 latest_jar() {
@@ -113,12 +141,14 @@ latest_jar() {
   module="$(service_module "$target")"
   target_dir="${ROOT_DIR}/${module}/target"
 
-  local jar
+  local jar count
   jar="$(find "$target_dir" -maxdepth 1 -type f -name "${service}-*.jar" \
     ! -name "*-sources.jar" ! -name "*-javadoc.jar" \
-    -print | sort | tail -n 1)"
+    -print)"
 
   [ -n "$jar" ] || fail "jar not found under ${target_dir}"
+  count="$(printf '%s\n' "$jar" | wc -l | tr -d ' ')"
+  [ "$count" -eq 1 ] || fail "expected one built JAR under ${target_dir}, found ${count}; refusing to choose a historical artifact"
   echo "$jar"
 }
 
@@ -172,6 +202,8 @@ deploy_one() {
   jar="$(latest_jar "$target")"
   version="$(git_version)"
 
+  echo "==> Artifact: ${jar}"
+  shasum -a 256 "$jar"
   echo "==> Deploying ${service} to ${host}"
   ssh_cmd "$host" "mkdir -p '${REMOTE_TMP_DIR}'"
   scp_cmd "$jar" "${host}:${REMOTE_TMP_DIR}/${service}.jar"

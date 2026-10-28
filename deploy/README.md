@@ -42,32 +42,24 @@ MySQL, Redis and Nginx stay on the public server. Nacos, RocketMQ broker and the
    systemctl reload nginx
    ```
 
-## GitHub Actions secrets
+## Production release from the local workspace
 
-Set these repository secrets:
-
-- `IW_DEPLOY_SSH_KEY`: private key allowed to SSH to both servers. The remote user needs passwordless `sudo` for `systemctl`.
-- `IW_PUBLIC_HOST`, `IW_PUBLIC_USER`, `IW_PUBLIC_PORT`: public server SSH.
-- `IW_CORE_HOST`, `IW_CORE_USER`, `IW_CORE_PORT`: private Java server SSH address reachable from the public server.
-
-The workflow copies `iw-external` directly to the public server and copies `iw-core` through the public server as an SSH jump host.
-
-Production log and incident commands are documented in [OPERATIONS.md](OPERATIONS.md).
-
-## Manual release command
-
-If GitHub Actions is unavailable, build locally with JDK 17:
+GitHub Actions deployment is retired. Run from the repository root:
 
 ```bash
-mvn -pl iw-packaging-parent/iw-core,iw-packaging-parent/iw-external -am -DskipTests package
+bash scripts/deploy-prod-local.sh deploy core
+bash scripts/deploy-prod-local.sh status core
 ```
 
-Then copy the Jar and run the deploy script on the target server:
+Use `external` or `all` only when those services also need updating. The script builds the current local workspace, including uncommitted changes; it does not check out a GitHub revision.
 
-```bash
-bash deploy/scripts/deploy-jar.sh iw-core /tmp/iw-core.jar
-bash deploy/scripts/deploy-jar.sh iw-external /tmp/iw-external.jar
-```
+The build uses JDK 17, `/usr/local/maven/apache-maven-3.8.6/bin/mvn`, `/usr/local/maven/repository`, and temporary neutral Maven settings. Repository conflicts in the environment or project `.mvn` configuration stop the build. `clean package` clears historical artifacts, and the selector refuses to choose when more than one release JAR remains. The selected path and SHA-256 appear before upload.
+
+Default SSH aliases are `aliyun87` for core and `aliyun183` for external. Override them with `IW_LOCAL_CORE_HOST` and `IW_LOCAL_EXTERNAL_HOST`. Existing local SSH configuration supplies authentication and jump-host settings.
+
+The script uploads the JAR and `deploy/scripts/deploy-jar.sh`, which updates the server symlink and restarts the chosen service. `restart` only restarts the existing JAR; it does not rebuild or upload code. `status` only checks service/process state; verify the business endpoint separately.
+
+Database scripts are not run automatically. Apply the feature's schema steps before deploying its code. See [LIFE_TOOLS_RELEASE.md](LIFE_TOOLS_RELEASE.md) for the life-tools release and [OPERATIONS.md](OPERATIONS.md) for logs.
 
 ## Local Nginx fallback
 
