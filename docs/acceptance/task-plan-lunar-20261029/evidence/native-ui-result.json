@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "mode": "native simulator with mocked read APIs",
+  "realBusinessApi": false,
+  "dataWrites": 0
+}

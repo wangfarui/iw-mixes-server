@@ -34,6 +34,14 @@ public class PointsTaskPlanDetailVo implements DetailVo {
 
     @Schema(title = "计划日期(开始日期)")
     private LocalDate planDate;
+    private String calendarType;
+    private LocalDate anchorDate;
+    private String planDateText;
+    private String ruleText;
+    private Integer lunarYear;
+    private Integer lunarMonth;
+    private Integer lunarDay;
+    private Boolean leapMonth;
 
     @Schema(title = "计划天数")
     private Integer cycleDays;

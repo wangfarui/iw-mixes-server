@@ -9,7 +9,13 @@ import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateStatusDto;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanDetailVo;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanPageVo;
 import com.itwray.iw.points.service.PointsTaskPlanService;
+import com.itwray.iw.points.service.PointsTaskPlanCalendar;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanScheduleDto;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanPreviewDto;
+import java.util.List;
 import com.itwray.iw.web.controller.WebController;
+import com.itwray.iw.web.utils.UserUtils;
+import com.itwray.iw.web.exception.AuthorizedException;
 import com.itwray.iw.web.model.vo.PageVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +40,38 @@ public class PointsTaskPlanController extends WebController<PointsTaskPlanServic
     @Autowired
     public PointsTaskPlanController(PointsTaskPlanService webService) {
         super(webService);
+    }
+
+    @Autowired
+    private PointsTaskPlanCalendar calendar;
+
+    @GetMapping("/calendar")
+    @Operation(summary = "查询农历年份的真实月份及天数")
+    public List<PointsTaskPlanCalendar.Month> calendar(@RequestParam int year) {
+        requireLogin();
+        return calendar.months(year);
+    }
+
+    @PostMapping("/convertDate")
+    @Operation(summary = "公历农历日期转换，不保存计划")
+    public PointsTaskPlanCalendar.DateSelection convertDate(
+            @RequestBody PointsTaskPlanScheduleDto dto) {
+        requireLogin();
+        return calendar.selection(calendar.requestedDate(dto));
+    }
+
+    @PostMapping("/preview")
+    @Operation(summary = "预览未来三次计划，不生成任务")
+    public PointsTaskPlanCalendar.Preview preview(
+            @RequestBody PointsTaskPlanPreviewDto dto) {
+        requireLogin();
+        return getWebService().preview(dto);
+    }
+
+    private void requireLogin() {
+        String token = UserUtils.getToken(false);
+        if (token == null || token.isBlank()) { throw new AuthorizedException("当前未登录，请先登录"); }
+        UserUtils.getUserId();
     }
 
     @PostMapping("/page")

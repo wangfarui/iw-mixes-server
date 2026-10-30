@@ -1,0 +1,71 @@
+{
+  "environment": "local 127.0.0.1:18000 real authenticated APIs",
+  "prefix": "LUNAR-AC-20261029-mvszausc-",
+  "results": [
+    {
+      "id": "AC-12a",
+      "status": "PASS",
+      "note": "unauthenticated calendar is rejected"
+    },
+    {
+      "id": "LOGIN",
+      "status": "PASS",
+      "note": "two real local logins, roles and family relationship match recorded identities"
+    },
+    {
+      "id": "AC-04",
+      "status": "PASS",
+      "note": "three real preview periods include regular month and matching leap month"
+    },
+    {
+      "id": "AC-03",
+      "status": "PASS",
+      "note": "leap date lunar -> solar -> lunar retains the actual day"
+    },
+    {
+      "id": "AC-02",
+      "status": "PASS",
+      "note": "metadata edit preserves the cursor and original anchor"
+    },
+    {
+      "id": "COMPAT",
+      "status": "PASS",
+      "note": "legacy update without calendar preserves lunar rule"
+    },
+    {
+      "id": "AC-12b",
+      "status": "PASS",
+      "note": "another real local user cannot read, preview or generate the plan"
+    },
+    {
+      "id": "AC-09",
+      "status": "PASS",
+      "note": "disabled plan remains disabled on date edit"
+    },
+    {
+      "id": "AC-07",
+      "status": "PASS",
+      "note": "saved reminder-window plan generated one task and advanced cursor, deadline correct"
+    },
+    {
+      "id": "AC-08",
+      "status": "PASS",
+      "note": "manual generation retry deduplicates without advancing cursor"
+    },
+    {
+      "id": "SOLAR",
+      "status": "PASS",
+      "note": "old creation payload defaults to solar"
+    }
+  ],
+  "plans": [
+    6,
+    7,
+    8
+  ],
+  "tasks": [
+    117,
+    118
+  ],
+  "cleanup": "plans soft-deleted; tasks moved to trash; no bulk trash cleanup"
+}

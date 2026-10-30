@@ -145,6 +145,17 @@ class TaskPlanGenerationTest {
     }
 
     @Test
+    void scheduledRetryIncludingDeletedTaskReturnsOriginalWithoutCreatingAnotherTask() {
+        PointsTaskBasicsEntity existing = new PointsTaskBasicsEntity();
+        existing.setId(88); existing.setSourcePlanDate(plan.getPlanDate());
+        existing.setDeadlineDate(plan.getPlanDate().plusDays(2)); existing.setDeleted(true);
+        when(mapper.queryScheduledGeneration(10, plan.getPlanDate(), 1)).thenReturn(existing);
+        PointsTaskPlanGenerateVo result = generator.generate(plan, plan.getPlanDate(), null);
+        assertEquals(88, result.getTaskId()); assertTrue(result.isTaskDeleted());
+        verifyNoInteractions(taskService, relations, bookkeeping);
+    }
+
+    @Test
     void missingOptionalNumbersUseZeroAndDisabledBookkeepingCreatesNoSnapshot() {
         plan.setDeadlineDays(null);
         plan.setRewardPoints(null);

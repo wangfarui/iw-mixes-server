@@ -28,6 +28,12 @@ public class PointsTaskPlanPageVo {
      */
     @JsonFormat(pattern = DateUtils.DATE_FORMAT)
     private LocalDate planDate;
+    private String calendarType;
+    private LocalDate anchorDate;
+    private String planDateText;
+    private String ruleText;
+    private com.itwray.iw.points.model.enums.TaskPlanCycleEnum planCycle;
+    private Integer cycleDays;
 
     /**
      * 下一次计划生成日期

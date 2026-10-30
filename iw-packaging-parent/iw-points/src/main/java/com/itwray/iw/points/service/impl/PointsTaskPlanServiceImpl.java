@@ -19,6 +19,8 @@ import com.itwray.iw.points.model.vo.plan.PointsTaskPlanDetailVo;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanGenerateVo;
 import com.itwray.iw.points.model.vo.plan.PointsTaskPlanPageVo;
 import com.itwray.iw.points.service.PointsTaskPlanService;
+import com.itwray.iw.points.service.PointsTaskPlanCalendar;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanPreviewDto;
 import com.itwray.iw.points.service.PointsTaskPlanGenerator;
 import com.itwray.iw.web.exception.BusinessException;
 import com.itwray.iw.web.model.vo.PageVo;
@@ -43,6 +45,10 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
 
     private TaskBookkeepingGateway taskBookkeepingGateway;
     private PointsTaskPlanGenerator taskPlanGenerator;
+    private PointsTaskPlanCalendar calendar = new PointsTaskPlanCalendar();
+
+    @Autowired
+    public void setCalendar(PointsTaskPlanCalendar calendar) { this.calendar = calendar; }
 
     @Autowired
     public void setTaskPlanGenerator(PointsTaskPlanGenerator generator) { this.taskPlanGenerator = generator; }
@@ -60,12 +66,13 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
     public Integer add(PointsTaskPlanAddDto dto) {
         this.checkAddDto(dto);
 
-        LocalDate nextPlanDate = this.computeNextPlanDate(dto);
         PointsTaskPlanEntity pointsTaskPlanEntity = BeanUtil.copyProperties(dto, PointsTaskPlanEntity.class);
-        pointsTaskPlanEntity.setNextPlanDate(nextPlanDate);
+        applySchedule(calendar.prepare(dto, null), pointsTaskPlanEntity);
+        pointsTaskPlanEntity.setStatus(1);
         applyBookkeeping(dto, pointsTaskPlanEntity);
 
-        getBaseDao().save(pointsTaskPlanEntity);
+        if (!getBaseDao().save(pointsTaskPlanEntity)) { throw new BusinessException("保存任务计划失败"); }
+        generateDueOnSave(pointsTaskPlanEntity);
 
         return pointsTaskPlanEntity.getId();
     }
@@ -76,16 +83,17 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
         this.checkAddDto(dto);
         PointsTaskPlanEntity existing = lockPlan(dto.getId());
 
-        LocalDate nextPlanDate = this.computeNextPlanDate(dto);
         PointsTaskPlanEntity entity = BeanUtil.copyProperties(dto, PointsTaskPlanEntity.class);
-        entity.setNextPlanDate(nextPlanDate);
+        applySchedule(calendar.prepare(dto, existing), entity);
+        entity.setStatus(existing.getStatus());
         if (dto.getBookkeepingEnabled() != null) { applyBookkeeping(dto, entity); }
         else {
             entity.setBookkeepingEnabled(existing.getBookkeepingEnabled());
             entity.setBookkeepingTemplate(existing.getBookkeepingTemplate());
         }
 
-        getBaseDao().updateById(entity);
+        if (!getBaseDao().updateById(entity)) { throw new BusinessException("保存任务计划失败"); }
+        if (!calendar.sameRule(entity, existing)) { generateDueOnSave(entity); }
         if (Boolean.FALSE.equals(dto.getBookkeepingEnabled())) {
             getBaseDao().lambdaUpdate().eq(PointsTaskPlanEntity::getId, dto.getId())
                     .set(PointsTaskPlanEntity::getBookkeepingTemplate, null).update();
@@ -99,7 +107,14 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
                 .eq(dto.getStatus() != null, PointsTaskPlanEntity::getStatus, dto.getStatus())
                 .orderByAsc(PointsTaskPlanEntity::getNextPlanDate)
                 .orderByDesc(PointsTaskPlanEntity::getId);
-        return getBaseDao().page(dto, queryWrapper, PointsTaskPlanPageVo.class);
+        PageVo<PointsTaskPlanPageVo> result = getBaseDao().page(dto, queryWrapper, PointsTaskPlanPageVo.class);
+        for (PointsTaskPlanPageVo vo : result.getRecords()) {
+            PointsTaskPlanEntity plan = BeanUtil.copyProperties(vo, PointsTaskPlanEntity.class);
+            vo.setCalendarType(plan.getCalendarType() == null ? "SOLAR" : plan.getCalendarType());
+            vo.setPlanDateText(calendar.dateText(vo.getCalendarType(), vo.getPlanDate()));
+            vo.setRuleText(calendar.ruleText(plan));
+        }
+        return result;
     }
 
     @Override
@@ -118,6 +133,17 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
         PointsTaskPlanDetailVo vo = BeanUtil.copyProperties(entity, PointsTaskPlanDetailVo.class, "bookkeepingTemplate");
         if (entity.getBookkeepingTemplate() != null) {
             vo.setBookkeepingTemplate(JSONUtil.toBean(entity.getBookkeepingTemplate(), TaskBookkeepingTemplateDto.class));
+        }
+        vo.setCalendarType(entity.getCalendarType() == null ? "SOLAR" : entity.getCalendarType());
+        vo.setAnchorDate(calendar.anchor(entity));
+        vo.setPlanDateText(calendar.dateText(vo.getCalendarType(), entity.getPlanDate()));
+        vo.setRuleText(calendar.ruleText(entity));
+        if ("LUNAR".equals(vo.getCalendarType())) {
+            var selected = calendar.selection(vo.getAnchorDate());
+            vo.setLunarYear(selected.lunarYear());
+            vo.setLunarMonth(selected.lunarMonth());
+            vo.setLunarDay(selected.lunarDay());
+            vo.setLeapMonth(selected.leapMonth());
         }
         return vo;
     }
@@ -143,33 +169,49 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
         return entity;
     }
 
-    private LocalDate computeNextPlanDate(PointsTaskPlanAddDto dto) {
-        LocalDate nextPlanDate = dto.getPlanDate();
-        if (dto.getRemindDays() != null) {
-            nextPlanDate = nextPlanDate.minusDays(dto.getRemindDays());
+    @Override
+    public PointsTaskPlanCalendar.Preview preview(PointsTaskPlanPreviewDto dto) {
+        PointsTaskPlanEntity existing = null;
+        if (dto.getId() != null) {
+            existing = getBaseDao().lambdaQuery().eq(PointsTaskPlanEntity::getId, dto.getId())
+                    .eq(PointsTaskPlanEntity::getUserId, UserUtils.getUserId()).one();
+            if (existing == null) { throw new BusinessException("任务计划不存在或无权操作"); }
         }
-        // 如果"下一次计划生成日期"在当天之后, 则日期生效
-        if (nextPlanDate.isAfter(LocalDate.now())) {
-            return nextPlanDate;
+        return calendar.preview(calendar.prepare(dto, existing));
+    }
+
+    private void applySchedule(PointsTaskPlanEntity schedule, PointsTaskPlanEntity entity) {
+        entity.setCalendarType(schedule.getCalendarType());
+        entity.setAnchorDate(schedule.getAnchorDate());
+        entity.setPlanDate(schedule.getPlanDate());
+        entity.setNextPlanDate(schedule.getNextPlanDate());
+        entity.setCycleDays(schedule.getCycleDays());
+        entity.setRemindDays(schedule.getRemindDays());
+        entity.setDeadlineDays(schedule.getDeadlineDays());
+    }
+
+    /** The inserted/updated plan is locked in the current transaction. */
+    private void generateDueOnSave(PointsTaskPlanEntity plan) {
+        if (!Integer.valueOf(1).equals(plan.getStatus()) || plan.getNextPlanDate().isAfter(calendar.today())) { return; }
+        // save() fills userId through MyBatis metadata; keep the owner explicit for generation.
+        plan.setUserId(UserUtils.getUserId());
+        taskPlanGenerator.generate(plan, plan.getPlanDate(), null);
+        LocalDate next = calendar.next(plan);
+        var update = getBaseDao().lambdaUpdate().eq(PointsTaskPlanEntity::getId, plan.getId());
+        if (next == null) {
+            update.set(PointsTaskPlanEntity::getStatus, 0);
+        } else {
+            update.set(PointsTaskPlanEntity::getPlanDate, next)
+                    .set(PointsTaskPlanEntity::getNextPlanDate, next.minusDays(plan.getRemindDays()));
         }
-        // 否则"计划日期"根据"计划周期"自增
-        LocalDate planDate = dto.getPlanDate();
-        switch (dto.getPlanCycle()) {
-            case DAY -> planDate = planDate.plusDays(1);
-            case WEEK -> planDate = planDate.plusWeeks(1);
-            case MONTH -> planDate = planDate.plusMonths(1);
-            case YEAR -> planDate = planDate.plusYears(1);
-            case CUSTOM -> planDate = planDate.plusDays(dto.getCycleDays());
-        }
-        dto.setPlanDate(planDate);
-        return computeNextPlanDate(dto);
+        if (!update.update()) { throw new BusinessException("推进计划日期失败，本次生成未保存"); }
     }
 
     /**
      * 数据校验
      */
     private void checkAddDto(PointsTaskPlanAddDto dto) {
-        if (dto.getPlanCycle() == null || dto.getPlanDate() == null) { throw new BusinessException("计划周期和计划日期不能为空"); }
+        if (dto.getPlanCycle() == null) { throw new BusinessException("计划周期不能为空"); }
         if ((dto.getRemindDays() != null && dto.getRemindDays() < 0) || (dto.getDeadlineDays() != null && dto.getDeadlineDays() < 0)
                 || (dto.getRewardPoints() != null && dto.getRewardPoints() < 0) || (dto.getPunishPoints() != null && dto.getPunishPoints() < 0)) {
             throw new BusinessException("提醒天数、截止天数和积分不能为负数");
@@ -178,9 +220,6 @@ public class PointsTaskPlanServiceImpl extends WebServiceImpl<PointsTaskPlanDao,
             if (dto.getCycleDays() == null || dto.getCycleDays() <= 0) {
                 throw new BusinessException("计划天数不能为空");
             }
-        }
-        if (dto.getPlanDate().isBefore(LocalDate.now())) {
-            throw new BusinessException("计划日期不能是历史日期");
         }
     }
 }

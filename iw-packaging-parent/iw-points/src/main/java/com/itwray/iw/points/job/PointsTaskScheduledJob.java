@@ -18,6 +18,8 @@ import com.itwray.iw.starter.rocketmq.MQProducerHelper;
 import com.itwray.iw.web.model.enums.mq.PointsRecordsTopicEnum;
 import com.itwray.iw.web.utils.UserUtils;
 import com.itwray.iw.points.service.PointsTaskPlanGenerator;
+import com.itwray.iw.points.service.PointsTaskPlanCalendar;
+import com.itwray.iw.web.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,6 +50,10 @@ public class PointsTaskScheduledJob {
 
     private TransactionTemplate transactionTemplate;
     private PointsTaskPlanGenerator taskPlanGenerator;
+    private PointsTaskPlanCalendar calendar = new PointsTaskPlanCalendar();
+
+    @Autowired
+    public void setCalendar(PointsTaskPlanCalendar calendar) { this.calendar = calendar; }
 
     @Autowired
     public void setTaskPlanGenerator(PointsTaskPlanGenerator generator) { this.taskPlanGenerator = generator; }
@@ -132,10 +138,16 @@ public class PointsTaskScheduledJob {
                         if (plan == null || !BoolEnum.TRUE.getCode().equals(plan.getStatus()) || plan.getNextPlanDate().isAfter(today)) { return false; }
                         LocalDate periodDate = plan.getPlanDate();
                         taskPlanGenerator.generate(plan, periodDate, null);
-                        LocalDate nextPeriod = computePlanDate(plan);
-                        pointsTaskPlanDao.lambdaUpdate().eq(PointsTaskPlanEntity::getId, plan.getId())
-                                .set(PointsTaskPlanEntity::getPlanDate, nextPeriod)
-                                .set(PointsTaskPlanEntity::getNextPlanDate, nextPeriod.minusDays(plan.getRemindDays())).update();
+                        LocalDate nextPeriod = calendar.next(plan);
+                        var update = pointsTaskPlanDao.lambdaUpdate().eq(PointsTaskPlanEntity::getId, plan.getId());
+                        if (nextPeriod == null) {
+                            update.set(PointsTaskPlanEntity::getStatus, 0);
+                            log.warn("计划 {} 已到支持的日期范围上限，生成最后一期后自动禁用", plan.getId());
+                        } else {
+                            update.set(PointsTaskPlanEntity::getPlanDate, nextPeriod)
+                                    .set(PointsTaskPlanEntity::getNextPlanDate, nextPeriod.minusDays(plan.getRemindDays() == null ? 0 : plan.getRemindDays()));
+                        }
+                        if (!update.update()) { throw new BusinessException("推进计划日期失败"); }
                         return true;
                     });
                 } catch (Exception e) {
@@ -161,15 +173,4 @@ public class PointsTaskScheduledJob {
         MQProducerHelper.send(PointsRecordsTopicEnum.TASK, pointsRecordsAddDto);
     }
 
-    private LocalDate computePlanDate(PointsTaskPlanEntity entity) {
-        LocalDate planDate = entity.getPlanDate();
-        switch (entity.getPlanCycle()) {
-            case DAY -> planDate = planDate.plusDays(1);
-            case WEEK -> planDate = planDate.plusWeeks(1);
-            case MONTH -> planDate = planDate.plusMonths(1);
-            case YEAR -> planDate = planDate.plusYears(1);
-            case CUSTOM -> planDate = planDate.plusDays(entity.getCycleDays());
-        }
-        return planDate;
-    }
 }

@@ -1,6 +1,7 @@
 package com.itwray.iw.points.service;
 
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanAddDto;
+import com.itwray.iw.points.model.dto.plan.PointsTaskPlanPreviewDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanPageDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateDto;
 import com.itwray.iw.points.model.dto.plan.PointsTaskPlanUpdateStatusDto;
@@ -20,6 +21,8 @@ import com.itwray.iw.points.model.vo.plan.PointsTaskPlanGenerateVo;
 public interface PointsTaskPlanService extends WebService<PointsTaskPlanAddDto, PointsTaskPlanUpdateDto, PointsTaskPlanDetailVo, Integer> {
 
     PageVo<PointsTaskPlanPageVo> page(PointsTaskPlanPageDto dto);
+
+    PointsTaskPlanCalendar.Preview preview(PointsTaskPlanPreviewDto dto);
 
     void updatePlanStatus(PointsTaskPlanUpdateStatusDto dto);
 

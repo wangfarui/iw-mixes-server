@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "realAuthenticatedAPI": true,
+  "calendar": "LUNAR",
+  "cycle": "MONTH",
+  "occurrences": 3,
+  "fixtureWrites": 0,
+  "sessionRestored": true
+}

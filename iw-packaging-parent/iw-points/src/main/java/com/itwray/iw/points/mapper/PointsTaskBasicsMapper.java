@@ -27,6 +27,11 @@ public interface PointsTaskBasicsMapper extends BaseMapper<PointsTaskBasicsEntit
                                                  @Param("requestId") String requestId,
                                                  @Param("userId") Integer userId);
 
+    // Includes deleted tasks; saving an edited rule must not recreate an already generated period.
+    PointsTaskBasicsEntity queryScheduledGeneration(@Param("planId") Integer planId,
+                                                   @Param("planDate") java.time.LocalDate planDate,
+                                                   @Param("userId") Integer userId);
+
     List<PointsTaskBasicsEntity> queryList(TaskBasicsListDto dto);
 
     List<QueryTaskNumBo> queryTaskNum(QueryGroupTaskNumParam param);

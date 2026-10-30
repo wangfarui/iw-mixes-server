@@ -36,14 +36,13 @@ public class PointsTaskPlanGenerator {
     /** A null requestId denotes scheduled generation; a non-null id denotes manual generation. */
     @Transactional(propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     public PointsTaskPlanGenerateVo generate(PointsTaskPlanEntity plan, LocalDate planDate, String requestId) {
-        if (requestId != null) {
-            PointsTaskBasicsEntity previous = tasks.getBaseMapper()
-                    .queryManualGeneration(plan.getId(), requestId, plan.getUserId());
-            if (previous != null) {
-                PointsTaskPlanGenerateVo result = result(previous.getId(), previous.getSourcePlanDate(), previous.getDeadlineDate());
-                result.setTaskDeleted(Boolean.TRUE.equals(previous.getDeleted()));
-                return result;
-            }
+        PointsTaskBasicsEntity previous = requestId == null
+                ? tasks.getBaseMapper().queryScheduledGeneration(plan.getId(), planDate, plan.getUserId())
+                : tasks.getBaseMapper().queryManualGeneration(plan.getId(), requestId, plan.getUserId());
+        if (previous != null) {
+            PointsTaskPlanGenerateVo result = result(previous.getId(), previous.getSourcePlanDate(), previous.getDeadlineDate());
+            result.setTaskDeleted(Boolean.TRUE.equals(previous.getDeleted()));
+            return result;
         }
 
         int deadlineDays = valueOrZero(plan.getDeadlineDays());

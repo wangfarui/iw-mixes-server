@@ -48,6 +48,12 @@ public class PointsTaskPlanEntity extends UserEntity<Integer> {
      */
     private LocalDate planDate;
 
+    /** SOLAR for all historical plans. */
+    private String calendarType;
+
+    /** Immutable original actual date; also encodes the original lunar month/day/leap status. */
+    private LocalDate anchorDate;
+
     /**
      * 计划天数
      * <p>仅在 planCycle = 5 时生效</p>

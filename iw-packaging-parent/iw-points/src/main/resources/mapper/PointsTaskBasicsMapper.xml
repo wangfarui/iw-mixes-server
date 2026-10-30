@@ -9,6 +9,13 @@
         for update
     </select>
 
+    <select id="queryScheduledGeneration" resultType="com.itwray.iw.points.model.entity.PointsTaskBasicsEntity">
+        select id, source_plan_date, deadline_date, deleted
+        from points_task_basics
+        where source_plan_id = #{planId} and scheduled_plan_date = #{planDate} and user_id = #{userId}
+        for update
+    </select>
+
     <select id="queryTaskNum" resultType="com.itwray.iw.points.model.bo.QueryTaskNumBo">
         select task_group_id, count(*) as taskNum
         from points_task_basics
