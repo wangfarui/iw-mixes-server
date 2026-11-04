@@ -29,6 +29,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +95,7 @@ class CodeScanService implements CodeBackfillTrigger {
     ScanState scanState(CodeStatsModule.ScopeInfo scope, CodeRange range) {
         List<ScanMonth> months = new ArrayList<>();
         for (YearMonth month : range.months()) {
-            months.add(scanMonth(scope, month));
+            months.add(scanMonth(scope, month, range));
         }
         boolean anyAvailable = months.stream().anyMatch(month -> month.retryAfterSeconds() == 0
                 && !STATUS_RUNNING.equals(month.status()) && !STATUS_QUEUED.equals(month.status()));
@@ -114,7 +115,8 @@ class CodeScanService implements CodeBackfillTrigger {
                 CodeStatsSupport.format(next), latest.getStatus(), latest.getFinishedAt()==null || "CANCELLED".equals(latest.getStatus())
                 || "INTERRUPTED".equals(latest.getStatus()) ? 0 :
                 Math.max(0, Duration.between(now, latest.getFinishedAt().plusSeconds(
-                Math.max(0,properties.getCodeUserCooldownSeconds()))).getSeconds()));
+                Math.max(0,properties.getCodeUserCooldownSeconds()))).getSeconds()), latest.getId(),
+                value(latest.getFailedRepos()), incompleteDiffs(scope, latest.getSyncFrom(), latest.getSyncTo()));
     }
 
     boolean dataReady(ScanState scan) {
@@ -245,8 +247,11 @@ class CodeScanService implements CodeBackfillTrigger {
         }
         List<RepoFailure> repoFailures = repoMapper.selectFailures(jobId).stream()
                 .map(this::toRepoFailure).toList();
+        boolean continuous = continuous(job);
+        LocalDate fromDate = continuous ? job.getSyncFrom() : YearMonth.parse(job.getMonth()).atDay(1);
+        LocalDate toDate = continuous ? job.getSyncTo() : YearMonth.parse(job.getMonth()).atEndOfMonth();
         List<CommitEntity> diffRows = commitMapper.selectDiffFailures(scope.codingTeamId(), scope.scope().name(),
-                scope.scopeId(), job.getMonth());
+                scope.scopeId(), fromDate, toDate);
         int safeSize = Math.max(1, Math.min(100, pageSize));
         int safePage = Math.max(1, pageNumber);
         int from = Math.min(diffRows.size(), (safePage - 1) * safeSize);
@@ -255,11 +260,11 @@ class CodeScanService implements CodeBackfillTrigger {
                 .map(row -> new CodeStatsModels.DiffFailure(row.getProjectName(), row.getDepotName(), row.getSha(),
                         row.getAuthorName(), "TOO_LARGE".equals(row.getDiffStatus()) ? "TOO_LARGE" : "REQUEST_FAILED",
                         "TOO_LARGE".equals(row.getDiffStatus())
-                                ? "diff 超过保护上限，未统计行数" : "diff 读取失败，未统计行数"))
+                                ? "diff 超过保护上限，未统计行数" : "diff 读取失败，未统计行数", CodeStatsSupport.format(row.getCommitAt())))
                 .toList();
         return new CodeStatsModels.Failures(repoFailures, diffFailures,
                 new Page(safePage, safeSize, diffRows.size(),
-                        diffRows.isEmpty() ? 0 : (diffRows.size() + safeSize - 1) / safeSize));
+                        diffRows.isEmpty() ? 0 : (diffRows.size() + safeSize - 1) / safeSize), fromDate.toString(), toDate.toString());
     }
 
     @Override
@@ -376,7 +381,7 @@ class CodeScanService implements CodeBackfillTrigger {
         }
     }
 
-    private ScanMonth scanMonth(CodeStatsModule.ScopeInfo scope, YearMonth month) {
+    private ScanMonth scanMonth(CodeStatsModule.ScopeInfo scope, YearMonth month, CodeRange range) {
         ScanJobEntity latest = jobMapper.selectLatest(scope.codingTeamId(), scope.scope().name(),
                 scope.scopeId(), month.toString());
         ScanJobEntity successful = jobMapper.selectLatestSuccessful(scope.codingTeamId(), scope.scope().name(),
@@ -388,11 +393,36 @@ class CodeScanService implements CodeBackfillTrigger {
         }
         long retryAfter = retryAfterSeconds(latest, month, now);
         LocalDateTime cooldownUntil = cooldownUntil(latest, month);
-        return new ScanMonth(month.toString(), latest.getId(), ("SYNC_V2".equals(latest.getScanMode()) || "SNAPSHOT_V1".equals(latest.getScanMode())) ? "SYNC" : latest.getScanMode(), latest.getStatus(),
+        String status = latest.getStatus();
+        String error = latest.getErrorMessage();
+        // A year-wide job may be partial solely due to a different month's diff.
+        // Preserve metadata failures, missing PATs, truncation and unfinished jobs conservatively.
+        boolean completeMetadata = value(latest.getFailedRepos()) == 0 && !Boolean.TRUE.equals(latest.getTruncated())
+                && scope.members().stream().noneMatch(member -> org.apache.commons.lang3.StringUtils.isBlank(member.token()));
+        if (continuous(latest) && completeMetadata && (STATUS_COMPLETED.equals(status)
+                || (STATUS_PARTIAL.equals(status) && "PARTIAL_SCAN".equals(latest.getErrorCode())
+                    && value(latest.getFailedDiffs()) > 0))) {
+            LocalDate fromDate = range.from().isAfter(month.atDay(1)) ? range.from() : month.atDay(1);
+            LocalDate toDate = range.to().isBefore(month.atEndOfMonth()) ? range.to() : month.atEndOfMonth();
+            long incomplete = incompleteDiffs(scope, fromDate, toDate);
+            status = incomplete == 0 ? STATUS_COMPLETED : STATUS_PARTIAL;
+            error = incomplete == 0 ? null : "当前查询范围有 " + incomplete + " 条提交的代码行未完整统计";
+        }
+        return new ScanMonth(month.toString(), latest.getId(), continuous(latest) ? "SYNC" : latest.getScanMode(), status,
                 latest.getStage(), progress(latest), CodeStatsSupport.format(latest.getStartedAt()),
                 CodeStatsSupport.format(latest.getFinishedAt()), successful == null ? null
                 : CodeStatsSupport.format(successful.getFinishedAt()),
-                CodeStatsSupport.format(cooldownUntil), retryAfter, latest.getErrorMessage());
+                CodeStatsSupport.format(cooldownUntil), retryAfter, error);
+    }
+
+    private boolean continuous(ScanJobEntity job) {
+        return job.getScanMode() != null && job.getSyncFrom() != null && job.getSyncTo() != null
+                && java.util.Set.of("SYNC", "SYNC_V2", "SNAPSHOT_V1").contains(job.getScanMode());
+    }
+
+    private long incompleteDiffs(CodeStatsModule.ScopeInfo scope, LocalDate from, LocalDate to) {
+        if (from == null || to == null) return 0;
+        return commitMapper.countIncompleteDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), from, to);
     }
 
     private ScanProgress progress(ScanJobEntity job) {

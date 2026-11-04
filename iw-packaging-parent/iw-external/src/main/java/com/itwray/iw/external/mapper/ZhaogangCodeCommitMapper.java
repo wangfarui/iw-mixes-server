@@ -149,14 +149,25 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
                                                @Param("scopeId") long scopeId);
 
     @Select("""
+            select count(*) from external_zhaogang_code_commit
+             where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
+               and commit_date between #{from} and #{to} and is_merge = 0
+               and diff_status in ('PENDING', 'FAILED', 'TOO_LARGE')
+               and binary depot_name <> 'online.base.apijar.service'
+            """)
+    long countIncompleteDiffs(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
+                              @Param("scopeId") long scopeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Select("""
             select * from external_zhaogang_code_commit
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
-               and month = #{month} and diff_status in ('FAILED', 'TOO_LARGE') and is_merge = 0
+               and commit_date between #{from} and #{to} and diff_status in ('FAILED', 'TOO_LARGE') and is_merge = 0
+               and binary depot_name <> 'online.base.apijar.service'
              order by commit_at desc
             """)
     List<CommitEntity> selectDiffFailures(@Param("codingTeamId") long codingTeamId,
                                           @Param("scopeType") String scopeType, @Param("scopeId") long scopeId,
-                                          @Param("month") String month);
+                                          @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Delete("""
             delete from external_zhaogang_code_commit

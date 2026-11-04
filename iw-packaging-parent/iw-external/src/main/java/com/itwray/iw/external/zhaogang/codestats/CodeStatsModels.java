@@ -39,7 +39,13 @@ public final class CodeStatsModels {
     }
 
     public record SyncInfo(boolean enabled, String from, String to, String lastFinishedAt,
-                           String nextSyncAt, String status, long retryAfterSeconds) {}
+                           String nextSyncAt, String status, long retryAfterSeconds, Long jobId,
+                           int failedRepoCount, long unavailableDiffCount) {
+        public SyncInfo(boolean enabled, String from, String to, String lastFinishedAt,
+                        String nextSyncAt, String status, long retryAfterSeconds) {
+            this(enabled, from, to, lastFinishedAt, nextSyncAt, status, retryAfterSeconds, null, 0, 0);
+        }
+    }
 
     public record ScanState(String scope, Long workbenchTeamId, Range range, String aggregateStatus,
                             List<ScanMonth> months, long retryAfterSeconds, SyncInfo sync) {
@@ -156,10 +162,18 @@ public final class CodeStatsModels {
     }
 
     public record DiffFailure(String projectName, String depotName, String sha, String authorName,
-                              String reasonCode, String reason) {
+                              String reasonCode, String reason, String commitAt) {
+        public DiffFailure(String projectName, String depotName, String sha, String authorName,
+                           String reasonCode, String reason) {
+            this(projectName, depotName, sha, authorName, reasonCode, reason, null);
+        }
     }
 
-    public record Failures(List<RepoFailure> repoFailures, List<DiffFailure> diffFailures, Page page) {
+    public record Failures(List<RepoFailure> repoFailures, List<DiffFailure> diffFailures, Page page,
+                           String from, String to) {
+        public Failures(List<RepoFailure> repoFailures, List<DiffFailure> diffFailures, Page page) {
+            this(repoFailures, diffFailures, page, null, null);
+        }
         public Failures {
             repoFailures = repoFailures == null ? List.of() : List.copyOf(repoFailures);
             diffFailures = diffFailures == null ? List.of() : List.copyOf(diffFailures);

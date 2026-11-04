@@ -1,0 +1,32 @@
+{
+  "backendHead": "dfeca1e63fd3c51dd7dbe30d0f319b739020a036",
+  "jarSha256": "fcf91f40b22be8c00ceb1dc6634a63c5bde0211d4fa7508b1e78188916992cb7",
+  "tests": {
+    "backend": 343,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "runtimePorts": {
+    "backend": 18026,
+    "vite": 5175
+  },
+  "verifiedJob": 42,
+  "currentMonth": {
+    "status": "COMPLETED",
+    "diffCoverage": 1,
+    "failedDiffCount": 0
+  },
+  "sync": {
+    "from": "2026-01-01",
+    "to": "2026-11-04",
+    "status": "PARTIAL",
+    "failedRepos": 0,
+    "unavailableDiffs": 4
+  },
+  "historicalJuly": {
+    "status": "PARTIAL",
+    "unavailableDiffs": 1
+  },
+  "credentialsExported": false
+}

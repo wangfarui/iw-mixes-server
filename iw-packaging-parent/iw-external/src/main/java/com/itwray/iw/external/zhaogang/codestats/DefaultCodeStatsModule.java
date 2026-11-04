@@ -232,7 +232,7 @@ class DefaultCodeStatsModule implements CodeStatsModule {
 
     private String versions(ScopeInfo info, CodeRange range) {
         String scopeKey = cache.scopeKey(info);
-        StringBuilder builder = new StringBuilder("continuous-v1-" + CodeLinePolicy.CACHE_VERSION).append('-')
+        StringBuilder builder = new StringBuilder("range-status-v2-" + CodeLinePolicy.CACHE_VERSION).append('-')
                 .append(identityService.signature(info)).append('-')
                 .append(cache.identityVersion(scopeKey));
         for (YearMonth month : range.months()) {
