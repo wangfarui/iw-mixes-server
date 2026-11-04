@@ -5,6 +5,8 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationException;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamException;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsForbiddenException;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarException;
+import com.itwray.iw.external.zhaogang.agent.ZhaogangAgentCodingCredentialException;
+import com.itwray.iw.external.zhaogang.agent.ZhaogangAgentTokenException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 /** 找钢工作台统一异常契约，避免不同页面丢失 CODING 权限上下文。 */
 @RestControllerAdvice(assignableTypes = {
         ZhaogangController.class,
+        ZhaogangAgentTokenController.class,
+        ZhaogangAgentApiController.class,
         ZhaogangCodeStatsController.class,
         ZhaogangCalendarController.class,
         ZhaogangTeamController.class,
@@ -60,6 +64,16 @@ class ZhaogangExceptionHandler {
     GeneralResponse<?> handleSessionException(ZhaogangSessionException error, HttpServletResponse response) {
         sessionManager.clear(response);
         return new GeneralResponse<>(401, error.getMessage());
+    }
+
+    @ExceptionHandler(ZhaogangAgentTokenException.class)
+    GeneralResponse<?> handleAgentTokenException(ZhaogangAgentTokenException error) {
+        return new GeneralResponse<>(401, error.getMessage());
+    }
+
+    @ExceptionHandler(ZhaogangAgentCodingCredentialException.class)
+    GeneralResponse<?> handleAgentCodingCredentialException(ZhaogangAgentCodingCredentialException error) {
+        return new GeneralResponse<>(409, error.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

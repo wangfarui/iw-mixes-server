@@ -2,6 +2,8 @@ package com.itwray.iw.external.zhaogang;
 
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationException;
+import com.itwray.iw.external.zhaogang.agent.ZhaogangAgentCodingCredentialException;
+import com.itwray.iw.external.zhaogang.agent.ZhaogangAgentTokenException;
 import com.itwray.iw.web.core.webmvc.ExceptionHandlerInterceptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.Order;
@@ -58,5 +60,16 @@ class CodingOpenApiExceptionTest {
 
         assertThat(response.getCode()).isEqualTo(500);
         assertThat(response.getMessage()).isEqualTo("环境必须是 test、uat 或 prd");
+    }
+
+    @Test
+    void separatesInvalidAgentTokenFromMissingCodingCredential() {
+        ZhaogangExceptionHandler handler = new ZhaogangExceptionHandler(mock(ZhaogangSessionManager.class));
+
+        assertThat(handler.handleAgentTokenException(new ZhaogangAgentTokenException("令牌无效")).getCode())
+                .isEqualTo(401);
+        assertThat(handler.handleAgentCodingCredentialException(
+                new ZhaogangAgentCodingCredentialException("请重新绑定 CODING 令牌")).getCode())
+                .isEqualTo(409);
     }
 }
