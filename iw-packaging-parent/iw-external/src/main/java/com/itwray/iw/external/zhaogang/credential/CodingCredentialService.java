@@ -11,8 +11,8 @@ import java.util.HexFormat;
 import java.util.Optional;
 
 /**
- * Stores the plaintext PAT backup and exposes it only to the team worklog path.
- * Other CODING calls continue to use the current session cookie token.
+ * Stores the plaintext PAT backup and exposes it only to server-side team worklog and
+ * team code statistics paths. Other CODING calls continue to use the session cookie token.
  */
 @Service
 public class CodingCredentialService {

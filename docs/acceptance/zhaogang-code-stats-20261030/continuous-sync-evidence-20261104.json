@@ -1,0 +1,222 @@
+{
+  "recordedDate": "2026-11-04",
+  "realJobs": [
+    {
+      "id": "33",
+      "status": "PARTIAL",
+      "started_at": "2026-11-03 17:00:44",
+      "finished_at": "2026-11-03 17:05:24",
+      "seconds": "280",
+      "total_repos": "232",
+      "total_branches": "9594",
+      "total_commits": "1469",
+      "total_diffs": "9",
+      "failed_repos": "1",
+      "failed_diffs": "4"
+    },
+    {
+      "id": "34",
+      "status": "PARTIAL",
+      "started_at": "2026-11-03 18:00:00",
+      "finished_at": "2026-11-03 18:01:48",
+      "seconds": "108",
+      "total_repos": "232",
+      "total_branches": "9597",
+      "total_commits": "1471",
+      "total_diffs": "2",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    },
+    {
+      "id": "35",
+      "status": "PARTIAL",
+      "started_at": "2026-11-03 21:00:00",
+      "finished_at": "2026-11-03 21:01:42",
+      "seconds": "102",
+      "total_repos": "232",
+      "total_branches": "9602",
+      "total_commits": "1471",
+      "total_diffs": "1",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    },
+    {
+      "id": "36",
+      "status": "PARTIAL",
+      "started_at": "2026-11-04 00:00:00",
+      "finished_at": "2026-11-04 00:01:27",
+      "seconds": "87",
+      "total_repos": "232",
+      "total_branches": "9604",
+      "total_commits": "1471",
+      "total_diffs": "1",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    },
+    {
+      "id": "37",
+      "status": "PARTIAL",
+      "started_at": "2026-11-04 03:00:00",
+      "finished_at": "2026-11-04 03:01:34",
+      "seconds": "94",
+      "total_repos": "232",
+      "total_branches": "9604",
+      "total_commits": "1471",
+      "total_diffs": "1",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    },
+    {
+      "id": "38",
+      "status": "PARTIAL",
+      "started_at": "2026-11-04 06:00:00",
+      "finished_at": "2026-11-04 06:01:28",
+      "seconds": "88",
+      "total_repos": "232",
+      "total_branches": "9604",
+      "total_commits": "1471",
+      "total_diffs": "1",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    },
+    {
+      "id": "39",
+      "status": "PARTIAL",
+      "started_at": "2026-11-04 09:00:00",
+      "finished_at": "2026-11-04 09:01:33",
+      "seconds": "93",
+      "total_repos": "232",
+      "total_branches": "9604",
+      "total_commits": "1471",
+      "total_diffs": "1",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    },
+    {
+      "id": "40",
+      "status": "PARTIAL",
+      "started_at": "2026-11-04 09:32:37",
+      "finished_at": "2026-11-04 09:34:19",
+      "seconds": "102",
+      "total_repos": "232",
+      "total_branches": "9605",
+      "total_commits": "1471",
+      "total_diffs": "1",
+      "failed_repos": "0",
+      "failed_diffs": "1"
+    }
+  ],
+  "monthly": [
+    {
+      "month": "2026-01",
+      "ordinary_count": "38",
+      "additions": "1427",
+      "deletions": "361"
+    },
+    {
+      "month": "2026-02",
+      "ordinary_count": "25",
+      "additions": "1030",
+      "deletions": "455"
+    },
+    {
+      "month": "2026-03",
+      "ordinary_count": "31",
+      "additions": "5333",
+      "deletions": "979"
+    },
+    {
+      "month": "2026-04",
+      "ordinary_count": "105",
+      "additions": "22934",
+      "deletions": "5479"
+    },
+    {
+      "month": "2026-05",
+      "ordinary_count": "83",
+      "additions": "20678",
+      "deletions": "1824"
+    },
+    {
+      "month": "2026-06",
+      "ordinary_count": "108",
+      "additions": "39420",
+      "deletions": "2578"
+    },
+    {
+      "month": "2026-07",
+      "ordinary_count": "62",
+      "additions": "12856",
+      "deletions": "980"
+    },
+    {
+      "month": "2026-08",
+      "ordinary_count": "116",
+      "additions": "25870",
+      "deletions": "4959"
+    },
+    {
+      "month": "2026-09",
+      "ordinary_count": "123",
+      "additions": "13095",
+      "deletions": "1832"
+    },
+    {
+      "month": "2026-10",
+      "ordinary_count": "98",
+      "additions": "8208",
+      "deletions": "2302"
+    },
+    {
+      "month": "2026-11",
+      "ordinary_count": "8",
+      "additions": "1019",
+      "deletions": "120"
+    }
+  ],
+  "checkpoints": [
+    {
+      "job_id": "40",
+      "checkpoints": "232",
+      "compressed_bytes": "2356836"
+    }
+  ],
+  "unknownLines": [
+    {
+      "depot_name": "business-knowledge-hub",
+      "short_sha": "880a302b2195",
+      "diff_status": "TOO_LARGE"
+    },
+    {
+      "depot_name": "pangmaoyun-skills",
+      "short_sha": "fbf0a37a5adf",
+      "diff_status": "TOO_LARGE"
+    },
+    {
+      "depot_name": "pangmaoyun-skills",
+      "short_sha": "0b685caa4eb3",
+      "diff_status": "FAILED"
+    },
+    {
+      "depot_name": "pmy-skills-cli",
+      "short_sha": "e05edb099a7c",
+      "diff_status": "TOO_LARGE"
+    }
+  ],
+  "cancelledIntermediateJobsRemoved": [
+    27,
+    28,
+    31,
+    32
+  ],
+  "cancelKeys31_32Remaining": 0,
+  "backendTestCount": 322,
+  "backendFailures": 0,
+  "backendErrors": 0,
+  "backendSkipped": 0,
+  "webChecks": "four passed 2026-11-04",
+  "runtimeJar": "/private/tmp/iw-continuous-build-graph/iw-packaging-parent/iw-external/target/iw-external-0.2.1.jar",
+  "runtimeJarSha256": "50d3ac7507e168c4932e1ade771a90b145cc11c7525be6d01ed47e18426251ce",
+  "runtimePort": 18026,
+  "vitePort": 5175
+}

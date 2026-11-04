@@ -8,7 +8,24 @@ public interface CodingOpenApiPort {
 
     CodingUser currentUser(String token);
 
+    default CodingUserProfile currentUserProfile(String token) {
+        CodingUser user = currentUser(token);
+        return new CodingUserProfile(user.id(), user.name(), user.avatar(), "", user.teamId());
+    }
+
     List<CodingProject> projects(String token, long userId);
+
+    default CodingDepotPage myDepots(String token, int pageNumber, int pageSize) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现仓库发现");
+    }
+
+    default CodingCommitPage commits(String token, CodingCommitQuery query) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现提交读取");
+    }
+
+    default CodingCommitDiff commitDiff(String token, long projectId, long depotId, String sha) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现 diff 读取");
+    }
 
     List<CodingPlan> plans(String token, long projectId);
 
@@ -19,6 +36,20 @@ public interface CodingOpenApiPort {
     CodingBuild latestBuild(String token, long projectId, long jobId);
 
     List<CodingBranch> branches(String token, long projectId, long depotId, String depotType, String keyword);
+
+    /** 供子包只读分支名，避免泄露 CODING 原始类型。 */
+    default List<String> branchNames(String token, long projectId, long depotId, String depotType, String keyword) {
+        return branches(token, projectId, depotId, depotType, keyword).stream()
+                .map(branch -> branch.name()).toList();
+    }
+
+    /** 扫描所需的分支头信息；旧适配器没有 SHA 时安全回退全量读取。 */
+    default List<CodingBranchHead> branchHeads(String token, long projectId, long depotId, String depotType) {
+        return branches(token, projectId, depotId, depotType, "").stream()
+                .map(branch -> new CodingBranchHead(branch.name(), branch.sha(), branch.lastCommitAtMillis())).toList();
+    }
+
+    record CodingBranchHead(String name, String sha, Long lastCommitAtMillis) {}
 
     CodingBuild triggerBuild(String token, long projectId, long jobId, String branch, String environment,
                              List<CodingBuildParameter> defaultParameters);
@@ -164,6 +195,38 @@ public interface CodingOpenApiPort {
             workingHours = workingHours == null ? BigDecimal.ZERO : workingHours;
         }
     }
+    record CodingUserProfile(long id, String name, String avatar, String email, long teamId) {
+    }
+
+    record CodingDepot(long id, long projectId, String projectName, String projectDisplayName, String name,
+                       String webUrl, String vcsType, String depotType) {
+    }
+
+    record CodingDepotPage(List<CodingDepot> items, long totalCount, int pageNumber, int pageSize) {
+        public CodingDepotPage {
+            items = items == null ? List.of() : List.copyOf(items);
+        }
+    }
+
+    record CodingCommitQuery(long projectId, long depotId, String depotType, String ref, String startDate,
+                             String endDate, int pageNumber, int pageSize) {
+    }
+
+    record CodingCommit(String sha, String shortSha, String authorName, String authorEmail, long commitAtMillis,
+                        String message, List<String> parents) {
+        public CodingCommit {
+            parents = parents == null ? List.of() : List.copyOf(parents);
+        }
+    }
+
+    record CodingCommitPage(List<CodingCommit> items, long totalCount, int pageNumber, int pageSize) {
+        public CodingCommitPage {
+            items = items == null ? List.of() : List.copyOf(items);
+        }
+    }
+
+    record CodingCommitDiff(int additions, int deletions, int filesChanged) {
+    }
 }
 
 record CodingUser(long id, String name, String avatar, String globalKey, long teamId) {
@@ -189,5 +252,6 @@ record CodingBuild(long id, String number, String status, String statusDetail, S
     }
 }
 
-record CodingBranch(String name) {
+record CodingBranch(String name, String sha, Long lastCommitAtMillis) {
+    CodingBranch(String name) { this(name, "", null); }
 }

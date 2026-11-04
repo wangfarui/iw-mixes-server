@@ -45,6 +45,68 @@ public class ZhaogangProperties {
     /** 事项批量读取的进程级调度线程数，不代表 CODING 并发数。 */
     private int codingIssueExecutorConcurrency = 32;
 
+    /** 提交读取 Action 的全局 QPS（跨所有 PAT），0 表示不限制。 */
+    private int codeCommitQps = 25;
+
+    /** diff 读取 Action 的全局 QPS（跨所有 PAT），0 表示不限制。 */
+    private int codeDiffQps = 25;
+
+    /** 代码扫描进程内并发任务数。 */
+    private int codeScanConcurrency = 2;
+
+    /** 代码扫描待执行队列容量。 */
+    private int codeScanQueueCapacity = 8;
+
+    /** 扫描任务心跳超时时间。 */
+    private int codeScanHeartbeatTimeoutSeconds = 300;
+
+    /** 提交分页大小。 */
+    private int codeCommitPageSize = 100;
+
+    /** 单分支单月最大分页数。 */
+    private int codeMaxPagesPerBranch = 100;
+
+    /** 单仓库分支保护上限。 */
+    private int codeMaxBranchesPerRepo = 2000;
+
+    /** 单次 diff 响应大小上限。 */
+    private long codeDiffMaxBytes = 5L * 1024 * 1024;
+
+    /** diff 请求超时时间。 */
+    private int codeDiffTimeoutMs = 30000;
+
+    /** 代码统计查询缓存秒数。 */
+    private int codeScanCacheSeconds = 60;
+
+    /** CODING 成员 profile 缓存小时数。 */
+    private int codeProfileCacheHours = 12;
+
+    /** 提交缓存保留自然月数。 */
+    private int codeStatsRetentionMonths = 24;
+
+    /** 扫描任务/检查点保留自然月数。 */
+    private int codeScanJobRetentionMonths = 6;
+
+    /** 当前月自动增量刷新间隔。 */
+    private int codeCurrentMonthRefreshMinutes = 180;
+
+    /** 持续同步首次回补下界；查看月份不会更改此范围。 */
+    private String codeSyncFrom = "2026-01-01";
+
+    private boolean codeSyncEnabled = true;
+
+    /** 当前月手动重扫冷却秒数。 */
+    private int codeCurrentMonthCooldownSeconds = 600;
+
+    /** 历史月手动重扫冷却秒数。 */
+    private int codeHistoricalCooldownSeconds = 86400;
+
+    /** 失败/部分/中断/取消后的重试冷却秒数。 */
+    private int codeFailedRetrySeconds = 600;
+
+    /** 同一用户手动重扫频率秒数。 */
+    private int codeUserCooldownSeconds = 300;
+
     /** CODING 事项快照缓存有效期。 */
     private int codingIssueCacheSeconds = 30;
 

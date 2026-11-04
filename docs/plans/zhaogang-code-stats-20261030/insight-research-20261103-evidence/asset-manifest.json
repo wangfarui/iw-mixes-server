@@ -1,0 +1,20 @@
+[
+  {
+    "name": "view-sdk-0cb9fca80a.js",
+    "downloadSha256": "759025e9aae97ad3a3ba53befc3db36fa5bb5a0ed453b01bd99f3b2996d07fd8",
+    "decodedSha256": "7de27c42c1b99c4f834c34c3346e7193bc9507dfebcb3c0abe4d943bcfe28120",
+    "decodedBytes": 2459
+  },
+  {
+    "name": "insightChart-195ad837-c560349a.js",
+    "downloadSha256": "7db1858bc164bdff63eaa1d8cbb586aba952b33709cb1fa2e82a767583497c08",
+    "decodedSha256": "f72e20c7608f4688a164cad7f29bc592d4187e8a71d8cc5ea5d08a7a720cc27e",
+    "decodedBytes": 2634772
+  },
+  {
+    "name": "insightChart-f352087a-1dfec153.js",
+    "downloadSha256": "589333cb2ceed0a03d0674237517272d4b9ab6fb1bd08b3e6f571aefa2757e98",
+    "decodedSha256": "d2d86abc92da6d45ab867cc403538b28338f5a28bd1ee1c686175e2f61746f05",
+    "decodedBytes": 33567
+  }
+]

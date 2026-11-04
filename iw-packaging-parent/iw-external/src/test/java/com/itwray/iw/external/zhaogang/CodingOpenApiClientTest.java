@@ -388,7 +388,7 @@ class CodingOpenApiClientTest {
 
         List<CodingBranch> branches = client.branches("test-token", 450L, 1L, "CODING", "release");
 
-        assertEquals(List.of(new CodingBranch("release_20260821")), branches);
+        assertEquals(List.of(new CodingBranch("release_20260821", "bbb", null)), branches);
     }
 
     @Test
@@ -542,6 +542,193 @@ class CodingOpenApiClientTest {
         CodingBuild build = client.latestBuild("test-token", 14878869L, 7011717L);
 
         assertEquals("步步(王发瑞)", build.triggerUser());
+    }
+
+
+    @Test
+    void currentUserProfileReadsEmail() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange, """
+                {"Response":{"User":{"Id":9292850,"Name":"步步(王发瑞)","Email":"WangFR@Example.com","TeamId":100}}}
+                """));
+
+        CodingOpenApiPort.CodingUserProfile profile = client.currentUserProfile("test-token");
+
+        assertEquals(9292850L, profile.id());
+        assertEquals("WangFR@Example.com", profile.email());
+        assertEquals(100L, profile.teamId());
+    }
+
+    @Test
+    void myDepotsReadsGitDepotPage() throws Exception {
+        CodingOpenApiClient client = client(exchange -> {
+            JsonNode request = objectMapper.readTree(exchange.getRequestBody());
+            boolean valid = "DescribeMyDepots".equals(request.path("Action").asText())
+                    && request.path("PageNumber").asInt() == 2
+                    && request.path("PageSize").asInt() == 100;
+            if (!valid) {
+                respondContractError(exchange);
+                return;
+            }
+            respond(exchange, """
+                    {"Response":{"DepotList":[{"Id":9001,"Name":"inventory-service","ProjectId":450,
+                      "ProjectName":"iw-mixes","ProjectDisplayName":"IW 系统",
+                      "WebUrl":"https://g-iijw5014.coding.net/p/iw-mixes/d/inventory-service",
+                      "VcsType":"git","DepotType":"CODING"}],"Page":{"TotalRow":101}}}
+                    """);
+        });
+
+        CodingOpenApiPort.CodingDepotPage page = client.myDepots("test-token", 2, 100);
+
+        assertEquals(1, page.items().size());
+        assertEquals(9001L, page.items().get(0).id());
+        assertEquals("IW 系统", page.items().get(0).projectDisplayName());
+        assertEquals(101L, page.totalCount());
+    }
+
+    @Test
+    void myDepotsReadsPayloadAndNestedPagination() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange, """
+                {"Response":{"Payload":{"Depots":[{"Id":9001,"Name":"sample","ProjectId":450,
+                "VcsType":"git"}],"Page":{"TotalRow":128,"PageNumber":1,"PageSize":100}}}}
+                """));
+        CodingOpenApiPort.CodingDepotPage page = client.myDepots("test-token", 1, 100);
+        assertEquals(1, page.items().size());
+        assertEquals(9001L, page.items().get(0).id());
+        assertEquals(128L, page.totalCount());
+    }
+
+    @Test
+    void myDepotsRejectsUnknownStructureInsteadOfReportingEmpty() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange, """
+                {"Response":{"Unexpected":[]}}
+                """));
+        org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class, () -> client.myDepots("test-token", 1, 100));
+    }
+
+    @Test
+    void commitsParseAuthorParentsAndPagination() throws Exception {
+        CodingOpenApiClient client = client(exchange -> {
+            JsonNode request = objectMapper.readTree(exchange.getRequestBody());
+            boolean valid = "DescribeGitCommitsInPage".equals(request.path("Action").asText())
+                    && request.path("DepotId").asLong() == 9001L
+                    && "feature/a".equals(request.path("Ref").asText())
+                    && "2026-10-01".equals(request.path("StartDate").asText())
+                    && "2026-10-31".equals(request.path("EndDate").asText())
+                    && request.path("PageNumber").asInt() == 1
+                    && request.path("PageSize").asInt() == 100;
+            if (!valid) {
+                respondContractError(exchange);
+                return;
+            }
+            respond(exchange, """
+                    {"Response":{"Commits":[{"Sha":"abcdef1234567890","ShortMessage":"优化库存查询",
+                      "AuthorName":"张明远","AuthorEmail":"zhangmy@example.com",
+                      "CommitDate":"2026-10-30T18:42:11+08:00",
+                      "Parents":[{"Sha":"p1"},{"Sha":"p2"}]}],"Page":{"TotalRow":1}}}
+                    """);
+        });
+
+        CodingOpenApiPort.CodingCommitPage page = client.commits("test-token",
+                new CodingOpenApiPort.CodingCommitQuery(450L, 9001L, "CODING", "feature/a",
+                        "2026-10-01", "2026-10-31", 1, 100));
+
+        assertEquals(1, page.totalCount());
+        CodingOpenApiPort.CodingCommit commit = page.items().get(0);
+        assertEquals("abcdef1234567890", commit.sha());
+        assertEquals("优化库存查询", commit.message());
+        assertEquals("zhangmy@example.com", commit.authorEmail());
+        assertEquals(2, commit.parents().size());
+        assertEquals(1793356931000L, commit.commitAtMillis());
+    }
+
+    @Test
+    void commitDiffSumsInsertionsAndDeletions() throws Exception {
+        CodingOpenApiClient client = client(exchange -> {
+            JsonNode request = objectMapper.readTree(exchange.getRequestBody());
+            boolean valid = "DescribeGitCommitDiff".equals(request.path("Action").asText())
+                    && request.path("DepotId").asLong() == 9001L
+                    && "abcdef".equals(request.path("Sha").asText());
+            if (!valid) {
+                respondContractError(exchange);
+                return;
+            }
+            respond(exchange, """
+                    {"Response":{"Diffs":[{"Insertions":10,"Deletions":2},{"Insertions":5,"Deletions":1}]}}
+                    """);
+        });
+
+        CodingOpenApiPort.CodingCommitDiff diff = client.commitDiff("test-token", 450L, 9001L, "abcdef");
+
+        assertEquals(15, diff.additions());
+        assertEquals(3, diff.deletions());
+        assertEquals(2, diff.filesChanged());
+    }
+
+    @Test
+    void commitDiffRejectsOversizedResponse() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/open-api", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            String body = "{\"Response\":{\"Diffs\":[{\"Insertions\":1,\"Deletions\":1,\"Padding\":\""
+                    + "x".repeat(4096) + "\"}]}}";
+            respond(exchange, body);
+        });
+        server.start();
+        ZhaogangProperties properties = new ZhaogangProperties();
+        properties.setApiUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/open-api");
+        properties.setCodeDiffMaxBytes(256);
+        CodingOpenApiClient client = new CodingOpenApiClient(properties, objectMapper);
+
+        org.junit.jupiter.api.Assertions.assertThrows(CodingResponseTooLargeException.class,
+                () -> client.commitDiff("test-token", 450L, 9001L, "abcdef"));
+    }
+
+    @Test
+    void retriesTransientDepotReadButNotPermissionFailures() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        CodingOpenApiClient client = client(exchange -> respond(exchange,
+                calls.incrementAndGet() < 3
+                        ? "{\"Response\":{\"Error\":{\"Code\":\"InternalError\",\"Message\":\"temporary\"}}}"
+                        : "{\"Response\":{\"Payload\":{\"Depots\":[]}}}"));
+        assertTrue(client.myDepots("test-token", 1, 100).items().isEmpty());
+        assertEquals(3, calls.get());
+    }
+
+    @Test
+    void permissionDeniedDepotReadIsNotRetried() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        CodingOpenApiClient client = client(exchange -> {
+            calls.incrementAndGet();
+            respond(exchange, "{\"Response\":{\"Error\":{\"Code\":\"UnauthorizedOperation\",\"Message\":\"denied\"}}}");
+        });
+        org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class,
+                () -> client.myDepots("test-token", 1, 100));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void transientReadRetriesAreBounded() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        CodingOpenApiClient client = client(exchange -> {
+            calls.incrementAndGet();
+            respond(exchange, "{\"Response\":{\"Error\":{\"Code\":\"InternalError\",\"Message\":\"temporary\"}}}");
+        });
+        org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class,
+                () -> client.myDepots("test-token", 1, 100));
+        assertEquals(3, calls.get());
+    }
+
+    @Test
+    void commitsUseNestedDataPaginationAndRejectUnknownResponse() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange,
+                "{\"Response\":{\"Data\":{\"Commits\":[],\"Page\":{\"TotalRow\":100}}}}"));
+        var page = client.commits("fixture-token", new CodingOpenApiPort.CodingCommitQuery(1, 1, "CODING", "main", "2026-10-01", "2026-10-31", 1, 100));
+        assertEquals(100L, page.totalCount());
+        server.stop(0);
+        client = client(exchange -> respond(exchange, "{\"Response\":{\"Unexpected\":[]}}"));
+        CodingOpenApiClient unknown = client;
+        org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class, () -> unknown.commits("fixture-token",
+                new CodingOpenApiPort.CodingCommitQuery(1, 1, "CODING", "main", "2026-10-01", "2026-10-31", 1, 100)));
     }
 
     private CodingOpenApiClient client(com.sun.net.httpserver.HttpHandler handler) throws IOException {

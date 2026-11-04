@@ -1,0 +1,123 @@
+-- 找钢工作台代码统计：设计草案。
+-- 本文件未在任何数据库执行；实施会话必须在获得授权的隔离/测试环境先备份、再按顺序执行并验证。
+-- 表名统一使用 external_zhaogang_code_*，沿用 iw-external-init.sql 的 utf8mb4 / InnoDB 风格。
+
+create table external_zhaogang_code_scan_job
+(
+    id               bigint unsigned                    not null auto_increment comment '扫描任务ID',
+    coding_team_id   bigint unsigned                    not null comment 'CODING顶层团队ID',
+    scope_type       varchar(16)                        not null comment '范围：SELF/WORKBENCH_TEAM',
+    scope_id         bigint unsigned                    not null comment 'SELF=CODING用户ID；TEAM=工作台团队ID',
+    month            char(7)                            not null comment '扫描自然月 YYYY-MM',
+    scan_mode        varchar(16)                        not null comment 'FULL/INCREMENTAL/DIFF_BACKFILL',
+    status           varchar(16)                        not null comment 'QUEUED/RUNNING/COMPLETED/PARTIAL/FAILED/CANCELLED/INTERRUPTED',
+    stage            varchar(16)                        not null comment 'DISCOVERING/IDENTITIES/BRANCHES/COMMITS/DIFFS/AGGREGATING/DONE',
+    active_key       varchar(128)                       null comment '活动任务唯一键，完成/失败/取消后置空',
+    total_repos      int unsigned default 0             not null comment '仓库总数',
+    done_repos       int unsigned default 0             not null comment '已完成仓库数',
+    total_branches   int unsigned default 0             not null comment '分支总数',
+    done_branches    int unsigned default 0             not null comment '已完成分支数',
+    total_commits    int unsigned default 0             not null comment '去重后提交总数',
+    done_commits     int unsigned default 0             not null comment '已处理提交数',
+    total_diffs      int unsigned default 0             not null comment '待取 diff 的已归属提交数',
+    done_diffs       int unsigned default 0             not null comment '已处理 diff 数',
+    failed_repos     int unsigned default 0             not null comment '失败仓库数',
+    failed_diffs     int unsigned default 0             not null comment '失败/超大 diff 数',
+    truncated        tinyint(1)     default 0           not null comment '是否触发保护阈值截断',
+    error_code       varchar(64)                        null comment '任务级错误码',
+    error_message    varchar(512)                       null comment '可展示的任务级错误',
+    requested_by     bigint unsigned                    not null comment '触发人CODING用户ID',
+    requested_mode   varchar(16)                        not null comment 'AUTO/MANUAL',
+    started_at       datetime                           null comment '开始执行时间',
+    finished_at      datetime                           null comment '结束时间',
+    heartbeat_at     datetime default current_timestamp not null comment '工作线程心跳',
+    create_time      datetime default current_timestamp not null,
+    update_time      datetime default current_timestamp not null on update current_timestamp,
+    primary key (id),
+    unique key uk_active_key (active_key),
+    key idx_scope_month_time (coding_team_id, scope_type, scope_id, month, create_time),
+    key idx_status_heartbeat (status, heartbeat_at)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码扫描任务';
+
+create table external_zhaogang_code_scan_repo
+(
+    id                   bigint unsigned not null auto_increment comment '任务内仓库检查点ID',
+    job_id               bigint unsigned not null comment '扫描任务ID',
+    project_id           bigint unsigned not null comment 'CODING项目ID',
+    project_name         varchar(128)    not null comment 'CODING项目路径/名称',
+    project_display_name varchar(128)    not null default '' comment '项目展示名快照，可为空',
+    depot_id             bigint unsigned not null comment 'CODING仓库ID',
+    depot_name           varchar(128)    not null comment '仓库名称',
+    web_url              varchar(512)    not null default '' comment '仓库Web地址，用于拼接提交链接',
+    branch_count         int unsigned default 0 not null comment '本次发现的分支数',
+    commit_count         int unsigned default 0 not null comment '本次去重提交数',
+    status               varchar(16)     not null comment 'PENDING/RUNNING/COMPLETED/FAILED/SKIPPED',
+    error_code           varchar(64)     null comment '仓库级错误码',
+    error_message        varchar(512)    null comment '可展示的仓库级错误',
+    create_time          datetime default current_timestamp not null,
+    update_time          datetime default current_timestamp not null on update current_timestamp,
+    primary key (id),
+    unique key uk_job_depot (job_id, depot_id),
+    key idx_job_status (job_id, status)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码扫描仓库检查点';
+
+create table external_zhaogang_code_commit
+(
+    id                   bigint unsigned not null auto_increment comment '提交统计行ID',
+    coding_team_id       bigint unsigned not null comment 'CODING顶层团队ID',
+    scope_type           varchar(16)     not null comment '范围：SELF/WORKBENCH_TEAM',
+    scope_id             bigint unsigned not null comment 'SELF=CODING用户ID；TEAM=工作台团队ID',
+    month                char(7)         not null comment '提交所属自然月 YYYY-MM',
+    project_id           bigint unsigned not null comment 'CODING项目ID',
+    project_name         varchar(128)    not null comment 'CODING项目路径/名称',
+    project_display_name varchar(128)    not null default '' comment '项目展示名快照',
+    depot_id             bigint unsigned not null comment 'CODING仓库ID',
+    depot_name           varchar(128)    not null comment '仓库名称',
+    sha                  varchar(64)     not null comment 'Git提交SHA',
+    short_sha            varchar(12)     not null comment '短SHA',
+    author_name          varchar(128)    not null default '' comment 'Git作者名，仅展示',
+    author_email_hash    char(64)        null comment '作者邮箱SHA-256，不存明文邮箱',
+    author_name_key      varchar(64)     not null default '' comment '归一化作者名SHA-256，空名不参与匹配',
+    commit_at            datetime        not null comment '作者提交时间（Asia/Shanghai）',
+    commit_date          date            not null comment '作者提交日期（Asia/Shanghai）',
+    message              varchar(1024)   not null default '' comment '提交说明，截断保存，仅纯文本展示',
+    branch_names         text            null comment '该提交出现过的分支名JSON数组，最多50个',
+    branch_count         int unsigned default 0 not null comment '该提交出现过的分支数',
+    branch_truncated     tinyint(1) default 0 not null comment '分支名是否因上限截断',
+    additions            bigint unsigned null comment '新增行数；null=未统计',
+    deletions            bigint unsigned null comment '删除行数；null=未统计',
+    files_changed        int unsigned    null comment '修改文件数；null=未统计',
+    diff_status          varchar(24)     not null comment 'PENDING/OK/SKIPPED_UNMAPPED/SKIPPED_MERGE/FAILED/TOO_LARGE',
+    is_merge             tinyint(1) default 0 not null comment '是否合并提交（Parents>1）',
+    commit_url           varchar(768)    not null default '' comment 'CODING提交Web地址',
+    last_seen_scan_id    bigint unsigned not null default 0 comment '最近一次看到该提交的全量扫描任务ID',
+    create_time          datetime default current_timestamp not null,
+    update_time          datetime default current_timestamp not null on update current_timestamp,
+    primary key (id),
+    unique key uk_scope_depot_sha (coding_team_id, scope_type, scope_id, depot_id, sha),
+    key idx_scope_month_date (coding_team_id, scope_type, scope_id, month, commit_date),
+    key idx_scope_month_depot (coding_team_id, scope_type, scope_id, month, depot_id),
+    key idx_scope_month_email (coding_team_id, scope_type, scope_id, month, author_email_hash),
+    key idx_scope_month_name (coding_team_id, scope_type, scope_id, month, author_name_key),
+    key idx_scope_seen (coding_team_id, scope_type, scope_id, month, last_seen_scan_id)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码提交统计缓存';
+
+create table external_zhaogang_code_identity
+(
+    id             bigint unsigned not null auto_increment comment '身份映射ID',
+    coding_team_id bigint unsigned not null comment 'CODING顶层团队ID',
+    scope_type     varchar(16)     not null comment '范围：SELF/WORKBENCH_TEAM',
+    scope_id       bigint unsigned not null comment 'SELF=CODING用户ID；TEAM=工作台团队ID',
+    identity_type  varchar(8)      not null comment 'EMAIL/NAME',
+    identity_key   char(64)        not null comment '邮箱或作者名归一化后的SHA-256',
+    coding_user_id bigint unsigned null comment '归属成员CODING用户ID；忽略时为空',
+    ignored        tinyint(1) default 0 not null comment '是否忽略该身份',
+    author_name    varchar(128)    not null default '' comment '作者名展示快照',
+    source         varchar(16)     not null comment 'AUTO/MANUAL/SELF',
+    updated_by     bigint unsigned not null comment '最后操作人CODING用户ID',
+    create_time    datetime default current_timestamp not null,
+    update_time    datetime default current_timestamp not null on update current_timestamp,
+    primary key (id),
+    unique key uk_scope_identity (coding_team_id, scope_type, scope_id, identity_type, identity_key),
+    key idx_scope_member (coding_team_id, scope_type, scope_id, coding_user_id)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码作者身份映射';

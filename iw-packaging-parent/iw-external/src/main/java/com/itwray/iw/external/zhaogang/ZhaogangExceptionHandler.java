@@ -3,6 +3,7 @@ package com.itwray.iw.external.zhaogang;
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationException;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamException;
+import com.itwray.iw.external.zhaogang.codestats.CodeStatsForbiddenException;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.annotation.Order;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 /** 找钢工作台统一异常契约，避免不同页面丢失 CODING 权限上下文。 */
 @RestControllerAdvice(assignableTypes = {
         ZhaogangController.class,
+        ZhaogangCodeStatsController.class,
         ZhaogangCalendarController.class,
         ZhaogangTeamController.class,
         ZhaogangIterationController.class,
@@ -42,6 +44,11 @@ class ZhaogangExceptionHandler {
     @ExceptionHandler(WorkbenchTeamException.class)
     GeneralResponse<?> handleTeamException(WorkbenchTeamException error) {
         return GeneralResponse.fail(error.getMessage());
+    }
+
+    @ExceptionHandler(CodeStatsForbiddenException.class)
+    GeneralResponse<?> handleCodeStatsForbidden(CodeStatsForbiddenException error) {
+        return new GeneralResponse<>(403, error.getMessage());
     }
 
     @ExceptionHandler(WorkCalendarException.class)

@@ -1,0 +1,71 @@
+{
+  "observedOn": "2026-11-03",
+  "source": "Native Chrome DevTools through CUA; no auth headers or Cookie exported",
+  "viewId": 315761,
+  "requests": [
+    {
+      "path": "/api/insight/view/detail",
+      "query": {
+        "id": 315761
+      },
+      "status": 200,
+      "durationMs": 429
+    },
+    {
+      "path": "/api/insight/chart/detail-v2",
+      "chartId": 631829,
+      "status": 200,
+      "durationMs": 869,
+      "request": {
+        "chartId": 631829,
+        "demo": false,
+        "filters": []
+      },
+      "datasetId": "CODING_CODE_COMMIT",
+      "metrics": [
+        "commit_count"
+      ],
+      "savedFilters": [
+        {
+          "filterId": "author",
+          "operator": 2,
+          "args": [
+            "9292850"
+          ]
+        },
+        {
+          "filterId": "date",
+          "operator": 1,
+          "args": [
+            "6"
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "date": "2026-11-02",
+          "commit_count": "1"
+        }
+      ]
+    },
+    {
+      "path": "/api/insight/chart/detail-v2",
+      "chartId": 631830,
+      "status": 200,
+      "durationMs": 869,
+      "datasetId": "CODING_CODE_COMMIT",
+      "metrics": [
+        "commit_insertions",
+        "commit_deletions"
+      ],
+      "rows": [
+        {
+          "date": "2026-11-02",
+          "commit_insertions": "12",
+          "commit_deletions": "7"
+        }
+      ]
+    }
+  ],
+  "note": "Measured first visible two charts only; does not establish data refresh SLA or backend storage engine."
+}

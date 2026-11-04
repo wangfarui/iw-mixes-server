@@ -3,6 +3,13 @@ package com.itwray.iw.external.zhaogang;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommit;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommitDiff;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommitPage;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommitQuery;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingDepot;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingDepotPage;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingUserProfile;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Department;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.TeamDirectory;
@@ -16,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -78,6 +86,100 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         return new CodingUser(longValue(user, "Id", "UserId"), text(user, "Name", "GlobalKey", "Login"),
                 text(user, "Avatar", "AvatarUrl"), text(user, "GlobalKey", "Login"),
                 longValue(user, "TeamId"));
+    }
+
+    @Override
+    public CodingUserProfile currentUserProfile(String token) {
+        JsonNode response = invoke(token, "DescribeCodingCurrentUser", Collections.emptyMap());
+        JsonNode user = response.path("User");
+        if (user.isMissingNode() || user.isEmpty()) {
+            throw new CodingOpenApiException("CODING 未返回当前用户信息");
+        }
+        return new CodingUserProfile(longValue(user, "Id", "UserId"), text(user, "Name", "GlobalKey", "Login"),
+                text(user, "Avatar", "AvatarUrl"), text(user, "Email", "EmailAddress"), longValue(user, "TeamId"));
+    }
+
+    @Override
+    public CodingDepotPage myDepots(String token, int pageNumber, int pageSize) {
+        JsonNode response = invoke(token, "DescribeMyDepots", Map.of(
+                "PageNumber", pageNumber, "PageSize", pageSize));
+        JsonNode data = response.path("Payload").isObject() ? response.path("Payload")
+                : response.path("Data").isObject() ? response.path("Data") : response;
+        List<JsonNode> items = array(data, "DepotList", "Depots", "DepotInfoList");
+        if (!data.path("DepotList").isArray() && !data.path("Depots").isArray()
+                && !data.path("DepotInfoList").isArray()) {
+            throw new CodingOpenApiException("CODING 仓库列表响应结构不符合预期，请检查接口兼容性");
+        }
+        List<CodingDepot> depots = new ArrayList<>();
+        for (JsonNode item : items) {
+            long id = longValue(item, "Id", "DepotId");
+            if (id <= 0) continue;
+            String name = text(item, "Name", "DepotName");
+            String projectName = text(item, "ProjectName", "ProjectPath");
+            depots.add(new CodingDepot(id, longValue(item, "ProjectId"), projectName,
+                    StringUtils.defaultIfBlank(text(item, "ProjectDisplayName", "ProjectName"), projectName),
+                    name, text(item, "WebUrl", "HttpsUrl", "WebURL", "HttpsCloneUrl"),
+                    text(item, "VcsType", "VCS"), StringUtils.defaultIfBlank(text(item, "DepotType"), "CODING")));
+        }
+        long total = longValue(data, "TotalCount", "Total", "TotalRow");
+        if (total <= 0) total = longValue(data.path("Page"), "TotalRow", "TotalCount");
+        if (total <= 0) total = longValue(response.path("Page"), "TotalRow", "TotalCount");
+        return new CodingDepotPage(depots, total, pageNumber, pageSize);
+    }
+
+    @Override
+    public CodingCommitPage commits(String token, CodingCommitQuery query) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("DepotId", query.depotId());
+        if (StringUtils.isNotBlank(query.ref())) request.put("Ref", query.ref());
+        if (StringUtils.isNotBlank(query.startDate())) request.put("StartDate", query.startDate());
+        if (StringUtils.isNotBlank(query.endDate())) request.put("EndDate", query.endDate());
+        request.put("PageNumber", query.pageNumber());
+        request.put("PageSize", query.pageSize());
+        JsonNode response = invoke(token, "DescribeGitCommitsInPage", request);
+        JsonNode data = response.path("Data").isObject() ? response.path("Data") : response;
+        List<JsonNode> items = array(data, "Commits", "CommitList", "GitCommits");
+        if (items.isEmpty()) items = array(response, "Commits", "CommitList", "GitCommits");
+        boolean recognized = java.util.stream.Stream.of(data, response).anyMatch(node ->
+                java.util.stream.Stream.of("Commits", "CommitList", "GitCommits")
+                        .anyMatch(field -> node.has(field) && (node.path(field).isArray() || node.path(field).isNull())));
+        if (!recognized) throw new CodingOpenApiException("CODING 提交列表响应结构不符合预期");
+        List<CodingCommit> commits = new ArrayList<>();
+        for (JsonNode item : items) {
+            String sha = text(item, "Sha", "CommitSha", "Id");
+            if (StringUtils.isBlank(sha)) continue;
+            String message = StringUtils.defaultIfBlank(text(item, "ShortMessage", "FullMessage", "Title", "Message"), "");
+            int lineBreak = message.indexOf('\n');
+            if (lineBreak >= 0) message = message.substring(0, lineBreak);
+            if (message.length() > 1024) message = message.substring(0, 1024);
+            Long millis = epochMillis(item, "CommitDate", "CommittedAt", "CreatedAt", "AuthorDate");
+            commits.add(new CodingCommit(sha, StringUtils.defaultIfBlank(text(item, "ShortSha"), abbreviateCommit(sha)),
+                    text(item, "AuthorName", "CommitterName", "Author"), text(item, "AuthorEmail", "CommitterEmail"),
+                    millis == null ? 0L : millis, message, parents(item)));
+        }
+        long total = longValue(data, "TotalCount", "Total", "TotalRow");
+        if (total <= 0) total = longValue(data.path("Page"), "TotalRow", "TotalCount");
+        if (total <= 0) total = longValue(response.path("Page"), "TotalRow", "TotalCount");
+        return new CodingCommitPage(commits, total, query.pageNumber(), query.pageSize());
+    }
+
+    @Override
+    public CodingCommitDiff commitDiff(String token, long projectId, long depotId, String sha) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("DepotId", depotId);
+        request.put("Sha", sha);
+        JsonNode response = invoke(token, "DescribeGitCommitDiff", request,
+                Math.max(1, properties.getCodeDiffMaxBytes()));
+        JsonNode data = response.path("Data").isObject() ? response.path("Data") : response;
+        List<JsonNode> diffs = array(data, "Diffs", "DiffList", "Files");
+        if (diffs.isEmpty()) diffs = array(response, "Diffs", "DiffList", "Files");
+        int additions = 0;
+        int deletions = 0;
+        for (JsonNode diff : diffs) {
+            additions += intValue(diff, "Insertions", "Additions", "Added");
+            deletions += intValue(diff, "Deletions", "Deleted");
+        }
+        return new CodingCommitDiff(additions, deletions, diffs.size());
     }
 
     @Override
@@ -167,7 +269,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             String name = item.isTextual() ? item.asText() : text(item, "Name", "Branch", "DisplayName");
             if (StringUtils.isNotBlank(name) && (normalizedKeyword.isEmpty()
                     || name.toLowerCase(Locale.ROOT).contains(normalizedKeyword))) {
-                result.add(new CodingBranch(name));
+                result.add(new CodingBranch(name, text(item, "Sha", "CommitSha"), epochMillis(item, "LastCommitDate")));
             }
         }
         return result;
@@ -561,6 +663,36 @@ class CodingOpenApiClient implements CodingOpenApiPort {
     }
 
     private JsonNode invoke(String token, String action, Map<String, Object> parameters) {
+        return invoke(token, action, parameters, Integer.MAX_VALUE);
+    }
+
+    private JsonNode invoke(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
+        boolean readOnly = java.util.Set.of("DescribeMyDepots", "DescribeProjectDepotBranches",
+                "DescribeGitCommitsInPage", "DescribeGitCommitDiff").contains(action);
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return invokeOnce(token, action, parameters, maxResponseBytes);
+            } catch (CodingOpenApiException error) {
+                String code = error.code();
+                boolean transientFailure = code.startsWith("InternalError")
+                        || code.startsWith("RequestLimitExceeded") || code.startsWith("HTTP_5")
+                        || error.getCause() instanceof java.io.IOException;
+                if (!readOnly || !transientFailure || Thread.currentThread().isInterrupted()) throw error;
+                if (attempt >= 2) {
+                    throw new CodingOpenApiException(action, code,
+                            "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描");
+                }
+                try {
+                    Thread.sleep(200L << attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new CodingOpenApiException("CODING 请求已取消", interrupted);
+                }
+            }
+        }
+    }
+
+    private JsonNode invokeOnce(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
         boolean acquired = false;
         try {
             requestLimiter.acquire(token, action);
@@ -569,13 +701,23 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             body.put("Action", action);
             parameters.forEach((key, value) -> body.set(key, objectMapper.valueToTree(value)));
             HttpRequest request = HttpRequest.newBuilder(URI.create(properties.safeApiUrl()))
-                    .timeout(Duration.ofMillis(properties.getRequestTimeoutMs()))
+                    .timeout(Duration.ofMillis("DescribeGitCommitDiff".equals(action)
+                            ? Math.max(properties.getRequestTimeoutMs(), properties.getCodeDiffTimeoutMs())
+                            : properties.getRequestTimeoutMs()))
                     .header(HttpHeaders.AUTHORIZATION, "token " + token)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                     .build();
-            HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            JsonNode root = objectMapper.readTree(httpResponse.body());
+            HttpResponse<InputStream> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            String responseBody;
+            try (InputStream stream = httpResponse.body()) {
+                byte[] bytes = readLimited(stream, maxResponseBytes);
+                if (bytes == null) {
+                    throw new CodingResponseTooLargeException(action, maxResponseBytes);
+                }
+                responseBody = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            }
+            JsonNode root = objectMapper.readTree(responseBody);
             JsonNode response = root.path("Response");
             JsonNode error = response.path("Error");
             if (httpResponse.statusCode() < 200 || httpResponse.statusCode() >= 300 || !error.isMissingNode()) {
@@ -595,6 +737,35 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         } finally {
             if (acquired) requestLimiter.release(token);
         }
+    }
+
+    private byte[] readLimited(InputStream stream, long maxBytes) throws java.io.IOException {
+        if (maxBytes >= Integer.MAX_VALUE) {
+            return stream.readAllBytes();
+        }
+        byte[] bytes = stream.readNBytes((int) Math.min(Integer.MAX_VALUE - 8L, maxBytes + 1));
+        return bytes.length > maxBytes ? null : bytes;
+    }
+
+    private List<String> parents(JsonNode item) {
+        List<String> result = new ArrayList<>();
+        JsonNode parents = item.path("Parents");
+        if (parents.isArray()) {
+            for (JsonNode parent : parents) {
+                String sha = parent.isTextual() ? parent.asText() : text(parent, "Sha", "Id");
+                if (StringUtils.isNotBlank(sha)) result.add(sha);
+            }
+        }
+        return result;
+    }
+
+    private int intValue(JsonNode node, String... names) {
+        for (String name : names) {
+            JsonNode value = node.path(name);
+            if (value.canConvertToInt()) return value.intValue();
+            if (value.isTextual() && value.asText().matches("-?\\d+")) return Integer.parseInt(value.asText());
+        }
+        return 0;
     }
 
     private CodingPlan toPlan(JsonNode item, long projectId) {
@@ -819,6 +990,15 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             try {
                 return OffsetDateTime.parse(value).toInstant().toEpochMilli();
             } catch (RuntimeException ignoredAgain) {
+                for (String pattern : List.of("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss")) {
+                    try {
+                        return java.time.LocalDateTime.parse(value,
+                                        DateTimeFormatter.ofPattern(pattern).withZone(CHINA_ZONE))
+                                .atZone(CHINA_ZONE).toInstant().toEpochMilli();
+                    } catch (RuntimeException ignoredPattern) {
+                        // 继续尝试下一个常见格式。
+                    }
+                }
                 return null;
             }
         }

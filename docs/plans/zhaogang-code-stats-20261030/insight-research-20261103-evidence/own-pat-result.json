@@ -1,0 +1,10 @@
+[
+  {
+    "httpStatus": 200,
+    "elapsedMs": 287,
+    "chartId": 631829,
+    "businessCode": 3015,
+    "message": "{'oauth_user_scope_error': '当前的 scope 不支持访问此 API'}",
+    "hasAggregatedData": false
+  }
+]

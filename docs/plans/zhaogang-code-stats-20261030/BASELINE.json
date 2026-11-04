@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-30T09:59:55.009507+00:00",
+  "repos": {
+    "iw-mixes-server": {
+      "head": "0d6d30194373e3df4ce7b1a9bac6b3430e33a3a3",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "d821532cfc9209085e6436093f52df5c9764547f",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "22864d75d1f92977fcfcb45477dff620070ee3043c1699ebe983e08ef39d9269",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-server/AGENTS.md",
+      "sha256": "90cff9a99988347de3f01e7d85c9814bb199ba7393095ebae492866ea82af62f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/scripts/iw-external-init.sql",
+      "sha256": "c9988f1a96dcc5d931b2e1952cd72448bd1a6aab8e5d3abcc7a0eff1dcb38978",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/IwExternalApplication.java",
+      "sha256": "d1012e0e0ac52f33167a238b016cb4f08997e3a84fe150a88029119bfcde90d7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/CodingOpenApiClient.java",
+      "sha256": "09d12f96aa435564067f0b091021d7f3c6146cc831b08d6151e52d2f26ff5e46",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/CodingOpenApiException.java",
+      "sha256": "e54e0e2ec0aa16626d54ad81e0ffb4109dab1ae3be79c0b2f7bad33444c3f445",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/CodingOpenApiPort.java",
+      "sha256": "6bcb10c550686dcddd81fc5ab81d6e0c1bec2acd062ff14eb3742d0308d2b448",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/CodingRequestLimiter.java",
+      "sha256": "8a4c793379089bad3162f06bb30d388108f05fbcd1555b9ea16338dd465f8492",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/ZhaogangController.java",
+      "sha256": "61d56a38ad44f3bb08f6b6ae3646273c191b20a687f5335816fa4d02eea41ab3",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/ZhaogangExceptionHandler.java",
+      "sha256": "94ddfd7c7c93efac7fb67962b679cb15834e13009212154648efec7f6aa9036c",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/ZhaogangProperties.java",
+      "sha256": "33804e0a1583febe217c750fe89cd2101fdd359d795c1d267359070b978a60c4",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/ZhaogangSession.java",
+      "sha256": "82cd1f9081563d36ec9594633ebb61e69b1060ff52c096af7dc6cc559712d174",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/credential/CodingCredentialService.java",
+      "sha256": "2d655dbe6bb95991a543e364b59d658efe951f0ac5d8cff4a61731f813fac6b7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/team/WorkbenchTeamModels.java",
+      "sha256": "cd5961350f8500a1a0f156dbdc9d7de789358d76e4c706893dfd2e085fc2a54d",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/team/WorkbenchTeamModule.java",
+      "sha256": "8683aa8b6c7775dca6e8558535a0b20963a32eddb16d08ecc73a56038cfd2465",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogModels.java",
+      "sha256": "9ab844f9062ddfdb5d5a29e3a1e5d74d285df346efff4fa8d92842955b4e4356",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogModule.java",
+      "sha256": "0ac84390e3f00e9bf7c336e388a701b30014a600f928ed696c6a8157467ae5c9",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogQueryService.java",
+      "sha256": "37ad298aa24201d71113fa51f9c7bc63d6d21d3a878e6b65d3d44890f09ead81",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogScopeDirectory.java",
+      "sha256": "f2cf3d94976aadc2658b8b2cc329c9727dcfb982f74760920e780a9e22c4ef16",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogViewCache.java",
+      "sha256": "9d1ce5880d77991c9f747cf50e61409e0e4c6e0f11176fa7cff1ed5830d1bf9e",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/test/java/com/itwray/iw/external/zhaogang/CodingOpenApiClientTest.java",
+      "sha256": "ea35580dd647f66bde52512ee77536499cd2ec88302c7fd120f0d25d1c7021e4",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/test/java/com/itwray/iw/external/zhaogang/worklog/WorklogQueryServiceTest.java",
+      "sha256": "c6662cc22d395ea5da9ad8b4a6179d1b0b25657e0b4729e2c279cf539a41520c",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/AGENTS.md",
+      "sha256": "b7611beddd999c4c3e46389a1f0bd0ba80b1d9bd0f063a813a2b935b387324e5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/public/zhaogang-release-notes.json",
+      "sha256": "f06e77d0b8390f96dc04dc786318945892e712be239bcc2e68c0425df6b5ba6c",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/api/zhaogang.ts",
+      "sha256": "b3ed2f3ed9fa32e2156ed8e046c7c0c6de98ced1096b14ba9c2514382d0b7073",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/router/zhaogang.ts",
+      "sha256": "b840ee6606b9b6e96516e7383371dcd28def58b9cc12ff991b58b7b9f7d9893d",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/services/zhaogangPreferences.ts",
+      "sha256": "0935c010fe5c9a737f657faa0b11d59c10708e4af9cfb12964033c444d9bb84f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/services/zhaogangReleaseNotes.ts",
+      "sha256": "374986ead89ce185eade3097b69a3f12faa6d7a3b35a390b797a6ec319d7ada1",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/types/zhaogang.ts",
+      "sha256": "e6aa30af1273ed24e8696eacb0f886932bfd28f3ee7d398642d7bcdfb9e4e092",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/ZhaogangWorkbench.vue",
+      "sha256": "1a9c58a7b65fbc62ee04ef7bcb821a7d03ffaa6ad80f3efc3d11a5873a65779e",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/components/worklog/WorklogCoverageNotice.vue",
+      "sha256": "f18b9c16d4ece1b1075cd33dc88ce1242b379fc3230767f131fadebd683572d0",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/components/worklog/WorklogDashboard.vue",
+      "sha256": "b199cbd46449494be3a1322a69d98dcad5d52e9ad675cf93ab219c988bf19abd",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/components/worklog/WorklogTrendChart.vue",
+      "sha256": "49b40501fef1363fd8a1debc650960ba3d3e3f331c7eb04e56ee368bebbdbbae",
+      "tracked": true
+    }
+  ]
+}

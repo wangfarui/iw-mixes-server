@@ -1,0 +1,9 @@
+{
+  "specUrl": "https://assets.codehub.cn/document/openapi/353b949e0b605519499f4c684f185b2649231b9f.yaml",
+  "specSha256": "4464a3266cbb631eb93c2aa0fd3e75786aaab3fc3036a2618e3e42d31ac6a89d",
+  "insightTaggedOperations": 0,
+  "readonlyScope": "performance:dataset:ro",
+  "scopeDocumentationSection": "OAuth 认证 / 生态令牌权限",
+  "patSelectabilityVerified": false,
+  "coversChartDetailV2Verified": false
+}

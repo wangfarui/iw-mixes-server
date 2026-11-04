@@ -1,0 +1,89 @@
+{
+  "recordedAt": "2026-11-03T11:07:59.552124+08:00",
+  "backendHead": "0d6d30194373e3df4ce7b1a9bac6b3430e33a3a3",
+  "webHead": "d821532cfc9209085e6436093f52df5c9764547f",
+  "jar": "/private/tmp/iw-continuous-build-complete/iw-packaging-parent/iw-external/target/iw-external-0.2.1.jar",
+  "jarMtime": "2026-11-03T11:02:22.428329+08:00",
+  "jarSha256": "d289e45fae8296aa1835a2b17603f94cdad87ffc84c14a05861462f80a8778e4",
+  "runtimeSourceMatchesWorkspace": 28,
+  "backendPort": 18016,
+  "frontendUrl": "http://localhost:5174/zhaogang/code/mine",
+  "versions": {
+    "java": "17.0.9 JetBrains",
+    "maven": "3.8.6",
+    "node": "18.17.0",
+    "npm": "9.8.1",
+    "vite": "5.4.21"
+  },
+  "unauthenticatedRequest": {
+    "http": 200,
+    "businessCode": 401
+  },
+  "job": [
+    {
+      "id": "29",
+      "scope_type": "SELF",
+      "scope_id": "9292850",
+      "scan_mode": "SYNC",
+      "status": "RUNNING",
+      "stage": "COMMITS",
+      "sync_from": "2026-01-01",
+      "sync_to": "2026-11-03",
+      "total_repos": "232",
+      "done_repos": "232",
+      "total_branches": "9584",
+      "done_branches": "84",
+      "total_commits": "0",
+      "failed_repos": "0",
+      "failed_diffs": "0",
+      "started_at": "2026-11-03 11:05:11"
+    }
+  ],
+  "summary": [
+    {
+      "month": "2026-10",
+      "ordinary_count": "98",
+      "additions": "8208",
+      "deletions": "2302"
+    },
+    {
+      "month": "2026-11",
+      "ordinary_count": "1",
+      "additions": "12",
+      "deletions": "7"
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpoint_repos": "2",
+      "compressed_bytes": "384"
+    }
+  ],
+  "cleanup": [
+    {
+      "intermediate_jobs": "0",
+      "intermediate_repos": "0",
+      "intermediate_commits": "0"
+    }
+  ],
+  "testResults": {
+    "backend": {
+      "tests": 309,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "web": [
+      "type-check PASS",
+      "build PASS",
+      "check:zhaogang-release-notes PASS",
+      "test:zhaogang-code-stats-range PASS"
+    ]
+  },
+  "notCompleted": [
+    "Full backfill since 2026-01-01",
+    "Real changed-head incremental timing",
+    "Actual three-hour timer firing",
+    "Real team PAT acceptance"
+  ]
+}
