@@ -110,6 +110,8 @@ class CodeContinuousWorkerTest {
             return new CodingCommitPage(rows,rows.size(),1,100);
         }).when(coding).commits(anyString(),any());
         assertEquals("PARTIAL",run(1,"2026-11-02").getStatus());
+        verify(repos).updateState(eq(1L), eq(1L), eq("FAILED"), eq(2), anyInt(), eq("BRANCH_CHANGED"),
+                contains("有 1 个分支待复核"));
         assertEquals(Map.of("release",a),CodeSyncCheckpointCodec.decode(checkpoint).branches());
         verify(commits,never()).cleanupSyncRepo(anyLong(),anyString(),anyLong(),anyLong(),any(),any(),anyLong());
         assertEquals("COMPLETED",run(2,"2026-11-03").getStatus());
@@ -123,10 +125,85 @@ class CodeContinuousWorkerTest {
         doThrow(new CodingOpenApiException("FailedOperation","diff 修改文件过多，不宜在网页展示"))
                 .when(coding).commitDiff(anyString(),anyLong(),anyLong(),anyString());
         assertEquals("PARTIAL",run(1,"2026-11-03").getStatus());
-        verify(commits).updateDiffStatus(77L,"TOO_LARGE");
+        verify(commits).updateDiff(77L, null, null, null, "DIFF_UPSTREAM_LIMIT");
         // 行数不可用不影响已完成元数据的可见范围清理，不能永久保留已不可达提交。
         verify(commits,times(11)).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
         verify(commits,never()).updateDiff(77L,0L,0L,0,"OK");
+    }
+
+    @Test void targetedRetryOnlyReadsSelectedFailedDiffWithoutScanningOrCleaningHistory() {
+        var selected = new CommitEntity();
+        selected.setId(77L); selected.setDepotId(1L); selected.setProjectId(10L);
+        selected.setSha(a); selected.setDepotName("repo");
+        var unrelated = new CommitEntity();
+        unrelated.setId(78L); unrelated.setDepotId(1L); unrelated.setProjectId(10L);
+        unrelated.setSha(b); unrelated.setDepotName("repo");
+        LocalDate from = LocalDate.of(2026, 1, 7);
+        LocalDate to = LocalDate.of(2026, 10, 29);
+        when(commits.selectDiffFailures(100L, "SELF", 1L, from, to)).thenReturn(List.of(unrelated, selected));
+        when(coding.commitDiff(anyString(), eq(10L), eq(1L), eq(a))).thenReturn(new CodingCommitDiff(1, 0, 1));
+        job = new ScanJobEntity();
+        job.setId(3L); job.setCodingTeamId(100L); job.setScopeType("SELF"); job.setScopeId(1L);
+        job.setMonth("2026-10"); job.setScanMode(CodeScanWorker.DIFF_RETRY); job.setSyncFrom(from); job.setSyncTo(to);
+        job.setFailedRepos(0); job.setFailedDiffs(0); job.setTruncated(false);
+        new CodeScanWorker(coding, jobs, repos, commits, identities, cache, new ZhaogangProperties(), Clock.systemUTC())
+                .run(new CodeScanWorker.ScanInput(job, scope, YearMonth.of(2026, 10), CodeScanWorker.DIFF_RETRY,
+                        1L, Map.of(), "", List.of(77L)));
+        assertEquals("COMPLETED", job.getStatus());
+        assertEquals(1, job.getDoneDiffs());
+        verify(coding).commitDiff("fixture-token", 10L, 1L, a);
+        verifyNoMoreInteractions(coding);
+        verify(commits).updateDiff(77L, 1L, 0L, 1, "OK");
+        verify(commits, never()).cleanupFullScan(anyLong(), anyString(), anyLong(), anyString(), anyLong());
+        verify(cache).bumpScanVersion("100:SELF:1", "diff-retry");
+    }
+
+    @Test void manualRetryUsesGitForRootAndLargeFailuresAndKeepsUnconfirmedLinesUnknown() {
+        LocalDate from = LocalDate.of(2026, 1, 7);
+        LocalDate to = LocalDate.of(2026, 10, 29);
+        var root = retryCommit(77L, a);
+        var large = retryCommit(78L, b);
+        var unresolved = retryCommit(79L, "c".repeat(40));
+        var forbidden = retryCommit(80L, "d".repeat(40));
+        when(commits.selectDiffFailures(100L, "SELF", 1L, from, to))
+                .thenReturn(List.of(root, large, unresolved, forbidden));
+        when(coding.commitDiff("fixture-token", 10L, 1L, a))
+                .thenThrow(new CodingOpenApiException("DescribeGitCommitDiff", "FailedOperation", "参数异常", 400, null));
+        when(coding.commitDiff("fixture-token", 10L, 1L, b))
+                .thenThrow(new CodingResponseTooLargeException("DescribeGitCommitDiff", 512, 200));
+        when(coding.commitDiff("fixture-token", 10L, 1L, unresolved.getSha()))
+                .thenThrow(new CodingOpenApiException("FailedOperation", "diff 修改文件过多"));
+        when(coding.commitDiff("fixture-token", 10L, 1L, forbidden.getSha()))
+                .thenThrow(new CodingOpenApiException("DescribeGitCommitDiff", "HTTP_403", "forbidden", 403, null));
+        var git = mock(CodeGitLineStats.class);
+        var batch = mock(CodeGitLineStats.Batch.class);
+        when(git.batch(scope)).thenReturn(batch);
+        when(batch.count(root, "fixture-token")).thenReturn(CodeGitLineStats.Result.ok(new CodingCommitDiff(1, 0, 1)));
+        when(batch.count(large, "fixture-token")).thenReturn(CodeGitLineStats.Result.ok(new CodingCommitDiff(0, 23954, 1)));
+        when(batch.count(unresolved, "fixture-token"))
+                .thenReturn(CodeGitLineStats.Result.failed(CodeGitLineStats.Failure.OBJECT_UNAVAILABLE));
+        job = new ScanJobEntity();
+        job.setId(3L); job.setCodingTeamId(100L); job.setScopeType("SELF"); job.setScopeId(1L);
+        job.setMonth("2026-10"); job.setScanMode(CodeScanWorker.DIFF_RETRY); job.setSyncFrom(from); job.setSyncTo(to);
+        job.setFailedRepos(0); job.setFailedDiffs(0); job.setTruncated(false);
+        new CodeScanWorker(coding, jobs, repos, commits, identities, cache, new ZhaogangProperties(), Clock.systemUTC(), git)
+                .run(new CodeScanWorker.ScanInput(job, scope, YearMonth.of(2026, 10), CodeScanWorker.DIFF_RETRY,
+                        1L, Map.of(), "", List.of(77L, 78L, 79L, 80L)));
+        assertEquals("PARTIAL", job.getStatus());
+        assertEquals(4, job.getDoneDiffs());
+        assertEquals(2, job.getFailedDiffs());
+        verify(commits).updateDiff(77L, 1L, 0L, 1, "OK");
+        verify(commits).updateDiff(78L, 0L, 23954L, 1, "OK");
+        verify(commits).updateDiff(79L, null, null, null, "DIFF_UPSTREAM_LIMIT");
+        verify(commits).updateDiff(80L, null, null, null, "DIFF_PERMISSION_DENIED");
+        verify(batch, never()).count(eq(forbidden), anyString());
+    }
+
+    private CommitEntity retryCommit(long id, String sha) {
+        var row = new CommitEntity();
+        row.setId(id); row.setDepotId(1L); row.setProjectId(10L);
+        row.setSha(sha); row.setDepotName("repo");
+        return row;
     }
 
 }

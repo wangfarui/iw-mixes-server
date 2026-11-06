@@ -75,6 +75,13 @@ public class ZhaogangProperties {
     /** diff 请求超时时间。 */
     private int codeDiffTimeoutMs = 30000;
 
+    /** 仅在用户发起定向补算时，允许通过只读 HTTPS Git 获取缺失行数。 */
+    private boolean codeGitLineStatsEnabled = true;
+
+    private int codeGitLineStatsTimeoutSeconds = 40;
+
+    private long codeGitLineStatsMaxBytes = 128L * 1024 * 1024;
+
     /** 代码统计查询缓存秒数。 */
     private int codeScanCacheSeconds = 60;
 

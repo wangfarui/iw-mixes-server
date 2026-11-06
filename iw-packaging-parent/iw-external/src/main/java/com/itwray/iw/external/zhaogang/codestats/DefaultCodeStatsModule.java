@@ -184,6 +184,20 @@ class DefaultCodeStatsModule implements CodeStatsModule {
     }
 
     @Override
+    public CodeStatsModels.DiffRetryJob retryDiffs(Context context, long sourceJobId,
+                                                  CodeStatsModels.DiffRetryRequest request) {
+        ScanJobEntity source = requireJob(sourceJobId);
+        return scanService.retryDiffs(resolveJobScope(context, source), source, request, context.userId());
+    }
+
+    @Override
+    public CodeStatsModels.DiffRetryJob diffRetryStatus(Context context, long jobId) {
+        ScanJobEntity job = requireJob(jobId);
+        resolveJobScope(context, job);
+        return scanService.diffRetryStatus(job);
+    }
+
+    @Override
     public IdentityPage identities(Context context, String scope, Long workbenchTeamId, String keyword,
                                    int pageNumber, int pageSize) {
         return identityService.identities(context, scope, workbenchTeamId, keyword, pageNumber, pageSize);
@@ -211,6 +225,9 @@ class DefaultCodeStatsModule implements CodeStatsModule {
     }
 
     private ScopeInfo resolveJobScope(Context context, ScanJobEntity job) {
+        if (job.getCodingTeamId() != context.codingTeamId()) {
+            throw new CodeStatsForbiddenException("无权查看其他 CODING 团队的扫描任务");
+        }
         Scope scope = parseScope(job.getScopeType());
         if (scope == Scope.SELF && job.getScopeId() != context.userId()) {
             throw new CodingOpenApiException("无权查看其他成员的扫描任务");
@@ -232,9 +249,9 @@ class DefaultCodeStatsModule implements CodeStatsModule {
 
     private String versions(ScopeInfo info, CodeRange range) {
         String scopeKey = cache.scopeKey(info);
-        StringBuilder builder = new StringBuilder("range-status-v2-" + CodeLinePolicy.CACHE_VERSION).append('-')
+        StringBuilder builder = new StringBuilder("range-status-v3-" + CodeLinePolicy.CACHE_VERSION).append('-')
                 .append(identityService.signature(info)).append('-')
-                .append(cache.identityVersion(scopeKey));
+                .append(cache.identityVersion(scopeKey)).append('-').append(cache.scanVersion(scopeKey, "diff-retry"));
         for (YearMonth month : range.months()) {
             builder.append('-').append(cache.scanVersion(scopeKey, month.toString()));
         }

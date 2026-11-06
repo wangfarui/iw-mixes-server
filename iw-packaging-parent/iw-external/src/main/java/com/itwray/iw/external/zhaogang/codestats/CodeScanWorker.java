@@ -47,6 +47,7 @@ import java.util.Set;
 class CodeScanWorker {
 
     private static final Logger log = LoggerFactory.getLogger(CodeScanWorker.class);
+    static final String DIFF_RETRY = "DIFF_RETRY";
 
     private final CodingOpenApiPort coding;
     private final ZhaogangCodeScanJobMapper jobMapper;
@@ -56,20 +57,30 @@ class CodeScanWorker {
     private final CodeStatsViewCache cache;
     private final ZhaogangProperties properties;
     private final Clock clock;
+    private final CodeGitLineStats gitLineStats;
     private long nextDbCancelCheckMillis;
 
     @Autowired
     CodeScanWorker(CodingOpenApiPort coding, ZhaogangCodeScanJobMapper jobMapper,
                    ZhaogangCodeScanRepoMapper repoMapper, ZhaogangCodeCommitMapper commitMapper,
-                   CodeIdentityResolver identities, CodeStatsViewCache cache, ZhaogangProperties properties) {
+                   CodeIdentityResolver identities, CodeStatsViewCache cache, ZhaogangProperties properties,
+                   CodeGitLineStats gitLineStats) {
         this(coding, jobMapper, repoMapper, commitMapper, identities, cache, properties,
-                Clock.system(CodeStatsSupport.CHINA_ZONE));
+                Clock.system(CodeStatsSupport.CHINA_ZONE), gitLineStats);
     }
 
     CodeScanWorker(CodingOpenApiPort coding, ZhaogangCodeScanJobMapper jobMapper,
                    ZhaogangCodeScanRepoMapper repoMapper, ZhaogangCodeCommitMapper commitMapper,
                    CodeIdentityResolver identities, CodeStatsViewCache cache, ZhaogangProperties properties,
                    Clock clock) {
+        this(coding, jobMapper, repoMapper, commitMapper, identities, cache, properties, clock,
+                new CodeGitLineStats(coding, properties));
+    }
+
+    CodeScanWorker(CodingOpenApiPort coding, ZhaogangCodeScanJobMapper jobMapper,
+                   ZhaogangCodeScanRepoMapper repoMapper, ZhaogangCodeCommitMapper commitMapper,
+                   CodeIdentityResolver identities, CodeStatsViewCache cache, ZhaogangProperties properties,
+                   Clock clock, CodeGitLineStats gitLineStats) {
         this.coding = coding;
         this.jobMapper = jobMapper;
         this.repoMapper = repoMapper;
@@ -78,6 +89,7 @@ class CodeScanWorker {
         this.cache = cache;
         this.properties = properties;
         this.clock = clock;
+        this.gitLineStats = gitLineStats;
     }
 
     void run(ScanInput input) {
@@ -85,19 +97,22 @@ class CodeScanWorker {
         try {
             job.setStatus("RUNNING");
             job.setStartedAt(LocalDateTime.now(clock));
-            job.setStage("DIFF_BACKFILL".equals(input.mode()) ? "DIFFS" : "DISCOVERING");
+            boolean retryOnly = DIFF_RETRY.equals(input.mode());
+            job.setStage(retryOnly || "DIFF_BACKFILL".equals(input.mode()) ? "DIFFS" : "DISCOVERING");
             save(job);
             if (cancelled(job)) {
                 finish(job, "CANCELLED", "CANCELLED", "扫描已取消");
                 return;
             }
-            job.setStage("IDENTITIES");
-            applyIdentities(input, job);
+            if (!retryOnly) {
+                job.setStage("IDENTITIES");
+                applyIdentities(input, job);
+            }
             List<IdentityEntity> selection = identities.mappings(input.scope());
             input = new ScanInput(input.job(), input.scope(), input.month(), input.mode(), input.requestedBy(),
-                    identities.mappingIndex(selection), identities.signature(selection));
+                    identities.mappingIndex(selection), identities.signature(selection), input.retryCommitIds());
             job.setIdentitySignature(input.identitySignature());
-            if (!"SYNC".equals(input.mode())) pruneUnmatched(input);
+            if (!retryOnly && !"SYNC".equals(input.mode())) pruneUnmatched(input);
             save(job);
             Map<Long, DepotPlan> depots = Map.of();
             Map<Long, List<String>> depotTokens = Map.of();
@@ -107,7 +122,7 @@ class CodeScanWorker {
                 for (YearMonth m = YearMonth.from(job.getSyncFrom()); !m.isAfter(YearMonth.from(job.getSyncTo())); m = m.plusMonths(1))
                     touchedMonths.add(m.toString());
             }
-            if (!"DIFF_BACKFILL".equals(input.mode())) {
+            if (!retryOnly && !"DIFF_BACKFILL".equals(input.mode())) {
                 depots = discover(input, job);
                 Map<Long, List<BranchPlan>> branches = discoverBranches(input, job, depots);
                 touchedMonths.addAll("SYNC".equals(input.mode())
@@ -359,13 +374,17 @@ class CodeScanWorker {
             if (!java.util.Objects.equals(input.identitySignature(), identities.signature(input.scope())))
                 throw new CodingOpenApiException("IDENTITY_CHANGED", "Git 身份已变化，将按新身份重新同步");
             // 单个 ref 变化不能使整个仓库的已验证分支进度失效。只发布仍稳定的分支；未完整范围不清旧行。
+            int changedBranches = 0;
             try {
                 Map<String, String> after = new LinkedHashMap<>();
                 coding.branchHeads(entry.getValue().isEmpty() ? depot.tokens().get(0).token() : entry.getValue().get(0).token(),
                         depot.depot().projectId(), depot.depot().id(), "CODING")
                         .forEach(branch -> after.put(branch.name(), branch.sha()));
                 if (!after.equals(nextBranches)) {
-                    if (!failed) failureCode = "BRANCH_CHANGED";
+                    if (!failed) {
+                        failureCode = "BRANCH_CHANGED";
+                        changedBranches = logChangedBranches(job.getId(), entry.getKey(), nextBranches, after);
+                    }
                     failed = true;
                     nextBranches.entrySet().removeIf(branch -> !java.util.Objects.equals(after.get(branch.getKey()),branch.getValue()));
                     nextHeads.keySet().retainAll(new HashSet<>(nextBranches.values()));
@@ -392,7 +411,11 @@ class CodeScanWorker {
                             input.scope().scopeId(),entry.getKey(),job.getId());
                 } catch(java.io.IOException failure) { failed=true;failureCode="CHECKPOINT_TOO_LARGE"; }
             }
-            if (failed) markRepoFailed(job, depot, failureCode, "部分分支未同步，已保留稳定分支进度和成功数据", entry.getValue().size(), written);
+            if (failed) markRepoFailed(job, depot, failureCode,
+                    "BRANCH_CHANGED".equals(failureCode)
+                            ? "有 " + changedBranches + " 个分支待复核，已保留稳定分支进度和成功数据"
+                            : "部分分支未同步，已保留稳定分支进度和成功数据",
+                    entry.getValue().size(), written);
             else {
                 commitMapper.cleanupSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(), input.scope().scopeId(),
                         entry.getKey(), job.getSyncFrom(), job.getSyncTo(), job.getId());
@@ -405,6 +428,25 @@ class CodeScanWorker {
         log.info("zhaogang continuous sync, jobId={}, skippedHeads={}, commitPageCalls={}", job.getId(), skipped, calls.get());
         job.setStage("DIFFS"); save(job);
         return touched;
+    }
+
+    private int logChangedBranches(long jobId, long depotId, Map<String, String> before, Map<String, String> after) {
+        Set<String> branches = new LinkedHashSet<>(before.keySet());
+        branches.addAll(after.keySet());
+        List<String> changed = branches.stream()
+                .filter(branch -> !java.util.Objects.equals(before.get(branch), after.get(branch)))
+                .toList();
+        for (String branch : changed.stream().limit(10).toList()) {
+            log.info("zhaogang branch head changed, jobId={}, depotId={}, branch={}, beforeSha={}, afterSha={}, changedBranches={}",
+                    jobId, depotId, CodeStatsSupport.truncate(branch.replaceAll("\\p{Cntrl}", "?"), 200),
+                    diagnosticSha(before.get(branch)), diagnosticSha(after.get(branch)), changed.size());
+        }
+        return changed.size();
+    }
+
+    private static String diagnosticSha(String sha) {
+        if (sha == null) return "-";
+        return sha.matches("[0-9a-fA-F]{40}|[0-9a-fA-F]{64}") ? sha : "INVALID_SHA";
     }
 
     private Set<String> collectCommits(ScanInput input, ScanJobEntity job, Map<Long, DepotPlan> depots,
@@ -742,11 +784,21 @@ class CodeScanWorker {
         input.scope().members().forEach(member -> memberIds.add(member.userId()));
 
         List<CommitEntity> pending = new ArrayList<>();
-        for (String month : touchedMonths) {
-            commitMapper.applyCommitCountOnlyPolicy(input.scope().codingTeamId(), input.scope().scope().name(),
-                    input.scope().scopeId(), month, CodeLinePolicy.COMMIT_COUNT_ONLY_DEPOT);
-            pending.addAll(commitMapper.selectPendingDiffs(input.scope().codingTeamId(),
-                    input.scope().scope().name(), input.scope().scopeId(), month));
+        boolean retryOnly = DIFF_RETRY.equals(input.mode());
+        CodeGitLineStats.Batch gitBatch = retryOnly && properties.isCodeGitLineStatsEnabled()
+                ? gitLineStats.batch(input.scope()) : null;
+        if (retryOnly) {
+            Set<Long> selected = Set.copyOf(input.retryCommitIds());
+            commitMapper.selectDiffFailures(input.scope().codingTeamId(), input.scope().scope().name(),
+                    input.scope().scopeId(), job.getSyncFrom(), job.getSyncTo()).stream()
+                    .filter(row -> selected.contains(row.getId())).forEach(pending::add);
+        } else {
+            for (String month : touchedMonths) {
+                commitMapper.applyCommitCountOnlyPolicy(input.scope().codingTeamId(), input.scope().scope().name(),
+                        input.scope().scopeId(), month, CodeLinePolicy.COMMIT_COUNT_ONLY_DEPOT);
+                pending.addAll(commitMapper.selectPendingDiffs(input.scope().codingTeamId(),
+                        input.scope().scope().name(), input.scope().scopeId(), month));
+            }
         }
         job.setTotalDiffs(pending.size());
         job.setDoneDiffs(0);
@@ -762,53 +814,94 @@ class CodeScanWorker {
             if (CodeLinePolicy.commitCountOnly(commit.getDepotName())) {
                 commitMapper.updateDiff(commit.getId(), null, null, null, CodeLinePolicy.SKIPPED_REPOSITORY);
             } else if (resolved.memberId() == null || !memberIds.contains(resolved.memberId())) {
-                commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
+                if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
+                else commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
             } else {
                 List<String> candidates = new ArrayList<>();
                 MemberToken ownerToken = memberTokens.get(resolved.memberId());
                 if (ownerToken != null) candidates.add(ownerToken.token());
                 candidates.addAll(depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens));
                 if (candidates.isEmpty()) {
-                    commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
+                    if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
+                    else commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
                 } else {
-                    fetchDiff(commit, candidates, job);
+                    fetchDiff(commit, candidates, job, gitBatch);
                 }
             }
             processed++;
             job.setDoneDiffs(processed);
-            if (processed % 25 == 0) save(job);
+            if (retryOnly || processed % 25 == 0) save(job);
         }
         job.setStage("AGGREGATING");
         save(job);
     }
 
-    private void fetchDiff(CommitEntity commit, List<String> candidates, ScanJobEntity job) {
-        boolean tooLarge = false;
-        RuntimeException lastError = null;
+    private void fetchDiff(CommitEntity commit, List<String> candidates, ScanJobEntity job, CodeGitLineStats.Batch gitBatch) {
+        Set<DiffAttempt> failures = new LinkedHashSet<>();
+        String gitCandidate = null;
         for (String token : new LinkedHashSet<>(candidates)) {
+            CodingCommitDiff diff;
             try {
-                CodingCommitDiff diff = coding.commitDiff(token, commit.getProjectId(),
+                diff = coding.commitDiff(token, commit.getProjectId(),
                         commit.getDepotId(), commit.getSha());
-                commitMapper.updateDiff(commit.getId(), (long) diff.additions(), (long) diff.deletions(),
-                        diff.filesChanged(), "OK");
+            } catch (CodingOpenApiException error) {
+                CodeDiffFailure reason = CodeDiffFailure.classify(error);
+                failures.add(new DiffAttempt(reason, CodeDiffFailure.safeUpstreamCode(error),
+                        error.httpStatus(), error instanceof CodingResponseTooLargeException large ? large.limitBytes() : null));
+                if (gitBatch != null && gitCandidate == null && isGitFallbackCandidate(reason, error.httpStatus())) {
+                    gitCandidate = token;
+                }
+                if (Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
+                continue;
+            }
+            commitMapper.updateDiff(commit.getId(), (long) diff.additions(), (long) diff.deletions(),
+                    diff.filesChanged(), "OK");
+            return;
+        }
+        CodeGitLineStats.Failure gitFailure = null;
+        if (gitCandidate != null) {
+            if (cancelled(job)) throw new ScanCancelledException();
+            CodeGitLineStats.Result git = gitBatch.count(commit, gitCandidate);
+            if (cancelled(job) || Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
+            if (git.stats() != null) {
+                CodingCommitDiff stats = git.stats();
+                commitMapper.updateDiff(commit.getId(), (long) stats.additions(), (long) stats.deletions(),
+                        stats.filesChanged(), "OK");
+                log.info("zhaogang code diff filled, jobId={}, projectId={}, depotId={}, sha={}, source=GIT, additions={}, deletions={}, files={}",
+                        job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
+                        stats.additions(), stats.deletions(), stats.filesChanged());
                 return;
-            } catch (CodingResponseTooLargeException e) {
-                tooLarge = true;
-            } catch (RuntimeException e) {
-                if (e instanceof CodingOpenApiException error && "FailedOperation".equals(error.code())
-                        && StringUtils.defaultString(error.getMessage()).contains("diff 修改文件过多")) tooLarge = true;
-                else lastError = e;
             }
+            gitFailure = git.failure();
         }
-        if (tooLarge) {
-            commitMapper.updateDiffStatus(commit.getId(), "TOO_LARGE");
-        } else {
-            commitMapper.updateDiffStatus(commit.getId(), "FAILED");
-            if (lastError != null) {
-                log.debug("zhaogang code diff failed, jobId={}, depotId={}", job.getId(), commit.getDepotId());
-            }
-        }
+        CodeDiffFailure failure = failures.stream().map(DiffAttempt::reason)
+                .min(java.util.Comparator.comparingInt(CodeScanWorker::diffFailurePriority))
+                .orElse(CodeDiffFailure.REQUEST_FAILED);
+        commitMapper.updateDiff(commit.getId(), null, null, null, failure.status());
+        log.info("zhaogang code diff failed, jobId={}, projectId={}, depotId={}, sha={}, reason={}, gitFallback={}, attempts={}",
+                job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
+                failure.name(), gitFailure, failures.stream().limit(8).toList());
         job.setFailedDiffs(job.getFailedDiffs() + 1);
+    }
+
+    private static boolean isGitFallbackCandidate(CodeDiffFailure reason, Integer httpStatus) {
+        if (!reason.sizeLimit && reason != CodeDiffFailure.INVALID_ARGUMENT) return false;
+        if (httpStatus == null || (httpStatus >= 200 && httpStatus < 300)) return true;
+        return (reason == CodeDiffFailure.INVALID_ARGUMENT && (httpStatus == 400 || httpStatus == 422))
+                || (reason == CodeDiffFailure.UPSTREAM_LIMIT && httpStatus == 413);
+    }
+
+    private static int diffFailurePriority(CodeDiffFailure reason) {
+        return switch (reason) {
+            case UPSTREAM_LIMIT, RESPONSE_LIMIT -> 0;
+            case INVALID_ARGUMENT, INVALID_RESPONSE -> 1;
+            case RATE_LIMITED, TIMEOUT, UNAVAILABLE -> 2;
+            case PERMISSION_DENIED -> 3;
+            case REQUEST_FAILED -> 4;
+        };
+    }
+
+    private record DiffAttempt(CodeDiffFailure reason, String upstreamCode, Integer httpStatus, Long limitBytes) {
     }
 
     private void aggregate(ScanInput input, ScanJobEntity job) {
@@ -830,7 +923,8 @@ class CodeScanWorker {
                 || (job.getFailedDiffs() != null && job.getFailedDiffs() > 0)
                 || Boolean.TRUE.equals(job.getTruncated());
         finish(job, partial ? "PARTIAL" : "COMPLETED", partial ? "PARTIAL_SCAN" : null,
-                partial ? "扫描完成，但存在失败仓库或未完整统计的 diff" : null);
+                partial ? DIFF_RETRY.equals(input.mode()) ? "部分提交仍无法统计行数"
+                        : "扫描已结束，部分仓库、分支或提交行数待补齐" : null);
     }
 
     private void markRepoCompleted(ScanJobEntity job, DepotPlan plan, int branchCount, int commitCount) {
@@ -880,7 +974,9 @@ class CodeScanWorker {
         job.setHeartbeatAt(LocalDateTime.now(clock));
         jobMapper.updateFinal(job);
         try {
-            if ("SYNC".equals(job.getScanMode()) || "SYNC_V2".equals(job.getScanMode())) {
+            if (DIFF_RETRY.equals(job.getScanMode())) {
+                cache.bumpScanVersion(job.getCodingTeamId() + ":" + job.getScopeType() + ":" + job.getScopeId(), "diff-retry");
+            } else if ("SYNC".equals(job.getScanMode()) || "SYNC_V2".equals(job.getScanMode())) {
                 for (YearMonth m = YearMonth.from(job.getSyncFrom()); !m.isAfter(YearMonth.from(job.getSyncTo())); m = m.plusMonths(1))
                     cache.bumpScanVersion(job.getCodingTeamId() + ":" + job.getScopeType() + ":" + job.getScopeId(), m.toString());
             } else cache.bumpScanVersion(job.getCodingTeamId() + ":" + job.getScopeType() + ":" + job.getScopeId(), job.getMonth());
@@ -912,9 +1008,10 @@ class CodeScanWorker {
     }
 
     record ScanInput(ScanJobEntity job, CodeStatsModule.ScopeInfo scope, YearMonth month, String mode,
-                     long requestedBy, Map<String, IdentityEntity> identityIndex, String identitySignature) {
+                     long requestedBy, Map<String, IdentityEntity> identityIndex, String identitySignature,
+                     List<Long> retryCommitIds) {
         ScanInput(ScanJobEntity job, CodeStatsModule.ScopeInfo scope, YearMonth month, String mode, long requestedBy) {
-            this(job, scope, month, mode, requestedBy, Map.of(), "");
+            this(job, scope, month, mode, requestedBy, Map.of(), "", List.of());
         }
     }
 

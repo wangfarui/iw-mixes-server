@@ -35,6 +35,10 @@ public interface CodeStatsModule {
 
     Failures failures(Context context, long jobId, int pageNumber, int pageSize);
 
+    CodeStatsModels.DiffRetryJob retryDiffs(Context context, long sourceJobId, CodeStatsModels.DiffRetryRequest request);
+
+    CodeStatsModels.DiffRetryJob diffRetryStatus(Context context, long jobId);
+
     IdentityPage identities(Context context, String scope, Long workbenchTeamId, String keyword, int pageNumber,
                             int pageSize);
 

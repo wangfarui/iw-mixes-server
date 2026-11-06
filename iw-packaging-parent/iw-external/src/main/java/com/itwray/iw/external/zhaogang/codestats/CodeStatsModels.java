@@ -162,11 +162,29 @@ public final class CodeStatsModels {
     }
 
     public record DiffFailure(String projectName, String depotName, String sha, String authorName,
-                              String reasonCode, String reason, String commitAt) {
+                              String reasonCode, String reason, String commitAt, Long depotId) {
+        public DiffFailure(String projectName, String depotName, String sha, String authorName,
+                           String reasonCode, String reason, String commitAt) {
+            this(projectName, depotName, sha, authorName, reasonCode, reason, commitAt, null);
+        }
         public DiffFailure(String projectName, String depotName, String sha, String authorName,
                            String reasonCode, String reason) {
             this(projectName, depotName, sha, authorName, reasonCode, reason, null);
         }
+    }
+
+    public record DiffRetryTarget(
+            @jakarta.validation.constraints.Positive long depotId,
+            @jakarta.validation.constraints.NotBlank
+            @jakarta.validation.constraints.Pattern(regexp = "[0-9a-fA-F]{40}|[0-9a-fA-F]{64}") String sha) {
+    }
+
+    public record DiffRetryRequest(
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Size(min = 1, max = 100)
+            List<@jakarta.validation.constraints.NotNull @jakarta.validation.Valid DiffRetryTarget> targets) {
+    }
+
+    public record DiffRetryJob(long jobId, String status, int total, int done, int failed, String error) {
     }
 
     public record Failures(List<RepoFailure> repoFailures, List<DiffFailure> diffFailures, Page page,

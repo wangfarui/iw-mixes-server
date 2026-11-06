@@ -33,6 +33,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -52,6 +53,7 @@ class CodeScanService implements CodeBackfillTrigger {
     private static final String STATUS_CANCELLED = "CANCELLED";
     private static final String STATUS_INTERRUPTED = "INTERRUPTED";
     private static final String STATUS_NOT_STARTED = "NOT_STARTED";
+    private static final String DIFF_RETRY_COOLDOWN = "diff-retry";
 
     private final ZhaogangCodeScanJobMapper jobMapper;
     private final ZhaogangCodeScanRepoMapper repoMapper;
@@ -257,14 +259,68 @@ class CodeScanService implements CodeBackfillTrigger {
         int from = Math.min(diffRows.size(), (safePage - 1) * safeSize);
         int to = Math.min(diffRows.size(), from + safeSize);
         List<CodeStatsModels.DiffFailure> diffFailures = diffRows.subList(from, to).stream()
-                .map(row -> new CodeStatsModels.DiffFailure(row.getProjectName(), row.getDepotName(), row.getSha(),
-                        row.getAuthorName(), "TOO_LARGE".equals(row.getDiffStatus()) ? "TOO_LARGE" : "REQUEST_FAILED",
-                        "TOO_LARGE".equals(row.getDiffStatus())
-                                ? "diff 超过保护上限，未统计行数" : "diff 读取失败，未统计行数", CodeStatsSupport.format(row.getCommitAt())))
+                .map(this::toDiffFailure)
                 .toList();
         return new CodeStatsModels.Failures(repoFailures, diffFailures,
                 new Page(safePage, safeSize, diffRows.size(),
                         diffRows.isEmpty() ? 0 : (diffRows.size() + safeSize - 1) / safeSize), fromDate.toString(), toDate.toString());
+    }
+
+    private CodeStatsModels.DiffFailure toDiffFailure(CommitEntity row) {
+        CodeDiffFailure failure = CodeDiffFailure.fromStatus(row.getDiffStatus());
+        boolean legacyLimit = "TOO_LARGE".equals(row.getDiffStatus());
+        String reasonCode = failure != null ? failure.name() : legacyLimit ? "TOO_LARGE" : "REQUEST_FAILED";
+        String reason = failure != null ? failure.reason : legacyLimit ? "diff 超过保护上限" : "diff 读取失败";
+        return new CodeStatsModels.DiffFailure(row.getProjectName(), row.getDepotName(), row.getSha(),
+                row.getAuthorName(), reasonCode, reason + "，未统计行数", CodeStatsSupport.format(row.getCommitAt()), row.getDepotId());
+    }
+
+    CodeStatsModels.DiffRetryJob retryDiffs(CodeStatsModule.ScopeInfo scope, ScanJobEntity source,
+                                           CodeStatsModels.DiffRetryRequest request, long requestedBy) {
+        if (scope.scope() == Scope.WORKBENCH_TEAM && !scope.administrator()) {
+            throw new CodeStatsForbiddenException("只有团队管理员可以重试团队 diff");
+        }
+        if (source.getFinishedAt() == null || CodeScanWorker.DIFF_RETRY.equals(source.getScanMode())) {
+            throw new CodingOpenApiException("请从已结束的同步任务重试");
+        }
+        if (!hasToken(scope)) throw new CodingOpenApiException("没有可用的 CODING 令牌，无法重试");
+        String scopeKey = cache.scopeKey(scope);
+        if (jobMapper.selectByActiveKey(activeKey(scope, "")) != null) {
+            throw new CodingOpenApiException("当前范围有任务正在处理，请稍后重试");
+        }
+        if (cache.userCooldownActive(scopeKey, requestedBy, DIFF_RETRY_COOLDOWN)) {
+            throw new CodingOpenApiException("重试冷却中，请稍后再试");
+        }
+        YearMonth sourceMonth = YearMonth.parse(source.getMonth());
+        LocalDate from = continuous(source) ? source.getSyncFrom() : sourceMonth.atDay(1);
+        LocalDate to = continuous(source) ? source.getSyncTo() : sourceMonth.atEndOfMonth();
+        Set<CodeStatsModels.DiffRetryTarget> targets = Set.copyOf(request.targets());
+        List<CommitEntity> matches = commitMapper.selectDiffFailures(scope.codingTeamId(), scope.scope().name(),
+                scope.scopeId(), from, to).stream()
+                .filter(row -> targets.contains(new CodeStatsModels.DiffRetryTarget(row.getDepotId(), row.getSha())))
+                .toList();
+        if (matches.isEmpty() || matches.size() != targets.size()) {
+            throw new CodingOpenApiException("所选失败记录已变化，请刷新明细后重试");
+        }
+        LocalDate first = matches.stream().map(CommitEntity::getCommitDate).min(LocalDate::compareTo).orElseThrow();
+        LocalDate last = matches.stream().map(CommitEntity::getCommitDate).max(LocalDate::compareTo).orElseThrow();
+        var selection = new DiffRetrySelection(first, last, matches.stream().map(CommitEntity::getId).toList());
+        ScanJobEntity job = createAndSubmit(scope, YearMonth.from(last), CodeScanWorker.DIFF_RETRY, "MANUAL",
+                requestedBy, null, selection);
+        if (job == null) throw new CodingOpenApiException("当前范围有任务正在处理或队列已满，请稍后重试");
+        cache.markUserCooldown(scopeKey, requestedBy, DIFF_RETRY_COOLDOWN);
+        return new CodeStatsModels.DiffRetryJob(job.getId(), STATUS_QUEUED, selection.commitIds().size(), 0, 0, null);
+    }
+
+    CodeStatsModels.DiffRetryJob diffRetryStatus(ScanJobEntity job) {
+        if (!CodeScanWorker.DIFF_RETRY.equals(job.getScanMode())) {
+            throw new CodingOpenApiException("diff 重试任务不存在");
+        }
+        return new CodeStatsModels.DiffRetryJob(job.getId(), job.getStatus(), value(job.getTotalDiffs()),
+                value(job.getDoneDiffs()), value(job.getFailedDiffs()), job.getErrorMessage());
+    }
+
+    private record DiffRetrySelection(LocalDate from, LocalDate to, List<Long> commitIds) {
     }
 
     @Override
@@ -286,11 +342,21 @@ class CodeScanService implements CodeBackfillTrigger {
 
     private ScanJobEntity createAndSubmit(CodeStatsModule.ScopeInfo scope, YearMonth month, String mode,
                                           String requestedMode, long requestedBy, java.time.LocalDate syncFrom) {
+        return createAndSubmit(scope, month, mode, requestedMode, requestedBy, syncFrom, null);
+    }
+
+    private ScanJobEntity createAndSubmit(CodeStatsModule.ScopeInfo scope, YearMonth month, String mode,
+                                         String requestedMode, long requestedBy, LocalDate syncFrom,
+                                         DiffRetrySelection retry) {
         ScanJobEntity job = new ScanJobEntity();
         if ("SYNC".equals(mode)) {
             job.setSyncFrom(syncFrom == null ? java.time.LocalDate.parse(properties.getCodeSyncFrom()) : syncFrom);
             job.setSyncTo(java.time.LocalDate.now(clock));
             job.setSyncTeamKey(scope.teamKey()); job.setSyncTeamHost(scope.teamHost());
+        }
+        if (retry != null) {
+            job.setSyncFrom(retry.from());
+            job.setSyncTo(retry.to());
         }
         job.setCodingTeamId(scope.codingTeamId());
         job.setScopeType(scope.scope().name());
@@ -298,7 +364,7 @@ class CodeScanService implements CodeBackfillTrigger {
         job.setMonth(month.toString());
         job.setScanMode("SYNC".equals(mode) ? "SYNC_V2" : mode);
         job.setStatus(STATUS_QUEUED);
-        job.setStage("DIFF_BACKFILL".equals(mode) ? "DIFFS" : "DISCOVERING");
+        job.setStage(retry != null || "DIFF_BACKFILL".equals(mode) ? "DIFFS" : "DISCOVERING");
         job.setActiveKey(activeKey(scope, month.toString()));
         job.setTotalRepos(0);
         job.setDoneRepos(0);
@@ -306,7 +372,7 @@ class CodeScanService implements CodeBackfillTrigger {
         job.setDoneBranches(0);
         job.setTotalCommits(0);
         job.setDoneCommits(0);
-        job.setTotalDiffs(0);
+        job.setTotalDiffs(retry == null ? 0 : retry.commitIds().size());
         job.setDoneDiffs(0);
         job.setFailedRepos(0);
         job.setFailedDiffs(0);
@@ -320,7 +386,8 @@ class CodeScanService implements CodeBackfillTrigger {
             return null;
         }
         cache.bumpScanVersion(cache.scopeKey(scope), month.toString());
-        CodeScanWorker.ScanInput input = new CodeScanWorker.ScanInput(job, scope, month, mode, requestedBy);
+        CodeScanWorker.ScanInput input = new CodeScanWorker.ScanInput(job, scope, month, mode, requestedBy,
+                java.util.Map.of(), "", retry == null ? List.of() : retry.commitIds());
         try {
             executor.execute(() -> {
                 try {

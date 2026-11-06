@@ -21,6 +21,7 @@ class CodeStatsModuleContextTest {
                 .withBean(ZhaogangCodeScanRepoMapper.class, () -> mock(ZhaogangCodeScanRepoMapper.class))
                 .withBean(ZhaogangCodeCommitMapper.class, () -> mock(ZhaogangCodeCommitMapper.class))
                 .withBean(CodeIdentityResolver.class, () -> mock(CodeIdentityResolver.class))
+                .withBean(CodeGitLineStats.class)
                 .withBean(CodeScanWorker.class)
                 .withBean(CodeScanService.class)
                 .withBean(CodeStatsQueryService.class, () -> mock(CodeStatsQueryService.class))

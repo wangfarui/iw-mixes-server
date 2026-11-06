@@ -679,8 +679,33 @@ class CodingOpenApiClientTest {
         properties.setCodeDiffMaxBytes(256);
         CodingOpenApiClient client = new CodingOpenApiClient(properties, objectMapper);
 
-        org.junit.jupiter.api.Assertions.assertThrows(CodingResponseTooLargeException.class,
+        CodingResponseTooLargeException error = org.junit.jupiter.api.Assertions.assertThrows(CodingResponseTooLargeException.class,
                 () -> client.commitDiff("test-token", 450L, 9001L, "abcdef"));
+        assertEquals(256L, error.limitBytes());
+        assertEquals(200, error.httpStatus());
+    }
+
+    @Test
+    void commitDiffDoesNotTurnMissingStatsIntoZero() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange, "{\"Response\":{\"RequestId\":\"fixture\"}}"));
+        CodingOpenApiException error = org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class,
+                () -> client.commitDiff("test-token", 450L, 9001L, "abcdef"));
+        assertEquals("InvalidDiffResponse", error.code());
+    }
+
+    @Test
+    void commitDiffRetainsPlainHttpStatusWhenErrorBodyIsNotJson() throws Exception {
+        CodingOpenApiClient client = client(exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(403, 0);
+            try (var body = exchange.getResponseBody()) {
+                body.write("<html>forbidden</html>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+        });
+        CodingOpenApiException error = org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class,
+                () -> client.commitDiff("test-token", 450L, 9001L, "abcdef"));
+        assertEquals("HTTP_403", error.code());
+        assertEquals(403, error.httpStatus());
     }
 
     @Test

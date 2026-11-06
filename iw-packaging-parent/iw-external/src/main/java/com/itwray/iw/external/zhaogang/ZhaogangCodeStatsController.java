@@ -119,6 +119,21 @@ public class ZhaogangCodeStatsController {
         return GeneralResponse.success(module.failures(context(request, response), jobId, pageNumber, pageSize));
     }
 
+    @PostMapping("/scan/{jobId}/diff-retry")
+    @Operation(summary = "定向重试指定的失败 diff")
+    public GeneralResponse<CodeStatsModels.DiffRetryJob> retryDiffs(@PathVariable @Min(1) long jobId,
+                                                                   @Valid @RequestBody CodeStatsModels.DiffRetryRequest command,
+                                                                   HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.retryDiffs(context(request, response), jobId, command));
+    }
+
+    @GetMapping("/diff-retry/{jobId}")
+    @Operation(summary = "查询 diff 重试结果")
+    public GeneralResponse<CodeStatsModels.DiffRetryJob> diffRetryStatus(@PathVariable @Min(1) long jobId,
+                                                                        HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.diffRetryStatus(context(request, response), jobId));
+    }
+
     @GetMapping("/identities")
     @Operation(summary = "查询代码身份映射和未归属候选")
     public GeneralResponse<CodeStatsModels.IdentityPage> identities(@RequestParam @NotBlank String scope,

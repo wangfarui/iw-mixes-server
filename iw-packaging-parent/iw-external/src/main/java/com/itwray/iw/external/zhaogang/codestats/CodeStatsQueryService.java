@@ -201,7 +201,7 @@ class CodeStatsQueryService {
             CodeStatsSupport.fromBranchJson(commit.getBranchNames()).forEach(branches::add);
             if ("PENDING".equals(commit.getDiffStatus())) pending++;
             if ("OK".equals(commit.getDiffStatus())) ok++;
-            if ("FAILED".equals(commit.getDiffStatus()) || "TOO_LARGE".equals(commit.getDiffStatus())) failed++;
+            if (CodeDiffFailure.isFailure(commit.getDiffStatus())) failed++;
         }
         Set<Long> scannedRepos = scannedRepos(scope, range);
         if (!scannedRepos.isEmpty()) depots = scannedRepos;
@@ -396,7 +396,7 @@ class CodeStatsQueryService {
                 branches.stream().limit(50).toList(), commit.getBranchCount() == null ? branches.size()
                 : commit.getBranchCount(), Boolean.TRUE.equals(commit.getBranchTruncated()),
                 commit.getMessage(), ok ? commit.getAdditions() : null, ok ? commit.getDeletions() : null,
-                ok ? commit.getFilesChanged() : null, commit.getDiffStatus(), commit.getCommitUrl());
+                ok ? commit.getFilesChanged() : null, CodeDiffFailure.entryStatus(commit.getDiffStatus()), commit.getCommitUrl());
     }
 
     private static final class DayAccumulator {

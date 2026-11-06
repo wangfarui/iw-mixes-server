@@ -73,7 +73,8 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
     @Select("""
             select * from external_zhaogang_code_commit
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
-               and month = #{month} and is_merge = 0 and diff_status in ('PENDING', 'FAILED')
+               and month = #{month} and is_merge = 0
+               and diff_status in ('PENDING', 'FAILED', 'DIFF_RATE_LIMITED', 'DIFF_TIMEOUT', 'DIFF_UNAVAILABLE')
              order by id
             """)
     List<CommitEntity> selectPendingDiffs(@Param("codingTeamId") long codingTeamId,
@@ -152,7 +153,7 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
             select count(*) from external_zhaogang_code_commit
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
                and commit_date between #{from} and #{to} and is_merge = 0
-               and diff_status in ('PENDING', 'FAILED', 'TOO_LARGE')
+               and (diff_status in ('PENDING', 'FAILED', 'TOO_LARGE') or left(diff_status, 5) = 'DIFF_')
                and binary depot_name <> 'online.base.apijar.service'
             """)
     long countIncompleteDiffs(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
@@ -161,9 +162,10 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
     @Select("""
             select * from external_zhaogang_code_commit
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
-               and commit_date between #{from} and #{to} and diff_status in ('FAILED', 'TOO_LARGE') and is_merge = 0
+               and commit_date between #{from} and #{to} and is_merge = 0
+               and (diff_status in ('FAILED', 'TOO_LARGE') or left(diff_status, 5) = 'DIFF_')
                and binary depot_name <> 'online.base.apijar.service'
-             order by commit_at desc
+             order by commit_at desc, id desc
             """)
     List<CommitEntity> selectDiffFailures(@Param("codingTeamId") long codingTeamId,
                                           @Param("scopeType") String scopeType, @Param("scopeId") long scopeId,

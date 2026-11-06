@@ -171,6 +171,9 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         JsonNode response = invoke(token, "DescribeGitCommitDiff", request,
                 Math.max(1, properties.getCodeDiffMaxBytes()));
         JsonNode data = response.path("Data").isObject() ? response.path("Data") : response;
+        if (!hasDiffArray(data) && !hasDiffArray(response)) {
+            throw new CodingOpenApiException("DescribeGitCommitDiff", "InvalidDiffResponse", "CODING 未返回 diff 列表");
+        }
         List<JsonNode> diffs = array(data, "Diffs", "DiffList", "Files");
         if (diffs.isEmpty()) diffs = array(response, "Diffs", "DiffList", "Files");
         int additions = 0;
@@ -180,6 +183,10 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             deletions += intValue(diff, "Deletions", "Deleted");
         }
         return new CodingCommitDiff(additions, deletions, diffs.size());
+    }
+
+    private boolean hasDiffArray(JsonNode node) {
+        return node.path("Diffs").isArray() || node.path("DiffList").isArray() || node.path("Files").isArray();
     }
 
     @Override
@@ -676,11 +683,14 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 String code = error.code();
                 boolean transientFailure = code.startsWith("InternalError")
                         || code.startsWith("RequestLimitExceeded") || code.startsWith("HTTP_5")
+                        || "HTTP_429".equals(code) || Integer.valueOf(429).equals(error.httpStatus())
+                        || (error.httpStatus() != null && error.httpStatus() >= 500)
                         || error.getCause() instanceof java.io.IOException;
                 if (!readOnly || !transientFailure || Thread.currentThread().isInterrupted()) throw error;
                 if (attempt >= 2) {
                     throw new CodingOpenApiException(action, code,
-                            "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描");
+                            "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描",
+                            error.httpStatus(), error.getCause());
                 }
                 try {
                     Thread.sleep(200L << attempt);
@@ -694,6 +704,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
 
     private JsonNode invokeOnce(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
         boolean acquired = false;
+        Integer httpStatus = null;
         try {
             requestLimiter.acquire(token, action);
             acquired = true;
@@ -709,22 +720,34 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                     .build();
             HttpResponse<InputStream> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            httpStatus = httpResponse.statusCode();
             String responseBody;
             try (InputStream stream = httpResponse.body()) {
                 byte[] bytes = readLimited(stream, maxResponseBytes);
                 if (bytes == null) {
-                    throw new CodingResponseTooLargeException(action, maxResponseBytes);
+                    throw new CodingResponseTooLargeException(action, maxResponseBytes, httpResponse.statusCode());
                 }
                 responseBody = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
             }
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode response = root.path("Response");
+            JsonNode response;
+            try {
+                JsonNode root = objectMapper.readTree(responseBody);
+                response = root == null ? objectMapper.missingNode() : root.path("Response");
+            } catch (com.fasterxml.jackson.core.JsonProcessingException invalidJson) {
+                if (httpStatus < 200 || httpStatus >= 300) {
+                    throw new CodingOpenApiException(action, "HTTP_" + httpStatus, "CODING 请求失败", httpStatus, null);
+                }
+                if ("DescribeGitCommitDiff".equals(action)) {
+                    throw new CodingOpenApiException(action, "InvalidDiffResponse", "CODING 未返回可用的 diff", httpStatus, null);
+                }
+                throw invalidJson;
+            }
             JsonNode error = response.path("Error");
             if (httpResponse.statusCode() < 200 || httpResponse.statusCode() >= 300 || !error.isMissingNode()) {
                 String code = error.isMissingNode() ? "HTTP_" + httpResponse.statusCode() : text(error, "Code");
                 String message = error.isMissingNode() ? "CODING 请求失败" : text(error, "Message", "Code");
                 throw new CodingOpenApiException(action, code,
-                        StringUtils.defaultIfBlank(message, "CODING 请求失败"));
+                        StringUtils.defaultIfBlank(message, "CODING 请求失败"), httpResponse.statusCode(), null);
             }
             return response;
         } catch (CodingOpenApiException e) {
@@ -733,7 +756,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             Thread.currentThread().interrupt();
             throw new CodingOpenApiException("CODING 请求已取消", e);
         } catch (Exception e) {
-            throw new CodingOpenApiException("CODING 服务暂不可用", e);
+            throw new CodingOpenApiException(action, "", "CODING 服务暂不可用", httpStatus, e);
         } finally {
             if (acquired) requestLimiter.release(token);
         }

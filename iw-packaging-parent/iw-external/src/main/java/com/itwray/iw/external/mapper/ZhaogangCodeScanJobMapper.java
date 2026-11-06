@@ -17,7 +17,7 @@ public interface ZhaogangCodeScanJobMapper extends BaseMapper<ScanJobEntity> {
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
                and ((scan_mode in ('SYNC','SYNC_V2','SNAPSHOT_V1') and sync_from <= concat(#{month}, '-01')
                     and sync_to >= least(last_day(concat(#{month}, '-01')), current_date))
-                    or (scan_mode not in ('SYNC','SYNC_V2','SNAPSHOT_V1') and month = #{month}))
+                    or (scan_mode not in ('SYNC','SYNC_V2','SNAPSHOT_V1','DIFF_RETRY') and month = #{month}))
              order by id desc limit 1
             """)
     ScanJobEntity selectLatest(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
@@ -28,7 +28,7 @@ public interface ZhaogangCodeScanJobMapper extends BaseMapper<ScanJobEntity> {
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
                and ((scan_mode in ('SYNC','SYNC_V2','SNAPSHOT_V1') and sync_from <= concat(#{month}, '-01')
                     and sync_to >= least(last_day(concat(#{month}, '-01')), current_date))
-                    or (scan_mode not in ('SYNC','SYNC_V2','SNAPSHOT_V1') and month = #{month})) and status in ('COMPLETED', 'PARTIAL')
+                    or (scan_mode not in ('SYNC','SYNC_V2','SNAPSHOT_V1','DIFF_RETRY') and month = #{month})) and status in ('COMPLETED', 'PARTIAL')
              order by finished_at desc, id desc limit 1
             """)
     ScanJobEntity selectLatestSuccessful(@Param("codingTeamId") long codingTeamId,
