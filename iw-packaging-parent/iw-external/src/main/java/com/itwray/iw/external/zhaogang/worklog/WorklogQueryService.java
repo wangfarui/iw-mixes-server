@@ -30,7 +30,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -51,6 +50,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Component
 class WorklogQueryService {
@@ -58,14 +58,13 @@ class WorklogQueryService {
     private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
     private static final int PAGE_LIMIT = 1000;
     private static final int MAX_PAGES = 100;
-    private static final Duration ISSUE_CACHE_TTL = Duration.ofMinutes(30);
 
     private final CodingOpenApiPort coding;
     private final CodingIssueLinkBuilder issueLinkBuilder;
     private final Clock clock;
     private final ExecutorService memberExecutor;
     private final boolean ownsExecutor;
-    private final Map<IssueKey, CachedIssue> issueCache = new ConcurrentHashMap<>();
+    private final Map<IssueKey, CompletableFuture<IssueLookup>> issueRequests = new ConcurrentHashMap<>();
 
     @Autowired
     WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder,
@@ -114,13 +113,16 @@ class WorklogQueryService {
         LocalDate from = month.atDay(1);
         LocalDate toExclusive = month.plusMonths(1).atDay(1);
         List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive);
-        List<Worklog> allItems = deduplicate(flatten(memberResults), from, toExclusive);
+        List<ResolvedWorklog> worklogs = resolveWorklogs(team.host(), memberResults, from, toExclusive);
+        List<Worklog> allItems = distinctWorklogs(worklogs).stream()
+                .map(ResolvedWorklog::worklog).toList();
+        Map<Long, List<Worklog>> itemsByMember = worklogsByMember(worklogs);
         Map<Long, MemberLogs> resultsByMember = resultsByMember(memberResults);
         List<MemberDailyTotal> memberDailyTotals = scope == Scope.WORKBENCH_TEAM
                 ? members.stream().filter(member -> !resultsByMember.get(member.userId()).failed())
                 .map(member -> {
                     List<DailyTotal> totals = dailyTotals(
-                            deduplicate(resultsByMember.get(member.userId()).items(), from, toExclusive),
+                            itemsByMember.getOrDefault(member.userId(), List.of()),
                             from, toExclusive, schedule);
                     return new MemberDailyTotal(new User(member.userId(), member.userName(), member.avatar()),
                             totals, summary(totals, leaveDatesByMember.getOrDefault(member.userId(), Set.of())));
@@ -153,22 +155,20 @@ class WorklogQueryService {
             return emptyEntries(scope, workbenchTeamId, from, toExclusive);
         }
         List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive);
-        List<Worklog> allItems = deduplicate(flatten(memberResults), from, toExclusive);
-        List<Worklog> sortedItems = allItems.stream()
-                .sorted(Comparator.comparingLong(this::sortStart).reversed()
-                        .thenComparing(Comparator.comparingLong(this::sortSecondary).reversed())
-                        .thenComparing(Comparator.comparingLong(Worklog::id).reversed()))
-                .toList();
-        Map<Long, String> memberTokens = memberResults.stream()
-                .filter(result -> !result.failed() && StringUtils.isNotBlank(result.token()))
-                .collect(LinkedHashMap::new, (map, result) -> map.put(result.userId(), result.token()),
-                        LinkedHashMap::putAll);
-        Map<IssueKey, CodingOpenApiPort.Issue> issues = loadIssues(memberTokens, team.host(), sortedItems);
+        List<ResolvedWorklog> worklogs = distinctWorklogs(
+                resolveWorklogs(team.host(), memberResults, from, toExclusive));
+        Comparator<Worklog> byRegistrationTime = Comparator.comparingLong(this::sortStart).reversed()
+                .thenComparing(Comparator.comparingLong(this::sortSecondary).reversed())
+                .thenComparing(Comparator.comparingLong(Worklog::id).reversed());
         Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
                 (map, member) -> map.put(member.userId(), member), LinkedHashMap::putAll);
-        List<Item> entries = sortedItems.stream().map(item -> toItem(context, team, memberMap, issues, item)).toList();
+        List<Item> entries = worklogs.stream()
+                .sorted(Comparator.comparing(ResolvedWorklog::worklog, byRegistrationTime))
+                .map(item -> toItem(context, team, memberMap, item.lookup().issue(), item.worklog()))
+                .toList();
         BigDecimal totalHours = entries.stream().map(Item::hours).reduce(BigDecimal.ZERO, BigDecimal::add);
-        Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults, projectCount(allItems));
+        Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
+                projectCount(worklogs.stream().map(ResolvedWorklog::worklog).toList()));
         return new Entries(coverage, from.toString(), toExclusive.toString(), syncedAt(), normalizeHours(totalHours), entries);
     }
 
@@ -191,10 +191,9 @@ class WorklogQueryService {
         if (!rangeEnd.isAfter(from) || (members.isEmpty() && scope == Scope.WORKBENCH_TEAM)) {
             return emptyAbsence(scope, workbenchTeamId, month, from, rangeEnd);
         }
-        // CODING 按提交时间筛选工时列表，需扩大拉取窗口后再按实际工时日期截断。
-        LocalDate fetchToExclusive = monthEndExclusive.isAfter(today.plusDays(1))
-                ? monthEndExclusive : today.plusDays(1);
-        List<MemberLogs> memberResults = fetchMembers(members, from, fetchToExclusive);
+        List<MemberLogs> memberResults = fetchMembers(members, from, monthEndExclusive);
+        List<ResolvedWorklog> worklogs = resolveWorklogs(team.host(), memberResults, from, rangeEnd);
+        Map<Long, List<Worklog>> itemsByMember = worklogsByMember(worklogs);
         Map<Long, MemberLogs> resultsByMember = resultsByMember(memberResults);
         Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
                 (map, member) -> map.put(member.userId(), member), LinkedHashMap::putAll);
@@ -203,14 +202,15 @@ class WorklogQueryService {
                 .filter(result -> result != null && !result.failed() && !result.partial())
                 .map(result -> {
                     WorklogModule.MemberCredential member = memberMap.get(result.userId());
-                    List<AbsenceDay> days = absenceDays(deduplicate(result.items(), from, rangeEnd), from,
+                    List<AbsenceDay> days = absenceDays(itemsByMember.getOrDefault(member.userId(), List.of()), from,
                             rangeEnd, schedule, leaveDatesByMember.getOrDefault(result.userId(), Set.of()));
                     return days.isEmpty() ? null : new MemberAbsence(
                             new User(member.userId(), member.userName(), member.avatar()), days.size(), days);
                 })
                 .filter(java.util.Objects::nonNull)
                 .toList();
-        Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults, projectCount(flatten(memberResults)));
+        Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
+                projectCount(worklogs.stream().map(ResolvedWorklog::worklog).toList()));
         return new Absence(coverage, month.toString(), from.toString(), rangeEnd.toString(), syncedAt(), absentMembers);
     }
 
@@ -224,8 +224,11 @@ class WorklogQueryService {
 
     private List<MemberLogs> fetchMembers(List<WorklogModule.MemberCredential> members, LocalDate from,
                                           LocalDate toExclusive) {
+        // CODING 按提交时间返回记录。拉取至今天结束，才能覆盖历史区间内的补登工时。
+        LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
+        LocalDate fetchToExclusive = toExclusive.isBefore(tomorrow) ? tomorrow : toExclusive;
         long requestFrom = from.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() - 1;
-        long requestTo = toExclusive.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() + 1;
+        long requestTo = fetchToExclusive.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() + 1;
         List<CompletableFuture<MemberLogs>> futures = members.stream()
                 .map(member -> CompletableFuture.supplyAsync(() -> fetchMember(member, requestFrom, requestTo), memberExecutor))
                 .toList();
@@ -241,8 +244,9 @@ class WorklogQueryService {
         return results;
     }
 
-    private List<Worklog> flatten(List<MemberLogs> results) {
-        return results.stream().flatMap(result -> result.items().stream()).toList();
+    private Map<Long, List<Worklog>> worklogsByMember(List<ResolvedWorklog> items) {
+        return items.stream().collect(Collectors.groupingBy(ResolvedWorklog::memberId,
+                Collectors.mapping(ResolvedWorklog::worklog, Collectors.toList())));
     }
 
     private Map<Long, MemberLogs> resultsByMember(List<MemberLogs> results) {
@@ -275,6 +279,9 @@ class WorklogQueryService {
             return new MemberIssue(user, "TOKEN_MISSING", "尚未绑定 CODING 令牌，请该成员在工作台登录并绑定令牌");
         }
         if (!result.failed()) {
+            if (!result.pageLimitReached()) {
+                return new MemberIssue(user, "MISSING_START_AT", "部分记录缺少登记时间，未计入工时");
+            }
             return new MemberIssue(user, "INCOMPLETE", "工时记录达到查询页数上限，数据未完整取得");
         }
         RuntimeException error = result.error();
@@ -324,9 +331,14 @@ class WorklogQueryService {
 
     private List<Worklog> deduplicate(List<Worklog> items, LocalDate from, LocalDate toExclusive) {
         Map<String, Worklog> deduplicated = new LinkedHashMap<>();
-        items.stream().filter(item -> effectiveMillis(item) != null)
-                .filter(item -> within(item, from, toExclusive))
+        items.stream().filter(item -> within(item, from, toExclusive))
                 .forEach(item -> deduplicated.putIfAbsent(worklogKey(item), item));
+        return new ArrayList<>(deduplicated.values());
+    }
+
+    private List<ResolvedWorklog> distinctWorklogs(List<ResolvedWorklog> items) {
+        Map<String, ResolvedWorklog> deduplicated = new LinkedHashMap<>();
+        items.forEach(item -> deduplicated.putIfAbsent(worklogKey(item.worklog()), item));
         return new ArrayList<>(deduplicated.values());
     }
 
@@ -433,7 +445,7 @@ class WorklogQueryService {
 
     private MemberLogs fetchMember(WorklogModule.MemberCredential member, long from, long to) {
         if (StringUtils.isBlank(member.token())) {
-            return new MemberLogs(member.userId(), member.token(), List.of(), true, true,
+            return new MemberLogs(member.userId(), member.token(), List.of(), false, true,
                     new CodingOpenApiException("成员 " + member.userName() + " 尚未绑定 CODING 令牌"));
         }
         List<Worklog> result = new ArrayList<>();
@@ -449,81 +461,65 @@ class WorklogQueryService {
             }
             return new MemberLogs(member.userId(), member.token(), result, true, false, null);
         } catch (RuntimeException e) {
-            return new MemberLogs(member.userId(), member.token(), List.of(), true, true, e);
+            return new MemberLogs(member.userId(), member.token(), List.of(), false, true, e);
         }
     }
 
-    private Map<IssueKey, CodingOpenApiPort.Issue> loadIssues(Map<Long, String> memberTokens, String teamHost,
-                                                               List<Worklog> items) {
-        Map<IssueKey, CompletableFuture<CodingOpenApiPort.Issue>> pending = new LinkedHashMap<>();
-        for (Worklog item : items) {
-            if (item.issueCode() <= 0 || StringUtils.isBlank(item.projectName())) continue;
-            String token = memberTokens.get(item.userId());
-            if (StringUtils.isBlank(token)) continue;
-            IssueKey key = new IssueKey(teamHost, item.projectName(), item.issueCode(),
-                    CodingCredentialService.fingerprint(token));
-            CodingOpenApiPort.Issue cached = cachedIssue(key);
-            if (cached != null) {
-                pending.put(key, CompletableFuture.completedFuture(cached));
-            } else {
-                pending.computeIfAbsent(key, ignored -> CompletableFuture.supplyAsync(
-                        () -> fetchIssue(token, key), memberExecutor));
+    private List<ResolvedWorklog> resolveWorklogs(String teamHost, List<MemberLogs> memberResults,
+                                                  LocalDate from, LocalDate toExclusive) {
+        List<ResolvedWorklog> items = new ArrayList<>();
+        Map<IssueKey, CompletableFuture<IssueLookup>> pending = new LinkedHashMap<>();
+        CompletableFuture<IssueLookup> unknown = CompletableFuture.completedFuture(IssueLookup.UNKNOWN);
+        for (MemberLogs member : memberResults) {
+            if (member.items().isEmpty()) continue;
+            String fingerprint = CodingCredentialService.fingerprint(member.token());
+            for (Worklog item : deduplicate(member.items(), from, toExclusive)) {
+                CompletableFuture<IssueLookup> lookup = unknown;
+                if (item.issueCode() > 0 && StringUtils.isNotBlank(item.projectName())) {
+                    IssueKey key = new IssueKey(teamHost, item.projectName(), item.issueCode(), fingerprint);
+                    lookup = pending.computeIfAbsent(key, ignored -> requestIssue(member.token(), key));
+                }
+                items.add(new ResolvedWorklog(item, member.userId(), lookup));
             }
         }
-        Map<IssueKey, CodingOpenApiPort.Issue> result = new LinkedHashMap<>();
-        pending.forEach((key, future) -> {
-            CodingOpenApiPort.Issue issue = future.join();
-            if (issue != null) {
-                result.put(key, issue);
-                issueCache.put(key, new CachedIssue(issue, Instant.now().plus(ISSUE_CACHE_TTL)));
-            }
-        });
-        trimIssueCache();
-        return result;
+        return items.stream()
+                .filter(item -> !item.lookup().missing())
+                .toList();
     }
 
-    private CodingOpenApiPort.Issue fetchIssue(String token, IssueKey key) {
+    private CompletableFuture<IssueLookup> requestIssue(String token, IssueKey key) {
+        // 合并并发查验，下一次重新计算工时时再向 CODING 确认事项是否存在。
+        CompletableFuture<IssueLookup> future = issueRequests.computeIfAbsent(key,
+                ignored -> CompletableFuture.supplyAsync(() -> fetchIssue(token, key), memberExecutor));
+        return future.whenComplete((ignored, error) -> issueRequests.remove(key, future));
+    }
+
+    private IssueLookup fetchIssue(String token, IssueKey key) {
         try {
-            return coding.issue(token, key.projectName(), key.issueCode());
+            return new IssueLookup(coding.issue(token, key.projectName(), key.issueCode()), false);
+        } catch (CodingOpenApiException error) {
+            boolean missing = "InvalidParameterValue".equals(error.code()) && "issue_not_exist".equals(error.getMessage());
+            return new IssueLookup(null, missing);
         } catch (RuntimeException ignored) {
-            return null;
+            return IssueLookup.UNKNOWN;
         }
-    }
-
-    private CodingOpenApiPort.Issue cachedIssue(IssueKey key) {
-        CachedIssue cached = issueCache.get(key);
-        if (cached == null || cached.expiresAt().isBefore(Instant.now())) {
-            issueCache.remove(key);
-            return null;
-        }
-        return cached.issue();
-    }
-
-    private void trimIssueCache() {
-        if (issueCache.size() <= 5000) return;
-        Instant now = Instant.now();
-        issueCache.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
     }
 
     private Item toItem(WorklogModule.Context context, Team team,
                         Map<Long, WorklogModule.MemberCredential> members,
-                        Map<IssueKey, CodingOpenApiPort.Issue> issues, Worklog item) {
+                        CodingOpenApiPort.Issue issue, Worklog item) {
         WorklogModule.MemberCredential member = members.get(item.userId());
         User user = member == null
                 ? new User(item.userId(), item.userId() == context.userId() ? context.userName() : "成员 " + item.userId(),
                 item.userId() == context.userId() ? context.avatar() : "")
                 : new User(member.userId(), member.userName(), member.avatar());
-        String token = member == null ? "" : member.token();
-        IssueKey key = new IssueKey(team.host(), item.projectName(), item.issueCode(),
-                StringUtils.isBlank(token) ? "" : CodingCredentialService.fingerprint(token));
-        CodingOpenApiPort.Issue issue = issues.get(key);
         String title = issue == null ? "" : issue.title();
         if (StringUtils.isBlank(title)) title = StringUtils.defaultIfBlank(item.workingDesc(), "事项 #" + item.issueCode());
         String type = issue == null ? "" : issue.type();
         String typeName = issue == null ? "事项" : StringUtils.defaultIfBlank(issue.typeName(), issue.type());
         String displayName = issue == null ? item.projectName()
                 : StringUtils.defaultIfBlank(issue.projectDisplayName(), item.projectName());
-        return new Item(item.id(), user, formatTime(effectiveMillis(item)), formatTime(item.createdAt()),
+        return new Item(item.id(), user, formatTime(item.startAt()), formatTime(item.createdAt()),
                 formatTime(item.updatedAt()), normalizeHours(item.hours()), item.workingDesc(),
                 new Project(item.projectName(), displayName),
                 new WorklogModels.Issue(item.issueCode(), type, typeName, title),
@@ -536,17 +532,16 @@ class WorklogQueryService {
     }
 
     private LocalDate worklogDate(Worklog item) {
-        Long millis = effectiveMillis(item);
+        Long millis = registrationMillis(item);
         return millis == null ? null : Instant.ofEpochMilli(millis).atZone(CHINA_ZONE).toLocalDate();
     }
 
-    private Long effectiveMillis(Worklog item) {
-        return item.startAt() != null ? item.startAt() : item.createdAt();
+    private static Long registrationMillis(Worklog item) {
+        return item.startAt() != null && item.startAt() > 0 ? item.startAt() : null;
     }
 
     private long sortStart(Worklog item) {
-        Long value = effectiveMillis(item);
-        return value == null ? 0 : value;
+        return item.startAt();
     }
 
     private long sortSecondary(Worklog item) {
@@ -567,17 +562,27 @@ class WorklogQueryService {
     private String worklogKey(Worklog item) {
         if (item.id() > 0) return "id:" + item.id();
         return String.join(":", item.projectName(), String.valueOf(item.issueCode()), String.valueOf(item.userId()),
-                String.valueOf(effectiveMillis(item)), String.valueOf(item.createdAt()), String.valueOf(item.hours()));
+                String.valueOf(item.startAt()), String.valueOf(item.createdAt()), String.valueOf(item.hours()));
     }
 
-    private record MemberLogs(long userId, String token, List<Worklog> items, boolean partial, boolean failed,
+    private record MemberLogs(long userId, String token, List<Worklog> items, boolean pageLimitReached, boolean failed,
                               RuntimeException error) {
+        boolean partial() {
+            return failed || pageLimitReached || items.stream().anyMatch(item -> registrationMillis(item) == null);
+        }
     }
 
     private record IssueKey(String teamHost, String projectName, long issueCode, String tokenFingerprint) {
     }
 
-    private record CachedIssue(CodingOpenApiPort.Issue issue, Instant expiresAt) {
+    private record IssueLookup(CodingOpenApiPort.Issue issue, boolean missing) {
+        private static final IssueLookup UNKNOWN = new IssueLookup(null, false);
+    }
+
+    private record ResolvedWorklog(Worklog worklog, long memberId, CompletableFuture<IssueLookup> pendingLookup) {
+        IssueLookup lookup() {
+            return pendingLookup.join();
+        }
     }
 
     private static ThreadFactory daemonThreadFactory() {

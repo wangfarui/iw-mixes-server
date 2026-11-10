@@ -88,6 +88,95 @@ class WorklogQueryServiceTest {
     }
 
     @Test
+    void excludesMissingIssuesFromEntriesStatisticsAndAbsences() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        LocalDate date = LocalDate.of(2026, 8, 24);
+        long start = date.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli();
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of(
+                        new Worklog(1L, 11L, 101L, "project-a", 1L, new BigDecimal("2"), "", start, start, start),
+                        new Worklog(2L, 12L, 102L, "project-a", 1L, new BigDecimal("7"), "", start, start, start),
+                        new Worklog(3L, 13L, 103L, "project-a", 1L, new BigDecimal("3"), "", start, start, start),
+                        new Worklog(4L, 14L, 104L, "project-a", 1L, BigDecimal.ONE, "", start, start, start))));
+        when(coding.issue("token", "project-a", 101L))
+                .thenReturn(new CodingOpenApiPort.Issue(101L, "MISSION", "任务", "存在的事项", "项目 A", false));
+        when(coding.issue("token", "project-a", 102L))
+                .thenReturn(new CodingOpenApiPort.Issue(102L, "MISSION", "任务", "将删除的事项", "项目 A", false))
+                .thenThrow(new CodingOpenApiException("DescribeIssue", "InvalidParameterValue", "issue_not_exist"));
+        when(coding.issue("token", "project-a", 103L))
+                .thenThrow(new CodingOpenApiException("DescribeIssue", "UnauthorizedOperation", "permission denied"));
+        when(coding.issue("token", "project-a", 104L))
+                .thenThrow(new CodingOpenApiException("CODING 服务暂不可用", new java.io.IOException()));
+        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+                Clock.fixed(Instant.parse("2026-08-28T05:00:00Z"), CHINA_ZONE));
+        WorklogModule.Context context = new WorklogModule.Context("token", 1L, "成员", "", 10L,
+                "coding-team", "https://coding-team.coding.net");
+        Team team = new Team(10L, "团队", "https://coding-team.coding.net");
+        List<WorklogModule.MemberCredential> members = List.of(
+                new WorklogModule.MemberCredential(1L, "成员", "", "token"));
+        YearMonth month = YearMonth.from(date);
+        Schedule schedule = WorkCalendarDefaults.schedule(month);
+
+        Entries beforeDeletion = service.queryEntries(context, team, Scope.SELF, null, members, date, date.plusDays(1));
+        assertThat(beforeDeletion.totalHours()).isEqualByComparingTo("13");
+
+        Entries entries = service.queryEntries(context, team, Scope.SELF, null, members, date, date.plusDays(1));
+        Statistics stats = service.queryStatistics(context, team, Scope.WORKBENCH_TEAM, 300L, members, month, schedule);
+        Absence absence = service.queryAbsences(context, team, Scope.SELF, null, members, month, schedule);
+
+        assertThat(entries.items()).extracting(WorklogModels.Item::workLogId).containsExactly(4L, 3L, 1L);
+        assertThat(entries.totalHours()).isEqualByComparingTo("6");
+        assertThat(stats.dailyTotals().get(23).hours()).isEqualByComparingTo("6");
+        assertThat(stats.memberDailyTotals().get(0).dailyTotals().get(23).hours()).isEqualByComparingTo("6");
+        assertThat(absence.members().get(0).days()).anySatisfy(day -> {
+            assertThat(day.date()).isEqualTo(date.toString());
+            assertThat(day.hours()).isEqualByComparingTo("6");
+        });
+    }
+
+    @Test
+    void entriesAndStatisticsIncludeLastMonthWorklogsSubmittedThisMonth() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        long friday = Instant.parse("2026-10-30T01:00:00Z").toEpochMilli();
+        long monday = Instant.parse("2026-11-02T02:00:00Z").toEpochMilli();
+        Worklog backdated = new Worklog(1L, 1L, 1L, "project-a", 1L, new BigDecimal("3"),
+                "", friday, monday, monday);
+        Worklog current = worklog(2L, new BigDecimal("5"), monday);
+        Worklog undated = new Worklog(3L, 3L, 3L, "project-a", 1L, new BigDecimal("7"),
+                "", null, friday, friday);
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenAnswer(invocation -> {
+                    long requestFrom = invocation.getArgument(1);
+                    long requestTo = invocation.getArgument(2);
+                    return new WorklogPage(requestFrom <= monday && monday < requestTo
+                            ? List.of(backdated, current, undated) : List.of(undated));
+                });
+        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+                Clock.fixed(Instant.parse("2026-11-02T05:00:00Z"), CHINA_ZONE));
+        WorklogModule.Context context = new WorklogModule.Context("token", 1L, "成员", "", 10L,
+                "coding-team", "https://coding-team.coding.net");
+        Team team = new Team(10L, "团队", "https://coding-team.coding.net");
+        List<WorklogModule.MemberCredential> members = List.of(
+                new WorklogModule.MemberCredential(1L, "成员", "", "token"));
+        LocalDate weekStart = LocalDate.of(2026, 10, 26);
+        YearMonth october = YearMonth.of(2026, 10);
+
+        Entries entries = service.queryEntries(context, team, Scope.SELF, null,
+                members, weekStart, weekStart.plusWeeks(1));
+        Statistics statistics = service.queryStatistics(context, team, Scope.WORKBENCH_TEAM, 300L,
+                members, october, WorkCalendarDefaults.schedule(october));
+
+        assertThat(entries.items()).singleElement()
+                .satisfies(item -> assertThat(item.startAt()).isEqualTo("2026-10-30T09:00:00+08:00"));
+        assertThat(entries.totalHours()).isEqualByComparingTo("3");
+        assertThat(entries.coverage().memberIssues()).extracting(WorklogModels.MemberIssue::reasonCode)
+                .containsExactly("MISSING_START_AT");
+        assertThat(statistics.dailyTotals().get(29).hours()).isEqualByComparingTo("3");
+        assertThat(statistics.memberDailyTotals().get(0).dailyTotals().get(29).hours()).isEqualByComparingTo("3");
+        assertThat(statistics.coverage().partial()).isTrue();
+    }
+
+    @Test
     void coverageIdentifiesMembersWithMissingTokenAndRequestFailure() {
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         when(coding.worklogPage(eq("good-token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
