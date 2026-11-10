@@ -75,6 +75,8 @@ public final class TeamIterationEntities {
         private Long parentId;
         private String source;
         private String codingUrl;
+        @TableField(updateStrategy = FieldStrategy.NEVER)
+        private Boolean manuallyLinked;
         private String urlHash;
         private String projectName;
         private Long issueId;

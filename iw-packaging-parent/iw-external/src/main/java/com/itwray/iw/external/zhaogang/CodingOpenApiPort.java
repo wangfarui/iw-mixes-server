@@ -15,6 +15,10 @@ public interface CodingOpenApiPort {
 
     List<CodingProject> projects(String token, long userId);
 
+    default List<String> accessibleProjectNames(String token, long userId) {
+        return projects(token, userId).stream().map(CodingProject::name).toList();
+    }
+
     default CodingDepotPage myDepots(String token, int pageNumber, int pageSize) {
         throw new UnsupportedOperationException("当前 CODING 适配器未实现仓库发现");
     }
@@ -152,7 +156,17 @@ public interface CodingOpenApiPort {
                  String projectDisplayName, boolean subtask, long id, String statusName, String statusType,
                  BigDecimal workingHours, String description, Long parentCode, String parentProjectName,
                  String parentType, String parentTypeName, String developmentTeam, String definitionOfDone,
-                 String taskType, String assigneeName, String priority) {
+                 String taskType, String assigneeName, String priority, String onlineBug, String bugPriority) {
+
+        public Issue(long code, String type, String typeName, long issueTypeId, String title,
+                     String projectDisplayName, boolean subtask, long id, String statusName, String statusType,
+                     BigDecimal workingHours, String description, Long parentCode, String parentProjectName,
+                     String parentType, String parentTypeName, String developmentTeam, String definitionOfDone,
+                     String taskType, String assigneeName, String priority) {
+            this(code, type, typeName, issueTypeId, title, projectDisplayName, subtask, id, statusName, statusType,
+                    workingHours, description, parentCode, parentProjectName, parentType, parentTypeName,
+                    developmentTeam, definitionOfDone, taskType, assigneeName, priority, null, null);
+        }
 
         public Issue(long code, String type, String typeName, long issueTypeId, String title,
                      String projectDisplayName, boolean subtask, long id, String statusName, String statusType,

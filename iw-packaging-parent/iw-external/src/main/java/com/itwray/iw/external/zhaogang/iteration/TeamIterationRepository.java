@@ -65,16 +65,19 @@ interface TeamIterationRepository {
                                String codingSystemType, long codingIssueTypeId, String issueTypeName,
                                String title, String priority, Actor actor);
 
-    IssueEntity addChildIssue(long iterationId, long parentId, String projectName, CodingIssueType issueType,
+    IssueEntity addChildIssue(long iterationId, Long parentId, String projectName, CodingIssueType issueType,
                               String issueTypeName, String title, String description, String developmentTeam,
                               String definitionOfDone, BigDecimal estimatedHours, String taskType,
                               Boolean onlineBug, String bugPriority, String priority, IssueSyncStatus syncStatus, Actor actor);
+
+    IssueEntity bindIssue(long iterationId, long issueId, IssueLink link, Actor actor);
 
     Optional<IssueEntity> findIssue(long iterationId, String urlHash);
 
     Optional<IssueEntity> findIssue(long iterationId, long issueId);
 
-    IssueEntity updateIssue(long iterationId, long issueId, UpdateIssueCommand command, Actor actor);
+    IssueEntity updateIssue(long iterationId, long issueId, UpdateIssueCommand command,
+                            Long expectedIssueCode, Actor actor);
 
     void updateIssuePrototypeUrl(long iterationId, long issueId, String prototypeUrl, Actor actor);
 
@@ -88,9 +91,7 @@ interface TeamIterationRepository {
     IssueEntity upsertCodingSnapshot(long iterationId, Long parentId, String url, String urlHash, String projectName,
                                      long codingIssueId, long codingIssueCode, CodingIssueType issueType,
                                      String codingSystemType, long codingIssueTypeId, String issueTypeName,
-                                     String title, String description, String developmentTeam,
-                                     String definitionOfDone, BigDecimal estimatedHours, String taskType,
-                                     String priority, Long codingParentCode, Actor actor);
+                                     IssueSnapshotFields fields, Long codingParentCode, Actor actor);
 
     IssueEntity updateCodingWorklogSummary(long iterationId, long issueId, BigDecimal recordedHours,
                                            int worklogCount, Actor actor);
@@ -117,6 +118,19 @@ interface TeamIterationRepository {
                                      Actor actor);
 
     void removeReleasePlan(long iterationId, long releasePlanId, Actor actor);
+
+    record IssueLink(String url, String urlHash, String projectName, long issueId, long issueCode,
+                     String systemType, long typeId, String typeName, Long parentCode, IssueSnapshotFields fields,
+                     CodingWorklogSummary worklogSummary) {
+    }
+
+    record CodingWorklogSummary(BigDecimal recordedHours, int worklogCount) {
+    }
+
+    record IssueSnapshotFields(String title, String description, String developmentTeam, String definitionOfDone,
+                               BigDecimal estimatedHours, String taskType, String priority, Boolean onlineBug,
+                               String bugPriority) {
+    }
 
     record ResolvedMember(long teamId, String teamName, UserSnapshot user, List<Role> roles) {
         ResolvedMember(UserSnapshot user, List<Role> roles) {

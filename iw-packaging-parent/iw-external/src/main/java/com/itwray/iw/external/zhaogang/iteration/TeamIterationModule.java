@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.iteration;
 
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssueCodingLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
@@ -50,6 +51,10 @@ public interface TeamIterationModule {
     List<IterationTeamOption> iterationMemberOptions(Actor actor);
 
     IterationIssue addCodingIssue(Actor actor, long iterationId, CodingIssueCommand command);
+
+    IterationIssue addRootIssue(Actor actor, long iterationId, CreateChildIssueCommand command);
+
+    IterationIssue bindIssue(Actor actor, long iterationId, long issueId, IssueCodingLink command);
 
     IterationIssue addChildIssue(Actor actor, long iterationId, long parentIssueId,
                                  CreateChildIssueCommand command);

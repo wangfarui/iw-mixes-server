@@ -37,17 +37,21 @@ class IterationPrototypePersistenceTest {
         issue.setPrototypeUrl("https://example.com/stale-snapshot");
         String updateSql = configuration.getMappedStatement(ZhaogangIterationIssueMapper.class.getName() + ".updateById")
                 .getBoundSql(Map.of("et", issue)).getSql();
-        assertThat(updateSql).contains("title").doesNotContain("prototype_url");
+        assertThat(updateSql).contains("title").doesNotContain("prototype_url", "manually_linked");
 
         ZhaogangIterationIssueMapper mapper = mock(ZhaogangIterationIssueMapper.class);
         ZhaogangIterationMapper iterationMapper = mock(ZhaogangIterationMapper.class);
+        when(mapper.update(isNull(), any(Wrapper.class))).thenAnswer(invocation -> {
+            issue.setPrototypeUrl(null);
+            return 1;
+        });
         when(mapper.selectOne(any(Wrapper.class))).thenReturn(issue);
         MybatisTeamIterationRepository repository = new MybatisTeamIterationRepository(iterationMapper,
                 mock(ZhaogangIterationMemberMapper.class), mock(ZhaogangIterationMemberRoleMapper.class), mapper,
                 mock(ZhaogangIterationIssueWorklogMapper.class), mock(ZhaogangIterationReleasePlanMapper.class));
         var actor = new TeamIterationModels.Actor(100L, "tester", "", "test-token", "team");
         var updated = repository.updateIssue(1L, 2L, new TeamIterationModels.UpdateIssueCommand("需求", "描述",
-                null, null, null, null, null, null, null, ""), actor);
+                null, null, null, null, null, null, null, ""), null, actor);
         assertThat(updated.getPrototypeUrl()).isNull();
         ArgumentCaptor<LambdaUpdateWrapper<IssueEntity>> wrapper = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(mapper).update(isNull(), wrapper.capture());

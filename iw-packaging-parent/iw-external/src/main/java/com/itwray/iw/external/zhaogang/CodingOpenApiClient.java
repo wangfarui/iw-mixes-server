@@ -521,7 +521,8 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 text(parent.path("IssueTypeDetail"), "Name", "DisplayName", "TypeName"),
                 namedField(item, "开发团队", "DevelopmentTeam"),
                 namedField(item, "DoD", "DOD", "Definition of Done"),
-                namedField(item, "任务类型", "TaskType"), assigneeName, StringUtils.trimToNull(text(item, "Priority")));
+                namedField(item, "任务类型", "TaskType"), assigneeName, StringUtils.trimToNull(text(item, "Priority")),
+                namedField(item, "是否线上Bug", "是否线上 Bug"), namedField(item, "Bug优先级", "Bug 优先级"));
     }
 
     private String issueAssigneeName(JsonNode item) {

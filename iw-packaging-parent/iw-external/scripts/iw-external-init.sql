@@ -276,6 +276,7 @@ create table external_zhaogang_iteration_issue
     parent_id         bigint unsigned                       null comment '工作台父事项ID',
     source            varchar(16)                           not null comment 'CODING/WORKBENCH',
     coding_url        varchar(1000)                         null comment 'CODING事项详情链接',
+    manually_linked   tinyint(1) default 0                  not null comment '是否为人工事项补绑CODING链接',
     url_hash          char(64)                              null comment '项目与事项编号SHA-256摘要',
     project_name      varchar(128)                          not null comment 'CODING项目标识',
     issue_id          bigint unsigned                       null comment 'CODING事项ID',

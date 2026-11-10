@@ -4,6 +4,7 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssueCodingLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
@@ -31,6 +32,7 @@ import com.itwray.iw.external.zhaogang.iteration.entity.TeamIterationEntities.Me
 import com.itwray.iw.external.zhaogang.iteration.entity.TeamIterationEntities.ReleasePlanEntity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -348,6 +350,270 @@ class DefaultTeamIterationModuleTest {
                 .isEqualTo("https://g-iijw5014.coding.net/p/project-a/subtasks/issues/7783/detail");
     }
 
+    @ParameterizedTest
+    @EnumSource(CodingIssueType.class)
+    void rootIssueIsSavedLocallyWithoutCodingProject(CodingIssueType type) {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity root = localIssue(2L, 1L, type, "人工事项");
+        root.setParentId(null);
+        root.setProjectName("");
+        root.setSyncStatus(IssueSyncStatus.NOT_REQUIRED.name());
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of())));
+        when(repository.addChildIssue(eq(1L), isNull(), eq(""), eq(type), anyString(), eq("人工事项"), any(),
+                any(), any(), any(), any(), any(), any(), any(), eq(IssueSyncStatus.NOT_REQUIRED), eq(actor)))
+                .thenReturn(root);
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var created = module.addRootIssue(actor, 1L, new CreateChildIssueCommand(type, "人工事项", null,
+                root.getDevelopmentTeam(), root.getDefinitionOfDone(), root.getEstimatedHours(),
+                root.getTaskType(), root.getOnlineBug(), root.getBugPriority(), true));
+
+        assertThat(created.parentId()).isNull();
+        assertThat(created.issueType()).isEqualTo(type);
+        assertThat(created.syncStatus()).isEqualTo(IssueSyncStatus.NOT_REQUIRED);
+        assertThat(created.issueCode()).isNull();
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void directUnlinkedParentKeepsNewChildLocalEvenWhenAncestorIsLinked() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity root = linkedIssue(1L, CodingIssueType.REQUIREMENT, 7000L, "需求");
+        IssueEntity story = localIssue(2L, 1L, CodingIssueType.USER_STORY, "未关联的故事");
+        IssueEntity child = localIssue(3L, 2L, CodingIssueType.SUB_TASK, "工作台子事项");
+        child.setSyncStatus(IssueSyncStatus.NOT_REQUIRED.name());
+        child.setProjectName("");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(root, story))));
+        when(repository.addChildIssue(eq(1L), eq(2L), eq(""), eq(CodingIssueType.SUB_TASK), anyString(),
+                eq("工作台子事项"), any(), any(), any(), any(), any(), any(), any(), any(),
+                eq(IssueSyncStatus.NOT_REQUIRED), eq(actor))).thenReturn(child);
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var created = module.addChildIssue(actor, 1L, 2L, new CreateChildIssueCommand(CodingIssueType.SUB_TASK,
+                "工作台子事项", null, null, null, BigDecimal.ONE, "开发任务", null, null, true));
+
+        assertThat(created.parentId()).isEqualTo(2L);
+        assertThat(created.syncStatus()).isEqualTo(IssueSyncStatus.NOT_REQUIRED);
+        IssueEntity boundStory = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 7001L, "已关联的故事");
+        boundStory.setManuallyLinked(true);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(root, boundStory, child))));
+        assertThatThrownBy(() -> module.syncIssue(actor, 1L, 3L)).hasMessageContaining("先维护 CODING 链接");
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void unlinkedParentAutomaticallyReadsAccessibleCodingOptionsAndSavesChildLocally() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity parent = localIssue(1L, 0L, CodingIssueType.REQUIREMENT, "未关联的需求");
+        parent.setProjectName("");
+        IssueEntity child = localIssue(2L, 1L, CodingIssueType.USER_STORY, "工作台故事");
+        child.setProjectName("");
+        child.setSyncStatus(IssueSyncStatus.NOT_REQUIRED.name());
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(parent, child))));
+        when(coding.accessibleProjectNames(actor.token(), actor.userId()))
+                .thenReturn(List.of("project-a", "project-b", "project-c"));
+        var story = new CodingOpenApiPort.IssueType(11L, "用户故事", "REQUIREMENT", false);
+        var subTask = new CodingOpenApiPort.IssueType(12L, "子工作项", "SUB_TASK", true);
+        when(coding.issueTypes("token", "project-a")).thenReturn(List.of());
+        when(coding.issueTypes("token", "project-b")).thenReturn(List.of(story, subTask));
+        when(coding.issueTypes("token", "project-c")).thenReturn(List.of(story, subTask));
+        when(coding.issueFields("token", "project-b", "REQUIREMENT", 11L)).thenReturn(List.of(
+                selectField(101L, "开发团队", "基础服务组", "team-b")));
+        when(coding.issueFields("token", "project-c", "REQUIREMENT", 11L)).thenReturn(List.of(
+                selectField(102L, "DoD", "上线完成", "done")));
+        when(coding.issueFields("token", "project-b", "SUB_TASK", 12L)).thenReturn(List.of(
+                selectField(103L, "任务类型", "开发任务", "development")));
+        when(coding.issueFields("token", "project-c", "SUB_TASK", 12L)).thenReturn(List.of(
+                selectField(104L, "任务类型", "测试任务", "qa")));
+        when(repository.addChildIssue(eq(1L), eq(1L), eq(""), eq(CodingIssueType.USER_STORY),
+                anyString(), eq("工作台故事"), any(), eq("基础服务组"), eq("上线完成"), any(), any(), any(), any(),
+                any(), eq(IssueSyncStatus.NOT_REQUIRED), eq(actor))).thenReturn(child);
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var storyOptions = module.issueCreationOptions(actor, 1L, 1L, CodingIssueType.USER_STORY);
+        assertThat(storyOptions.developmentTeams()).extracting(TeamIterationModels.SelectionOption::value)
+                .containsExactly("基础服务组");
+        assertThat(storyOptions.definitionsOfDone()).extracting(TeamIterationModels.SelectionOption::value)
+                .containsExactly("上线完成");
+        var taskOptions = module.issueCreationOptions(actor, 1L, 1L, CodingIssueType.SUB_TASK);
+        assertThat(taskOptions.taskTypes()).extracting(TeamIterationModels.SelectionOption::value)
+                .containsExactly("开发任务", "测试任务");
+
+        var created = module.addChildIssue(actor, 1L, 1L, new CreateChildIssueCommand(CodingIssueType.USER_STORY,
+                "工作台故事", null, "基础服务组", "上线完成", null, null, null, null, true));
+        assertThat(created.projectName()).isEmpty();
+        assertThat(created.issueCode()).isNull();
+        assertThat(created.syncStatus()).isEqualTo(IssueSyncStatus.NOT_REQUIRED);
+        assertThat(module.issueEditOptions(actor, 1L, 2L)).isEqualTo(storyOptions);
+        verify(coding, never()).createIssue(any(), any());
+        verify(coding, never()).modifyIssue(any(), any());
+    }
+
+    @Test
+    void completeIterationProjectOptionsAvoidAnAccountWideProjectLookup() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity parent = localIssue(1L, 0L, CodingIssueType.REQUIREMENT, "本地需求");
+        parent.setProjectName("");
+        IssueEntity linked = linkedIssue(2L, CodingIssueType.REQUIREMENT, 7000L, "已关联需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(parent, linked))));
+        when(coding.issueTypes("token", "project-a")).thenReturn(List.of(
+                new CodingOpenApiPort.IssueType(11L, "用户故事", "REQUIREMENT", false)));
+        when(coding.issueFields("token", "project-a", "REQUIREMENT", 11L)).thenReturn(List.of(
+                selectField(101L, "开发团队", "基础服务组", "team-a"),
+                selectField(102L, "DoD", "上线完成", "done")));
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThat(module.issueCreationOptions(actor, 1L, 1L, CodingIssueType.USER_STORY))
+                .isEqualTo(module.issueCreationOptions(actor, 1L, 2L, CodingIssueType.USER_STORY));
+        verify(coding, never()).accessibleProjectNames(anyString(), anyLong());
+    }
+
+    @Test
+    void manuallyBindingExistingRowReadsCodingAndEnablesStatusWriteback() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity local = localIssue(2L, 1L, CodingIssueType.USER_STORY, "本地故事");
+        IssueEntity bound = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 8001L, "本地故事");
+        bound.setManuallyLinked(true);
+        local.setDescription("旧描述");
+        local.setDevelopmentTeam("旧开发团队");
+        local.setDefinitionOfDone("旧DoD");
+        var remote = new CodingOpenApiPort.Issue(8001L, "REQUIREMENT", "用户故事", 11L, "远端故事",
+                "项目 A", false, 18001L, "开发中", "PROCESSING", null, "远端描述", 9000L,
+                "project-a", "REQUIREMENT", "需求", "remote-team-id", "remote-dod-id", null);
+        when(coding.issueTypes("token", "project-a")).thenReturn(List.of(
+                new CodingOpenApiPort.IssueType(11L, "用户故事", "REQUIREMENT", false)));
+        when(coding.issueFields("token", "project-a", "REQUIREMENT", 11L)).thenReturn(List.of(
+                selectField(101L, "开发团队", "远端开发团队", "remote-team-id"),
+                selectField(102L, "DoD", "上线完成", "remote-dod-id")));
+        var command = new IssueCodingLink("https://g-iijw5014.coding.net/p/project-a/issues/8001/detail");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(local))));
+        when(coding.issue("token", "project-a", 8001L)).thenReturn(remote);
+        when(repository.bindIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+            TeamIterationRepository.IssueLink link = invocation.getArgument(2);
+            bound.setDescription(link.fields().description());
+            bound.setDevelopmentTeam(link.fields().developmentTeam());
+            bound.setDefinitionOfDone(link.fields().definitionOfDone());
+            return bound;
+        });
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var updated = module.bindIssue(actor, 1L, 2L, command);
+
+        assertThat(updated.id()).isEqualTo(2L);
+        assertThat(updated.parentId()).isEqualTo(1L);
+        assertThat(updated.syncStatus()).isEqualTo(IssueSyncStatus.SYNCED);
+        assertThat(updated.statusName()).isEqualTo(remote.statusName());
+        assertThat(updated.title()).isEqualTo("远端故事");
+        assertThat(updated.description()).isEqualTo("远端描述");
+        assertThat(updated.developmentTeam()).isEqualTo("远端开发团队");
+        assertThat(updated.definitionOfDone()).isEqualTo("上线完成");
+        verify(coding, never()).createIssue(any(), any());
+        verify(coding, never()).modifyIssue(any(), any());
+
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(bound))));
+        module.updateIssueStatus(actor, 1L, 2L, new UpdateIssueStatusCommand(9L));
+        verify(coding).modifyIssue("token", new CodingOpenApiPort.ModifyIssueRequest(
+                "project-a", 8001L, null, null, 9L, null, null, List.of()));
+        assertThatThrownBy(() -> module.bindIssue(actor, 1L, 2L, command)).hasMessageContaining("尚未关联");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void bindingSubTaskCopiesNativeTaskTypeAndWorklogSummary(boolean hasWorklogs) {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity local = localIssue(2L, 1L, CodingIssueType.SUB_TASK, "本地子工作项");
+        IssueEntity bound = linkedChild(2L, 1L, CodingIssueType.SUB_TASK, 8001L, "远端子工作项");
+        var remote = new CodingOpenApiPort.Issue(8001L, "SUB_TASK", "测试任务", 31L, "远端子工作项",
+                "项目 A", true, 18001L, "进行中", "PROCESSING", new BigDecimal("2.5"),
+                "", 9000L, "project-a", null, null, null, null, null, null, "2");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(local))));
+        when(coding.issue("token", "project-a", 8001L)).thenReturn(remote);
+        when(coding.issueTypes("token", "project-a")).thenReturn(List.of(
+                new CodingOpenApiPort.IssueType(31L, "测试任务", "SUB_TASK", true)));
+        when(coding.issueFields("token", "project-a", "SUB_TASK", 31L)).thenReturn(List.of());
+        when(coding.issueWorklogs("token", "project-a", 8001L)).thenReturn(hasWorklogs ? List.of(
+                new CodingOpenApiPort.IssueWorklog(1L, new BigDecimal("1.25"), BigDecimal.ZERO, 1L, 1L, 1L),
+                new CodingOpenApiPort.IssueWorklog(2L, new BigDecimal("0.5"), BigDecimal.ZERO, 2L, 2L, 2L)) : List.of());
+        when(repository.bindIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+            TeamIterationRepository.IssueLink link = invocation.getArgument(2);
+            bound.setCodingRecordedHours(link.worklogSummary().recordedHours());
+            bound.setCodingWorklogCount(link.worklogSummary().worklogCount());
+            return bound;
+        });
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var updated = module.bindIssue(actor, 1L, 2L, new IssueCodingLink("https://g-iijw5014.coding.net/p/project-a/issues/8001/detail"));
+
+        var link = ArgumentCaptor.forClass(TeamIterationRepository.IssueLink.class);
+        verify(repository).bindIssue(eq(1L), eq(2L), link.capture(), eq(actor));
+        assertThat(link.getValue().fields()).isEqualTo(new TeamIterationRepository.IssueSnapshotFields(
+                "远端子工作项", "", null, null, new BigDecimal("2.5"), "测试任务", "2", null, null));
+        assertThat(updated.recordedHours()).isEqualByComparingTo(hasWorklogs ? new BigDecimal("1.75") : BigDecimal.ZERO);
+        assertThat(updated.recordedWorklogCount()).isEqualTo(hasWorklogs ? 2 : 0);
+        verify(coding).issueWorklogs("token", "project-a", 8001L);
+    }
+
+    @Test
+    void bindingSubTaskKeepsItUnlinkedWhenCodingWorklogsCannotBeRead() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity local = localIssue(2L, 1L, CodingIssueType.SUB_TASK, "本地子工作项");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(local))));
+        when(coding.issue("token", "project-a", 8001L))
+                .thenReturn(codingIssue(8001L, "SUB_TASK", "子工作项", "远端子工作项", true));
+        when(coding.issueWorklogs("token", "project-a", 8001L))
+                .thenThrow(new CodingOpenApiException("工时接口暂不可用"));
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThatThrownBy(() -> module.bindIssue(actor, 1L, 2L,
+                new IssueCodingLink("https://g-iijw5014.coding.net/p/project-a/issues/8001/detail")))
+                .hasMessageContaining("读取 CODING 工时记录失败");
+        verify(repository, never()).bindIssue(anyLong(), anyLong(), any(), any());
+    }
+
+    @Test
+    void manualBindingRejectsTypeMismatchAndExistingAssociation() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity local = localIssue(2L, 1L, CodingIssueType.USER_STORY, "本地故事");
+        var command = new IssueCodingLink("https://g-iijw5014.coding.net/p/project-a/issues/8001/detail");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(local))));
+        when(coding.issue("token", "project-a", 8001L)).thenReturn(codingIssue(
+                8001L, "TASK", "任务", "远端任务", false));
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThatThrownBy(() -> module.bindIssue(actor, 1L, 2L, command)).hasMessageContaining("类型必须");
+        when(repository.findIssue(eq(1L), anyString())).thenReturn(Optional.of(local));
+        assertThatThrownBy(() -> module.bindIssue(actor, 1L, 2L, command)).hasMessageContaining("已关联到当前迭代");
+        verify(repository, never()).bindIssue(anyLong(), anyLong(), any(), any());
+    }
+
+    @Test
+    void batchRefreshIncludesManuallyBoundDefectWithoutImportingItsCodingParent() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity bound = linkedChild(2L, 1L, CodingIssueType.DEFECT, 8001L, "缺陷");
+        bound.setManuallyLinked(true);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(bound))));
+        when(repository.findIssue(eq(1L), anyString())).thenReturn(Optional.of(bound));
+        when(coding.issue("token", "project-a", 8001L)).thenReturn(new CodingOpenApiPort.Issue(
+                8001L, "DEFECT", "缺陷", 11L, "CODING 缺陷", "项目 A", true, 18001L,
+                "处理中", "PROCESSING", null, "远端描述", 9999L, "other-project", null, null, null, null, null));
+        when(repository.upsertCodingSnapshot(anyLong(), isNull(), anyString(), anyString(), anyString(), anyLong(),
+                anyLong(), eq(CodingIssueType.DEFECT), anyString(), anyLong(), anyString(), any(),
+                eq(9999L), eq(actor))).thenReturn(bound);
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThat(module.syncCodingIssues(actor, 1L).successCount()).isEqualTo(1);
+        verify(coding, never()).issue("token", "other-project", 9999L);
+    }
+
     @Test
     void childIssueCanUseAnySupportedTypeWithoutCallingCoding() {
         TeamIterationRepository repository = mock(TeamIterationRepository.class);
@@ -375,6 +641,8 @@ class DefaultTeamIterationModuleTest {
         TeamIterationRepository repository = mock(TeamIterationRepository.class);
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         IssueEntity root = linkedIssue(1L, CodingIssueType.REQUIREMENT, 7000L, "采购需求");
+        root.setSource(IssueSource.WORKBENCH.name());
+        root.setManuallyLinked(true);
         IssueEntity child = localIssue(2L, 1L, CodingIssueType.SUB_TASK, "实现接口");
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(root))));
         when(repository.addChildIssue(eq(1L), eq(1L), eq("project-a"), eq(CodingIssueType.SUB_TASK),
@@ -515,7 +783,7 @@ class DefaultTeamIterationModuleTest {
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         IssueEntity story = localIssue(2L, 1L, CodingIssueType.USER_STORY, "原用户故事");
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(story))));
-        when(repository.updateIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+        when(repository.updateIssue(eq(1L), eq(2L), any(), any(), eq(actor))).thenAnswer(invocation -> {
             UpdateIssueCommand command = invocation.getArgument(2);
             story.setTitle(command.title());
             story.setDescription(command.description());
@@ -569,7 +837,7 @@ class DefaultTeamIterationModuleTest {
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
         when(coding.modifyIssue(eq("token"), any(CodingOpenApiPort.ModifyIssueRequest.class)))
                 .thenReturn(codingIssue(8001L, "REQUIREMENT", "需求", "更新后的需求", false));
-        when(repository.updateIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+        when(repository.updateIssue(eq(1L), eq(2L), any(), any(), eq(actor))).thenAnswer(invocation -> {
             UpdateIssueCommand command = invocation.getArgument(2);
             issue.setTitle(command.title());
             issue.setDescription(command.description());
@@ -758,8 +1026,7 @@ class DefaultTeamIterationModuleTest {
                 selectField(102L, "DoD", "测试通过", "1010715")));
         IssueEntity synced = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 7778L, "用户故事");
         when(repository.upsertCodingSnapshot(anyLong(), isNull(), anyString(), anyString(), anyString(), anyLong(),
-                anyLong(), any(), anyString(), anyLong(), anyString(), anyString(), any(), any(), any(),
-                any(), any(), any(), any(), eq(actor))).thenReturn(synced);
+                anyLong(), any(), anyString(), anyLong(), anyString(), any(), any(), eq(actor))).thenReturn(synced);
 
         DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
                 new CodingIssueUrlParser());
@@ -769,7 +1036,8 @@ class DefaultTeamIterationModuleTest {
         assertThat(result.successCount()).isEqualTo(1);
         verify(repository).upsertCodingSnapshot(eq(1L), isNull(), anyString(), anyString(), eq("project-a"),
                 eq(17778L), eq(7778L), eq(CodingIssueType.USER_STORY), eq("REQUIREMENT"), eq(11L), eq("用户故事"),
-                eq("用户故事"), eq("说明"), eq("基础服务组"), eq("测试通过"), isNull(), isNull(), any(), isNull(), eq(actor));
+                eq(new TeamIterationRepository.IssueSnapshotFields("用户故事", "说明", "基础服务组", "测试通过",
+                        null, null, null, null, null)), isNull(), eq(actor));
     }
 
     @Test
@@ -807,8 +1075,7 @@ class DefaultTeamIterationModuleTest {
                 new CodingOpenApiPort.IssueWorklog(9001L, new BigDecimal("8"), BigDecimal.ZERO,
                         1787711400000L, 1787711400000L, 1787711400000L)));
         when(repository.upsertCodingSnapshot(anyLong(), isNull(), anyString(), anyString(), anyString(), anyLong(),
-                anyLong(), any(), anyString(), anyLong(), anyString(), anyString(), any(), any(), any(),
-                any(), any(), any(), any(), eq(actor))).thenReturn(subTask);
+                anyLong(), any(), anyString(), anyLong(), anyString(), any(), any(), eq(actor))).thenReturn(subTask);
         when(repository.updateCodingWorklogSummary(eq(1L), eq(2L), eq(new BigDecimal("8")), eq(1), eq(actor)))
                 .thenAnswer(invocation -> subTask);
         DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
@@ -1092,7 +1359,7 @@ class DefaultTeamIterationModuleTest {
                 new CodingOpenApiPort.IssueType(31L, "子工作项", "SUB_TASK", true)));
         when(coding.issueFields("token", "project-a", "SUB_TASK", 31L))
                 .thenReturn(List.of(selectField(201L, "任务类型", "开发", "development")));
-        when(repository.updateIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+        when(repository.updateIssue(eq(1L), eq(2L), any(), any(), eq(actor))).thenAnswer(invocation -> {
             UpdateIssueCommand command = invocation.getArgument(2);
             issue.setPriority(command.priority());
             return issue;
@@ -1110,7 +1377,7 @@ class DefaultTeamIterationModuleTest {
                 ArgumentCaptor.forClass(CodingOpenApiPort.ModifyIssueRequest.class);
         var ordered = org.mockito.Mockito.inOrder(coding, repository);
         ordered.verify(coding).modifyIssue(eq("token"), request.capture());
-        ordered.verify(repository).updateIssue(eq(1L), eq(2L), any(), eq(actor));
+        ordered.verify(repository).updateIssue(eq(1L), eq(2L), any(), any(), eq(actor));
         assertThat(request.getValue().priority()).isEqualTo(priority);
     }
 
@@ -1130,9 +1397,9 @@ class DefaultTeamIterationModuleTest {
                 new CodingOpenApiPort.IssueType(31L, "子工作项", "SUB_TASK", true)));
         when(coding.issueFields("token", "project-a", "SUB_TASK", 31L)).thenReturn(List.of());
         when(repository.upsertCodingSnapshot(anyLong(), isNull(), anyString(), anyString(), anyString(), anyLong(),
-                anyLong(), any(), anyString(), anyLong(), anyString(), anyString(), any(), any(), any(),
-                any(), any(), any(), any(), eq(actor))).thenAnswer(invocation -> {
-            issue.setPriority(invocation.getArgument(17));
+                anyLong(), any(), anyString(), anyLong(), anyString(), any(), any(), eq(actor))).thenAnswer(invocation -> {
+            TeamIterationRepository.IssueSnapshotFields fields = invocation.getArgument(11);
+            issue.setPriority(fields.priority());
             return issue;
         });
         when(repository.updateCodingWorklogSummary(eq(1L), eq(2L), any(), eq(0), eq(actor))).thenReturn(issue);
@@ -1166,7 +1433,7 @@ class DefaultTeamIterationModuleTest {
         assertThatThrownBy(() -> module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("实现接口", null,
                 null, null, new BigDecimal("8"), "开发", null, null, "1")))
                 .isInstanceOf(TeamIterationException.class);
-        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any(), any());
         assertThat(issue.getPriority()).isEqualTo("0");
     }
 
@@ -1177,7 +1444,7 @@ class DefaultTeamIterationModuleTest {
         IssueEntity issue = localIssue(2L, 1L, CodingIssueType.SUB_TASK, "实现接口");
         issue.setPriority("1");
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
-        when(repository.updateIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+        when(repository.updateIssue(eq(1L), eq(2L), any(), any(), eq(actor))).thenAnswer(invocation -> {
             UpdateIssueCommand command = invocation.getArgument(2);
             issue.setPriority(command.priority());
             return issue;
@@ -1209,7 +1476,7 @@ class DefaultTeamIterationModuleTest {
                 "实现接口", null, null, null, new BigDecimal("8"), "开发", null, null, "4")))
                 .hasMessageContaining("优先级");
         verifyNoInteractions(coding);
-        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any(), any());
     }
 
     @ParameterizedTest
@@ -1225,7 +1492,7 @@ class DefaultTeamIterationModuleTest {
 
         assertThat(result.prototypeUrl()).isEqualTo(url);
         verify(repository).updateIssuePrototypeUrl(1L, 2L, url, actor);
-        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any(), any());
         verifyNoInteractions(coding);
     }
 
@@ -1283,7 +1550,7 @@ class DefaultTeamIterationModuleTest {
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         IssueEntity issue = localIssue(2L, 1L, CodingIssueType.REQUIREMENT, "需求");
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue))));
-        when(repository.updateIssue(eq(1L), eq(2L), any(), eq(actor))).thenAnswer(invocation -> {
+        when(repository.updateIssue(eq(1L), eq(2L), any(), any(), eq(actor))).thenAnswer(invocation -> {
             UpdateIssueCommand command = invocation.getArgument(2);
             if (command.prototypeUrl() != null) issue.setPrototypeUrl(command.prototypeUrl().isEmpty() ? null : command.prototypeUrl());
             return issue;
@@ -1310,7 +1577,7 @@ class DefaultTeamIterationModuleTest {
         DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
         assertThatThrownBy(() -> module.updateIssue(actor, 1L, 2L, new UpdateIssueCommand("需求", "描述", null, null,
                 null, null, null, null, null, "javascript:alert(1)"))).hasMessageContaining("HTTP/HTTPS");
-        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any());
+        verify(repository, never()).updateIssue(anyLong(), anyLong(), any(), any(), any());
         verifyNoInteractions(coding);
     }
 

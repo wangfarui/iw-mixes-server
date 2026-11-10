@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.iteration;
 
+import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueField;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueType;
@@ -12,10 +13,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** 按项目缓存 CODING 事项类型和字段目录，业务层只使用稳定的中文业务值。 */
@@ -52,6 +56,62 @@ class CodingIssueMetadataCatalog {
                 bugPriorityOptions(metadata));
     }
 
+    IssueCreationOptions localCreationOptions(String token, long userId, CodingIssueType type,
+                                             Set<String> contextualProjects) {
+        var results = new ArrayList<IssueCreationOptions>();
+        var failures = new ArrayList<RuntimeException>();
+        readProjectOptions(token, type, contextualProjects, results, failures);
+        IssueCreationOptions options = mergeOptions(type, results);
+        if (hasRequiredOptions(options)) return options;
+
+        try {
+            List<String> otherProjects = coding.accessibleProjectNames(token, userId).stream()
+                    .filter(StringUtils::isNotBlank)
+                    .filter(project -> !contextualProjects.contains(project))
+                    .distinct().sorted().toList();
+            readProjectOptions(token, type, otherProjects, results, failures);
+        } catch (CodingOpenApiException error) {
+            failures.add(error);
+        }
+        if (results.isEmpty() && !failures.isEmpty()) throw failures.get(0);
+        return mergeOptions(type, results);
+    }
+
+    private void readProjectOptions(String token, CodingIssueType type, Iterable<String> projects,
+                                    List<IssueCreationOptions> results, List<RuntimeException> failures) {
+        for (String project : projects) {
+            try {
+                results.add(creationOptions(token, project, type));
+            } catch (CodingOpenApiException | TeamIterationException error) {
+                failures.add(error);
+            }
+        }
+    }
+
+    private IssueCreationOptions mergeOptions(CodingIssueType type, List<IssueCreationOptions> results) {
+        var teams = new LinkedHashSet<SelectionOption>();
+        var definitionsOfDone = new LinkedHashSet<SelectionOption>();
+        var taskTypes = new LinkedHashSet<SelectionOption>();
+        var bugPriorities = new LinkedHashSet<SelectionOption>();
+        for (IssueCreationOptions result : results) {
+            teams.addAll(result.developmentTeams());
+            definitionsOfDone.addAll(result.definitionsOfDone());
+            taskTypes.addAll(result.taskTypes());
+            bugPriorities.addAll(result.bugPriorities());
+        }
+        return new IssueCreationOptions(type, List.copyOf(teams), List.copyOf(definitionsOfDone),
+                List.copyOf(taskTypes), List.copyOf(bugPriorities));
+    }
+
+    private boolean hasRequiredOptions(IssueCreationOptions options) {
+        return switch (options.issueType()) {
+            case USER_STORY -> !options.developmentTeams().isEmpty() && !options.definitionsOfDone().isEmpty();
+            case SUB_TASK -> !options.taskTypes().isEmpty();
+            case DEFECT -> !options.bugPriorities().isEmpty();
+            default -> true;
+        };
+    }
+
     CodingOpenApiPort.CustomFieldValue customValue(IssueMetadata metadata, String businessValue,
                                                     String... fieldNames) {
         if (StringUtils.isBlank(businessValue)) return null;
@@ -68,10 +128,30 @@ class CodingIssueMetadataCatalog {
         if (StringUtils.isBlank(codingValue)) return codingValue;
         try {
             return displayValue(metadata(token, projectName, type), codingValue, fieldNames);
-        } catch (TeamIterationException ignored) {
+        } catch (CodingOpenApiException | TeamIterationException ignored) {
             // 字段目录不可用时保留 CODING 原值，避免同步过程中把本地值静默清空。
             return codingValue;
         }
+    }
+
+    String taskTypeValue(String token, String projectName, CodingOpenApiPort.Issue issue) {
+        CodingIssueType type = CodingIssueType.SUB_TASK;
+        if (StringUtils.isNotBlank(issue.taskType())) {
+            return displayValue(token, projectName, type, issue.taskType(), "任务类型");
+        }
+        try {
+            IssueMetadata metadata = metadata(token, projectName, type);
+            if (findField(metadata, "任务类型") == null) {
+                return metadata.allTypes().stream()
+                        .filter(item -> matches(item, type))
+                        .filter(item -> issue.issueTypeId() > 0 ? item.id() == issue.issueTypeId()
+                                : StringUtils.equals(item.name(), issue.typeName()))
+                        .map(CodingOpenApiPort.IssueType::name).findFirst().orElse(null);
+            }
+        } catch (CodingOpenApiException | TeamIterationException ignored) {
+            // 仅在 CODING 项目确认以原生事项类型区分任务时使用事项类型名。
+        }
+        return null;
     }
 
     private String displayValue(IssueMetadata metadata, String codingValue, String... fieldNames) {

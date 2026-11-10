@@ -164,6 +164,23 @@ class CodingOpenApiClientTest {
     }
 
     @Test
+    void issueReadsDefectFieldsFromCodingCustomFields() throws Exception {
+        CodingOpenApiClient client = client(exchange -> respond(exchange, """
+                {"Response":{"Issue":{"Code":7778,"Name":"缺陷","Type":"DEFECT","Priority":"2",
+                  "CustomFieldValues":[
+                    {"Name":"是否线上 Bug","Value":"online","DisplayValue":"是"},
+                    {"Name":"Bug 优先级","Value":"urgent","DisplayValue":"紧急"}
+                  ]}}}
+                """));
+
+        CodingOpenApiPort.Issue issue = client.issue("test-token", "project-a", 7778L);
+
+        assertEquals("是", issue.onlineBug());
+        assertEquals("紧急", issue.bugPriority());
+        assertEquals("2", issue.priority());
+    }
+
+    @Test
     void createIssueUsesParentOnlyForSubTasks() throws Exception {
         List<JsonNode> requests = new java.util.ArrayList<>();
         CodingOpenApiClient client = client(exchange -> {

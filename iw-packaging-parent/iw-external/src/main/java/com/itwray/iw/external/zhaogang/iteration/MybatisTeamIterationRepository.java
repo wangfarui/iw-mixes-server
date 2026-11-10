@@ -25,6 +25,7 @@ import com.itwray.iw.external.zhaogang.iteration.entity.TeamIterationEntities.Me
 import com.itwray.iw.external.zhaogang.iteration.entity.TeamIterationEntities.MemberRoleEntity;
 import com.itwray.iw.external.zhaogang.iteration.entity.TeamIterationEntities.ReleasePlanEntity;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -198,7 +199,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
 
     @Override
     @Transactional
-    public IssueEntity addChildIssue(long iterationId, long parentId, String projectName, CodingIssueType issueType,
+    public IssueEntity addChildIssue(long iterationId, Long parentId, String projectName, CodingIssueType issueType,
                                      String issueTypeName, String title, String description, String developmentTeam,
                                      String definitionOfDone, BigDecimal estimatedHours, String taskType,
                                      Boolean onlineBug, String bugPriority, String priority, IssueSyncStatus syncStatus, Actor actor) {
@@ -228,6 +229,56 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     }
 
     @Override
+    @Transactional
+    public IssueEntity bindIssue(long iterationId, long issueId, IssueLink link, Actor actor) {
+        IssueSnapshotFields fields = link.fields();
+        LambdaUpdateWrapper<IssueEntity> update = new LambdaUpdateWrapper<IssueEntity>()
+                .eq(IssueEntity::getIterationId, iterationId)
+                .eq(IssueEntity::getId, issueId)
+                .eq(IssueEntity::getSource, IssueSource.WORKBENCH.name())
+                .isNull(IssueEntity::getCodingUrl)
+                .isNull(IssueEntity::getIssueCode)
+                .ne(IssueEntity::getSyncStatus, IssueSyncStatus.SYNCING.name())
+                .set(IssueEntity::getCodingUrl, link.url())
+                .set(IssueEntity::getManuallyLinked, true)
+                .set(IssueEntity::getUrlHash, link.urlHash())
+                .set(IssueEntity::getProjectName, link.projectName())
+                .set(IssueEntity::getIssueId, link.issueId())
+                .set(IssueEntity::getIssueCode, link.issueCode())
+                .set(IssueEntity::getCodingSystemType, link.systemType())
+                .set(IssueEntity::getCodingIssueTypeId, link.typeId() > 0 ? link.typeId() : null)
+                .set(IssueEntity::getIssueTypeName, link.typeName())
+                .set(IssueEntity::getCodingParentCode, link.parentCode())
+                .set(IssueEntity::getTitle, fields.title())
+                .set(IssueEntity::getDescription, StringUtils.defaultIfBlank(fields.description(), null))
+                .set(IssueEntity::getDevelopmentTeam, fields.developmentTeam())
+                .set(IssueEntity::getDefinitionOfDone, fields.definitionOfDone())
+                .set(IssueEntity::getEstimatedHours, fields.estimatedHours())
+                .set(IssueEntity::getTaskType, fields.taskType())
+                .set(IssueEntity::getPriority, fields.priority())
+                .set(IssueEntity::getOnlineBug, fields.onlineBug())
+                .set(IssueEntity::getBugPriority, fields.bugPriority())
+                .set(IssueEntity::getSyncStatus, IssueSyncStatus.SYNCED.name())
+                .set(IssueEntity::getSyncMessage, null)
+                .set(IssueEntity::getSyncErrorCode, null)
+                .set(IssueEntity::getSyncStartedAt, null)
+                .set(IssueEntity::getSyncedAt, LocalDateTime.now());
+        if (link.worklogSummary() != null) {
+            update.set(IssueEntity::getCodingRecordedHours, link.worklogSummary().recordedHours())
+                    .set(IssueEntity::getCodingWorklogCount, link.worklogSummary().worklogCount());
+        }
+        int changed;
+        try {
+            changed = issueMapper.update(null, update);
+        } catch (DuplicateKeyException error) {
+            throw new TeamIterationException("该 CODING 事项已关联到当前迭代", error);
+        }
+        if (changed == 0) throw new TeamIterationException("事项的关联状态已变化，请刷新后重试");
+        iterationMapper.touch(iterationId, actor.userId(), actor.userName());
+        return findIssue(iterationId, issueId).orElseThrow(() -> new TeamIterationException("事项不存在"));
+    }
+
+    @Override
     public Optional<IssueEntity> findIssue(long iterationId, String urlHash) {
         return Optional.ofNullable(issueMapper.selectOne(new LambdaQueryWrapper<IssueEntity>()
                 .eq(IssueEntity::getIterationId, iterationId)
@@ -243,25 +294,30 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
 
     @Override
     @Transactional
-    public IssueEntity updateIssue(long iterationId, long issueId, UpdateIssueCommand command, Actor actor) {
-        IssueEntity entity = findIssue(iterationId, issueId)
-                .orElseThrow(() -> new TeamIterationException("事项不存在"));
-        entity.setTitle(command.title());
-        entity.setDescription(command.description());
-        entity.setDevelopmentTeam(command.developmentTeam());
-        entity.setDefinitionOfDone(command.definitionOfDone());
-        entity.setEstimatedHours(command.estimatedHours());
-        entity.setTaskType(command.taskType());
-        entity.setPriority(command.priority());
-        entity.setOnlineBug(command.onlineBug());
-        entity.setBugPriority(command.bugPriority());
-        issueMapper.updateById(entity);
-        if (command.prototypeUrl() != null) {
-            writePrototypeUrl(iterationId, issueId, command.prototypeUrl());
-            entity.setPrototypeUrl(StringUtils.trimToNull(command.prototypeUrl()));
+    public IssueEntity updateIssue(long iterationId, long issueId, UpdateIssueCommand command,
+                            Long expectedIssueCode, Actor actor) {
+        LambdaUpdateWrapper<IssueEntity> update = new LambdaUpdateWrapper<IssueEntity>()
+                .eq(IssueEntity::getIterationId, iterationId)
+                .eq(IssueEntity::getId, issueId)
+                .ne(IssueEntity::getSyncStatus, IssueSyncStatus.SYNCING.name())
+                .isNull(expectedIssueCode == null, IssueEntity::getIssueCode)
+                .eq(expectedIssueCode != null, IssueEntity::getIssueCode, expectedIssueCode)
+                .set(IssueEntity::getTitle, command.title())
+                .set(command.description() != null, IssueEntity::getDescription, command.description())
+                .set(command.developmentTeam() != null, IssueEntity::getDevelopmentTeam, command.developmentTeam())
+                .set(command.definitionOfDone() != null, IssueEntity::getDefinitionOfDone, command.definitionOfDone())
+                .set(command.estimatedHours() != null, IssueEntity::getEstimatedHours, command.estimatedHours())
+                .set(command.taskType() != null, IssueEntity::getTaskType, command.taskType())
+                .set(command.priority() != null, IssueEntity::getPriority, command.priority())
+                .set(command.onlineBug() != null, IssueEntity::getOnlineBug, command.onlineBug())
+                .set(command.bugPriority() != null, IssueEntity::getBugPriority, command.bugPriority())
+                .set(command.prototypeUrl() != null, IssueEntity::getPrototypeUrl,
+                        StringUtils.trimToNull(command.prototypeUrl()));
+        if (issueMapper.update(null, update) == 0) {
+            throw new TeamIterationException("事项的关联或同步状态已变化，请刷新后重试");
         }
         iterationMapper.touch(iterationId, actor.userId(), actor.userName());
-        return entity;
+        return findIssue(iterationId, issueId).orElseThrow(() -> new TeamIterationException("事项不存在"));
     }
 
     @Override
@@ -327,14 +383,14 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     public IssueEntity upsertCodingSnapshot(long iterationId, Long parentId, String url, String urlHash,
                                              String projectName, long codingIssueId, long codingIssueCode,
                                              CodingIssueType issueType, String codingSystemType,
-                                             long codingIssueTypeId, String issueTypeName, String title,
-                                             String description, String developmentTeam, String definitionOfDone,
-                                             BigDecimal estimatedHours, String taskType, String priority, Long codingParentCode,
-                                             Actor actor) {
+                                             long codingIssueTypeId, String issueTypeName, IssueSnapshotFields fields,
+                                             Long codingParentCode, Actor actor) {
         IssueEntity entity = findIssue(iterationId, urlHash).orElseGet(IssueEntity::new);
         entity.setIterationId(iterationId);
-        entity.setParentId(parentId);
-        entity.setSource(IssueSource.CODING.name());
+        if (!Boolean.TRUE.equals(entity.getManuallyLinked())) {
+            entity.setParentId(parentId);
+            entity.setSource(IssueSource.CODING.name());
+        }
         entity.setCodingUrl(url);
         entity.setUrlHash(urlHash);
         entity.setProjectName(projectName);
@@ -344,13 +400,15 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setCodingSystemType(codingSystemType);
         entity.setCodingIssueTypeId(codingIssueTypeId > 0 ? codingIssueTypeId : null);
         entity.setIssueTypeName(issueTypeName);
-        entity.setTitle(title);
-        entity.setPriority(priority);
-        entity.setDescription(description);
-        entity.setDevelopmentTeam(developmentTeam);
-        entity.setDefinitionOfDone(definitionOfDone);
-        entity.setEstimatedHours(estimatedHours);
-        entity.setTaskType(taskType);
+        entity.setTitle(fields.title());
+        entity.setPriority(fields.priority());
+        entity.setDescription(fields.description());
+        entity.setDevelopmentTeam(fields.developmentTeam());
+        entity.setDefinitionOfDone(fields.definitionOfDone());
+        entity.setEstimatedHours(fields.estimatedHours());
+        entity.setTaskType(fields.taskType());
+        entity.setOnlineBug(fields.onlineBug());
+        entity.setBugPriority(fields.bugPriority());
         entity.setSyncStatus(IssueSyncStatus.SYNCED.name());
         entity.setSyncMessage(null);
         entity.setSyncErrorCode(null);

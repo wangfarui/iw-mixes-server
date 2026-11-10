@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang;
 
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssueCodingLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
@@ -130,6 +131,20 @@ public class ZhaogangIterationController {
                                                           @RequestBody CodingIssueCommand command,
                                                           HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(module.addCodingIssue(actor(request, response), iterationId, command));
+    }
+
+    @PostMapping("/iterations/{iterationId}/issues")
+    public GeneralResponse<IterationIssue> addRootIssue(@PathVariable long iterationId,
+                                                        @RequestBody CreateChildIssueCommand command,
+                                                        HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.addRootIssue(actor(request, response), iterationId, command));
+    }
+
+    @PutMapping("/iterations/{iterationId}/issues/{issueId}/coding-link")
+    public GeneralResponse<IterationIssue> bindIssue(@PathVariable long iterationId, @PathVariable long issueId,
+                                                     @RequestBody IssueCodingLink command,
+                                                     HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.bindIssue(actor(request, response), iterationId, issueId, command));
     }
 
     @PostMapping("/iterations/{iterationId}/issues/{parentIssueId}/children")

@@ -112,6 +112,9 @@ public final class TeamIterationModels {
         }
     }
 
+    public record IssueCodingLink(String url) {
+    }
+
     public record CreateChildIssueCommand(CodingIssueType issueType, String title, String description,
                                           String developmentTeam, String definitionOfDone,
                                           BigDecimal estimatedHours, String taskType,
