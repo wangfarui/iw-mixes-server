@@ -131,7 +131,11 @@ public final class CodeStatsModels {
     public record Page(int pageNumber, int pageSize, long totalRow, int totalPage) {
     }
 
-    public record Entry(String sha, String shortSha, String commitAt, String projectName,
+    public enum EntrySort { COMMIT_AT, ADDITIONS, DELETIONS, FILES_CHANGED }
+
+    public enum SortDirection { ASC, DESC }
+
+    public record Entry(long depotId, String sha, String shortSha, String commitAt, String projectName,
                         String projectDisplayName, String depotName, List<String> branches, int branchCount,
                         boolean branchTruncated, String message, Long additions, Long deletions,
                         Integer filesChanged, String diffStatus, String commitUrl) {
@@ -140,9 +144,10 @@ public final class CodeStatsModels {
         }
     }
 
-    public record EntryPage(Range range, Page page, List<Entry> items) {
+    public record EntryPage(Range range, Page page, List<Entry> items, List<Repository> repositories) {
         public EntryPage {
             items = items == null ? List.of() : List.copyOf(items);
+            repositories = repositories == null ? List.of() : List.copyOf(repositories);
         }
     }
 

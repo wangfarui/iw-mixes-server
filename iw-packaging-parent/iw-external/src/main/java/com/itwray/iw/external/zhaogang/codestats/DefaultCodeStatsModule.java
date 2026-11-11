@@ -129,14 +129,17 @@ class DefaultCodeStatsModule implements CodeStatsModule {
     }
 
     @Override
-    public EntryPage entries(Context context, String from, String to, Long depotId, String keyword, int pageNumber,
-                             int pageSize, boolean refresh) {
-        ScopeInfo info = directory.resolve(context, Scope.SELF, null);
+    public EntryPage entries(Context context, String from, String to, String scopeValue, Long workbenchTeamId,
+                             Long memberUserId, Long depotId, String keyword, int pageNumber, int pageSize,
+                             CodeStatsModels.EntrySort sortBy, CodeStatsModels.SortDirection sortOrder, boolean refresh) {
+        ScopeInfo info = directory.resolve(context, parseScope(scopeValue), workbenchTeamId);
+        long targetMemberId = CodeStatsQueryService.entryMemberId(info, memberUserId);
         CodeRange range = CodeRange.parse(from, to, properties.getCodeStatsRetentionMonths(), clock);
         String safeKeyword = CodeStatsSupport.truncate(StringUtils.trimToEmpty(keyword), 100);
         int safePage = Math.max(1, pageNumber);
         int safeSize = Math.max(1, Math.min(100, pageSize));
-        String key = "entries:" + cache.scopeKey(info) + ":" + range.from() + ":" + range.to() + ":"
+        String key = "entries-v2:" + cache.scopeKey(info) + ":" + targetMemberId + ":"
+                + range.from() + ":" + range.to() + ":" + sortBy + ":" + sortOrder + ":"
                 + (depotId == null ? "" : depotId) + ":" + safeKeyword + ":" + safePage + ":" + safeSize + ":"
                 + versions(info, range);
         ScanState scan = scanService.scanState(info, range);
@@ -146,7 +149,7 @@ class DefaultCodeStatsModule implements CodeStatsModule {
             Optional<EntryPage> cached = cache.get(key, EntryPage.class);
             if (cached.isPresent()) return cached.get();
         }
-        EntryPage result = queryService.entries(info, range, depotId, safeKeyword, safePage, safeSize);
+        EntryPage result = queryService.entries(info, range, targetMemberId, depotId, safeKeyword, safePage, safeSize, sortBy, sortOrder);
         if (stable) cache.put(key, result);
         return result;
     }

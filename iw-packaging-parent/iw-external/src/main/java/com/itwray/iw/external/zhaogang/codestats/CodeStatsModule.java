@@ -25,8 +25,9 @@ public interface CodeStatsModule {
     MemberStatistics memberStatistics(Context context, String from, String to, long workbenchTeamId,
                                       long memberUserId);
 
-    EntryPage entries(Context context, String from, String to, Long depotId, String keyword, int pageNumber,
-                      int pageSize, boolean refresh);
+    EntryPage entries(Context context, String from, String to, String scope, Long workbenchTeamId,
+                      Long memberUserId, Long depotId, String keyword, int pageNumber, int pageSize,
+                      CodeStatsModels.EntrySort sortBy, CodeStatsModels.SortDirection sortOrder, boolean refresh);
 
     ScanState scan(Context context, String from, String to, String scope, Long workbenchTeamId);
 

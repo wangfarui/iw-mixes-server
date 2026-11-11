@@ -69,18 +69,23 @@ public class ZhaogangCodeStatsController {
     }
 
     @GetMapping("/entries")
-    @Operation(summary = "分页查询我的提交明细")
+    @Operation(summary = "分页查询本人或团队指定成员的提交明细")
     public GeneralResponse<CodeStatsModels.EntryPage> entries(@RequestParam @NotBlank String from,
                                                               @RequestParam @NotBlank String to,
+                                                              @RequestParam(defaultValue = "SELF") String scope,
+                                                              @RequestParam(required = false) @Min(1) Long workbenchTeamId,
+                                                              @RequestParam(required = false) @Min(1) Long memberUserId,
                                                               @RequestParam(required = false) Long depotId,
                                                               @RequestParam(required = false) @Size(max = 100) String keyword,
                                                               @RequestParam(defaultValue = "1") int pageNumber,
                                                               @RequestParam(defaultValue = "20") int pageSize,
+                                                              @RequestParam(defaultValue = "COMMIT_AT") CodeStatsModels.EntrySort sortBy,
+                                                              @RequestParam(defaultValue = "DESC") CodeStatsModels.SortDirection sortOrder,
                                                               @RequestParam(defaultValue = "false") boolean refresh,
                                                               HttpServletRequest request,
                                                               HttpServletResponse response) {
-        return GeneralResponse.success(module.entries(context(request, response), from, to, depotId, keyword,
-                pageNumber, pageSize, refresh));
+        return GeneralResponse.success(module.entries(context(request, response), from, to, scope, workbenchTeamId,
+                memberUserId, depotId, keyword, pageNumber, pageSize, sortBy, sortOrder, refresh));
     }
 
     @GetMapping("/scan")

@@ -11,6 +11,8 @@ import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Schedule;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarResolver;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Coverage;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.EntryPage;
+import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.EntrySort;
+import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.SortDirection;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.MemberMonthly;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanMonth;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanProgress;
@@ -164,14 +166,85 @@ class CodeStatsQueryServiceTest {
                         withMessage(commit("s3", "e9", "n9", "2026-10-04T10:00:00", "OK", 1, 1, 1, "main"),
                                 "其他作者")));
 
-        EntryPage page = service.entries(scope, range, null, "库存", 1, 1);
+        EntryPage page = service.entries(scope, range, null, null, "库存", 1, 1, EntrySort.COMMIT_AT, SortDirection.DESC);
 
         assertEquals(1, page.page().totalRow());
         assertEquals(1, page.items().size());
         assertEquals("s1", page.items().get(0).sha());
         assertEquals(100L, page.items().get(0).additions());
         assertFalse(page.items().get(0).branchTruncated());
-        assertNull(service.entries(scope, range, 999L, null, 1, 20).items().stream().findFirst().orElse(null));
+        assertNull(service.entries(scope, range, null, 999L, null, 1, 20, EntrySort.COMMIT_AT, SortDirection.DESC).items().stream().findFirst().orElse(null));
+    }
+
+    @Test
+    void memberEntriesUseTeamIdentityMappingsAndKeepRepositoryOptionsAcrossFilters() {
+        when(identityMapper.selectByScope(100L, "SELF", 1L))
+                .thenReturn(List.of(mapping("EMAIL", "e1", 1L, false)));
+        when(identityMapper.selectByScope(100L, "SELF", 2L))
+                .thenReturn(List.of(mapping("EMAIL", "e2", 2L, false), mapping("EMAIL", "manual", 2L, false),
+                        mapping("EMAIL", "ignored", 2L, true)));
+        when(commitMapper.selectForRange(100L, "WORKBENCH_TEAM", 9L, range.from(), range.to()))
+                .thenReturn(List.of(
+                        commit("s1", "e1", "n1", "2026-10-02T10:00:00", "OK", 900, 20, 2, "main"),
+                        withMessage(commit("s2", "e2", "n2", "2026-10-03T10:00:00", "OK", 10, 2, 1, "main"), "Fix ORDER"),
+                        withMessage(commit("manual", "manual", "n3", "2026-10-04T10:00:00", "OK", 40, 3, 3, "main"), "fix order mapping"),
+                        commit("ignored", "ignored", "ignored", "2026-10-05T10:00:00", "OK", 800, 2, 1, "main"),
+                        commit("unknown", "unknown", "unknown", "2026-10-06T10:00:00", "OK", 800, 2, 1, "main")));
+        EntryPage first = service.entries(teamScope(), range, 2L, null, " ORDER ", 1, 1, EntrySort.ADDITIONS, SortDirection.DESC);
+        assertEquals(2, first.page().totalRow());
+        assertEquals(2, first.page().totalPage());
+        assertEquals("manual", first.items().get(0).sha());
+        assertEquals("s2", service.entries(teamScope(), range, 2L, null, "order", 2, 1,
+                EntrySort.ADDITIONS, SortDirection.DESC).items().get(0).sha());
+        EntryPage filtered = service.entries(teamScope(), range, 2L, 2L, "ORDER", 1, 20,
+                EntrySort.COMMIT_AT, SortDirection.DESC);
+        assertEquals(List.of("s2"), filtered.items().stream().map(CodeStatsModels.Entry::sha).toList());
+        assertEquals(2, filtered.repositories().size());
+        assertEquals(List.of("s1"), service.entries(teamScope(), range, 1L, null, null, 1, 20,
+                EntrySort.COMMIT_AT, SortDirection.DESC).items().stream().map(CodeStatsModels.Entry::sha).toList());
+        assertTrue(service.entries(teamScope(), range, 3L, null, null, 1, 20,
+                EntrySort.COMMIT_AT, SortDirection.DESC).items().isEmpty());
+        EntryPage empty = service.entries(teamScope(), range, 2L, 2L, "no match", 1, 20,
+                EntrySort.COMMIT_AT, SortDirection.DESC);
+        assertEquals(0, empty.page().totalRow());
+        assertEquals(2, empty.repositories().size());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "COMMIT_AT,ASC,old|new|unknown", "COMMIT_AT,DESC,unknown|new|old",
+            "ADDITIONS,ASC,new|old|unknown", "ADDITIONS,DESC,old|new|unknown",
+            "DELETIONS,ASC,old|new|unknown", "DELETIONS,DESC,new|old|unknown",
+            "FILES_CHANGED,ASC,new|old|unknown", "FILES_CHANGED,DESC,old|new|unknown"
+    })
+    void entriesSortEntireResultBeforePagingAndLeaveUnknownMetricsLast(EntrySort field, SortDirection order,
+                                                                      String expected) {
+        when(identityMapper.selectByScope(100L, "SELF", 1L))
+                .thenReturn(List.of(mapping("EMAIL", "e1", 1L, false)));
+        // FAILED can retain stale raw numbers; sort what the UI actually displays (null), not those numbers.
+        when(commitMapper.selectForRange(anyLong(), anyString(), anyLong(), any(), any())).thenReturn(List.of(
+                commit("old", "e1", "n1", "2026-10-02T10:00:00", "OK", 100, 2, 8, "main"),
+                commit("new", "e1", "n1", "2026-10-03T10:00:00", "OK", 10, 20, 1, "main"),
+                commit("unknown", "e1", "n1", "2026-10-04T10:00:00", "FAILED", 999, 999, 999, "main")));
+        List<String> actual = new ArrayList<>();
+        for (int page = 1; page <= 3; page++) {
+            EntryPage result = service.entries(selfScope(), range, null, null, null, page, 1, field, order);
+            assertEquals(3, result.page().totalRow());
+            actual.add(result.items().get(0).sha());
+        }
+        assertEquals(List.of(expected.split("\\|")), actual);
+        assertTrue(service.entries(selfScope(), range, null, null, null, Integer.MAX_VALUE, 100, field, order)
+                .items().isEmpty());
+    }
+
+    @Test
+    void memberEntriesRejectMissingNonDeveloperAndOtherTeamsMembersAndSelfImpersonation() {
+        for (Long member : new Long[]{null, 4L, 5L, 6L, 999L}) {
+            assertThrows(CodingOpenApiException.class, () -> service.entries(teamScope(), range, member,
+                    null, null, 1, 20, EntrySort.COMMIT_AT, SortDirection.DESC));
+        }
+        assertThrows(CodingOpenApiException.class, () -> service.entries(selfScope(), range, 2L,
+                null, null, 1, 20, EntrySort.COMMIT_AT, SortDirection.DESC));
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -232,7 +305,7 @@ class CodeStatsQueryServiceTest {
         assertEquals(0, mine.coverage().failedDiffCount());
         assertEquals(1D, mine.coverage().diffCoverage());
         assertFalse(mine.coverage().partial());
-        var entry = service.entries(selfScope(), range, 999L, null, 1, 20).items().get(0);
+        var entry = service.entries(selfScope(), range, null, 999L, null, 1, 20, EntrySort.COMMIT_AT, SortDirection.DESC).items().get(0);
         assertEquals("SKIPPED_REPOSITORY", entry.diffStatus());
         assertNull(entry.additions()); assertNull(entry.deletions()); assertNull(entry.filesChanged());
         TeamStatistics team = service.teamStatistics(teamScope(), range, completedScan(), false, true);

@@ -133,8 +133,24 @@ class CodeStatsQueryService {
                 daily(range, mine, scope.codingTeamId()));
     }
 
-    EntryPage entries(CodeStatsModule.ScopeInfo scope, CodeRange range, Long depotId, String keyword,
-                      int pageNumber, int pageSize) {
+    static long entryMemberId(CodeStatsModule.ScopeInfo scope, Long memberUserId) {
+        if (scope.scope() == Scope.SELF) {
+            if (memberUserId != null && memberUserId != scope.scopeId()) {
+                throw new CodingOpenApiException("个人范围只允许查询本人的提交明细");
+            }
+            return scope.scopeId();
+        }
+        if (memberUserId == null || scope.developmentMembers().stream()
+                .noneMatch(member -> member.userId() == memberUserId)) {
+            throw new CodingOpenApiException("指定成员不在当前团队代码统计范围内");
+        }
+        return memberUserId;
+    }
+
+    EntryPage entries(CodeStatsModule.ScopeInfo scope, CodeRange range, Long memberUserId, Long depotId,
+                      String keyword, int pageNumber, int pageSize, CodeStatsModels.EntrySort sortBy,
+                      CodeStatsModels.SortDirection sortOrder) {
+        long targetMemberId = entryMemberId(scope, memberUserId);
         Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
         String normalizedKeyword = StringUtils.trimToEmpty(keyword).toLowerCase(Locale.ROOT);
         List<CommitEntity> mine = commits(scope, range).stream()
@@ -142,20 +158,38 @@ class CodeStatsQueryService {
                     CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex,
                             commit.getAuthorEmailHash(), commit.getAuthorNameKey());
                     return !resolved.ignored() && resolved.memberId() != null
-                            && resolved.memberId() == scope.scopeId();
-                })
+                            && resolved.memberId() == targetMemberId;
+                }).toList();
+        List<Entry> filtered = mine.stream()
                 .filter(commit -> depotId == null || depotId <= 0 || commit.getDepotId().equals(depotId))
                 .filter(commit -> normalizedKeyword.isEmpty()
                         || StringUtils.defaultString(commit.getMessage()).toLowerCase(Locale.ROOT)
                         .contains(normalizedKeyword))
+                .map(this::toEntry)
+                .sorted(entryOrder(sortBy, sortOrder))
                 .toList();
         int safeSize = Math.max(1, Math.min(100, pageSize));
         int safePage = Math.max(1, pageNumber);
-        int from = Math.min(mine.size(), (safePage - 1) * safeSize);
-        int to = Math.min(mine.size(), from + safeSize);
-        List<Entry> items = mine.subList(from, to).stream().map(this::toEntry).toList();
-        return new EntryPage(range.view(), new Page(safePage, safeSize, mine.size(),
-                mine.isEmpty() ? 0 : (mine.size() + safeSize - 1) / safeSize), items);
+        int from = (int) Math.min(filtered.size(), (long) (safePage - 1) * safeSize);
+        int to = Math.min(filtered.size(), from + safeSize);
+        return new EntryPage(range.view(), new Page(safePage, safeSize, filtered.size(),
+                filtered.isEmpty() ? 0 : (filtered.size() + safeSize - 1) / safeSize),
+                filtered.subList(from, to), repositories(mine));
+    }
+
+    private Comparator<Entry> entryOrder(CodeStatsModels.EntrySort sortBy, CodeStatsModels.SortDirection sortOrder) {
+        boolean ascending = sortOrder == CodeStatsModels.SortDirection.ASC;
+        Comparator<Long> numbers = Comparator.nullsLast(ascending ? Comparator.<Long>naturalOrder() : Comparator.<Long>reverseOrder());
+        Comparator<Entry> primary = switch (sortBy) {
+            case COMMIT_AT -> Comparator.comparing(Entry::commitAt,
+                    Comparator.nullsLast(ascending ? Comparator.<String>naturalOrder() : Comparator.<String>reverseOrder()));
+            case ADDITIONS -> Comparator.comparing(Entry::additions, numbers);
+            case DELETIONS -> Comparator.comparing(Entry::deletions, numbers);
+            case FILES_CHANGED -> Comparator.comparing(entry -> entry.filesChanged() == null
+                    ? null : entry.filesChanged().longValue(), numbers);
+        };
+        return primary.thenComparing(Entry::commitAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparingLong(Entry::depotId).thenComparing(Entry::sha);
     }
 
     private List<CommitEntity> commits(CodeStatsModule.ScopeInfo scope, CodeRange range) {
@@ -374,7 +408,7 @@ class CodeStatsQueryService {
     private Entry toEntry(CommitEntity commit) {
         List<String> branches = CodeStatsSupport.fromBranchJson(commit.getBranchNames());
         boolean ok = "OK".equals(commit.getDiffStatus());
-        return new Entry(commit.getSha(), commit.getShortSha(), CodeStatsSupport.format(commit.getCommitAt()),
+        return new Entry(commit.getDepotId(), commit.getSha(), commit.getShortSha(), CodeStatsSupport.format(commit.getCommitAt()),
                 commit.getProjectName(), commit.getProjectDisplayName(), commit.getDepotName(),
                 branches.stream().limit(50).toList(), commit.getBranchCount() == null ? branches.size()
                 : commit.getBranchCount(), Boolean.TRUE.equals(commit.getBranchTruncated()),
