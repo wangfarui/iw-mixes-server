@@ -1,9 +1,13 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.LeaveCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.RenameCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ReorderCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamRepository.StoredTeam;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
@@ -40,6 +44,48 @@ class DefaultWorkbenchTeamModuleTest {
         assertThat(detail.permissions().administrator()).isTrue();
         assertThat(detail.members()).filteredOn(item -> item.administrator()).singleElement()
                 .extracting(WorkbenchTeamModels.Member::userId).isEqualTo(100L);
+    }
+
+    @Test
+    void bothViewersSeeCodingRoleButOnlyTheAdministratorReceivesActivity() throws Exception {
+        WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
+        var lastUsedAt = LocalDateTime.of(2026, 11, 6, 10, 20);
+        var profiles = List.of(new MemberProfile(200L, CodingRole.QA, lastUsedAt));
+        when(repository.findMemberProfiles(1L, true)).thenReturn(profiles);
+        when(repository.findMemberProfiles(1L, false)).thenReturn(profiles);
+        var module = new DefaultWorkbenchTeamModule(repository);
+
+        var adminView = module.detail(administrator, 1L).members().stream()
+                .filter(item -> item.userId() == 200L).findFirst().orElseThrow();
+        var memberView = module.detail(member, 1L).members().stream()
+                .filter(item -> item.userId() == 200L).findFirst().orElseThrow();
+
+        assertThat(adminView.codingRole()).isEqualTo(CodingRole.QA);
+        assertThat(memberView.codingRole()).isEqualTo(CodingRole.QA);
+        assertThat(adminView.lastUsedAt()).isEqualTo(lastUsedAt);
+        var json = new ObjectMapper().findAndRegisterModules().writeValueAsString(memberView);
+        assertThat(json).contains("\"codingRole\":\"QA\"").doesNotContain("lastUsedAt");
+    }
+
+    @Test
+    void roleEditRequiresCurrentTeamAdministratorAndTargetMembership() {
+        WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
+        StoredTeam stored = storedTeam();
+        when(repository.findById(1L)).thenReturn(Optional.of(stored));
+        var module = new DefaultWorkbenchTeamModule(repository);
+        var command = new UpdateMemberRoleCommand(3, CodingRole.BACKEND);
+
+        assertThatThrownBy(() -> module.updateMemberRole(member, 1L, 100L, command))
+                .isInstanceOf(WorkbenchTeamException.class).hasMessage("只有团队管理员可以执行此操作");
+        assertThatThrownBy(() -> module.updateMemberRole(administrator, 1L, 300L, command))
+                .isInstanceOf(WorkbenchTeamException.class).hasMessage("所选用户不是当前团队成员");
+        verify(repository, never()).updateMemberRole(1L, member, 100L, command);
+        verify(repository, never()).updateMemberRole(1L, administrator, 300L, command);
+
+        when(repository.updateMemberRole(1L, administrator, 200L, command)).thenReturn(stored);
+        module.updateMemberRole(administrator, 1L, 200L, command);
+        verify(repository).updateMemberRole(1L, administrator, 200L, command);
     }
 
     @Test

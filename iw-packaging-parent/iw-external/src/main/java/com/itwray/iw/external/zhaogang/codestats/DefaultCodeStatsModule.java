@@ -32,6 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 class DefaultCodeStatsModule implements CodeStatsModule {
@@ -243,7 +244,8 @@ class DefaultCodeStatsModule implements CodeStatsModule {
     }
 
     private String statisticsKey(ScopeInfo info, CodeRange range) {
-        return "statistics:" + cache.scopeKey(info) + ":" + range.from() + ":" + range.to() + ":"
+        String prefix = info.scope() == Scope.WORKBENCH_TEAM ? "team-member-statistics:" : "statistics:";
+        return prefix + cache.scopeKey(info) + ":" + range.from() + ":" + range.to() + ":"
                 + versions(info, range);
     }
 
@@ -259,6 +261,10 @@ class DefaultCodeStatsModule implements CodeStatsModule {
         if (sync != null) builder.append("-sync-").append(sync.getId()).append('-').append(sync.getStatus());
         builder.append("-members-").append(info.members().stream().map(member -> String.valueOf(member.userId()))
                 .sorted().reduce((left, right) -> left + "," + right).orElse(""));
+        if (info.scope() == Scope.WORKBENCH_TEAM) {
+            builder.append("-developers-").append(info.developmentMembers().stream()
+                    .map(member -> String.valueOf(member.userId())).sorted().collect(Collectors.joining(",")));
+        }
         return builder.toString();
     }
 

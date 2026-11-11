@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.team;
 
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CreateCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.InvitationPreview;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.LeaveCommand;
@@ -9,12 +10,14 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ReorderCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamDetail;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamOption;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamScope;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.IterationTeamOption;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface WorkbenchTeamModule {
 
@@ -27,6 +30,8 @@ public interface WorkbenchTeamModule {
     TeamDetail detail(Actor actor, long teamId);
 
     TeamDetail rename(Actor actor, long teamId, RenameCommand command);
+
+    TeamDetail updateMemberRole(Actor actor, long teamId, long targetUserId, UpdateMemberRoleCommand command);
 
     TeamDetail removeMember(Actor actor, long teamId, long targetUserId, VersionCommand command);
 
@@ -43,6 +48,8 @@ public interface WorkbenchTeamModule {
     List<WorklogTeamOption> worklogTeams(Actor actor);
 
     WorklogTeamScope resolveWorklogScope(Actor actor, long teamId);
+
+    Optional<CodeSyncTeam> findCodeSyncTeam(long codingTeamId, long teamId);
 
     List<IterationTeamOption> iterationMemberOptions(Actor actor);
 }

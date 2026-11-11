@@ -109,15 +109,16 @@ class CodeScanService implements CodeBackfillTrigger {
 
     private CodeStatsModels.SyncInfo syncInfo(CodeStatsModule.ScopeInfo scope) {
         ScanJobEntity latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
-        if (latest == null) return new CodeStatsModels.SyncInfo(false, properties.getCodeSyncFrom(), null, null, null, "NOT_STARTED", 0);
+        boolean enabled = properties.isCodeSyncEnabled() && scope.automaticSyncEligible() && hasToken(scope);
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime next = now.toLocalDate().atStartOfDay().plusHours((now.getHour() / 3 + 1) * 3L);
-        return new CodeStatsModels.SyncInfo(properties.isCodeSyncEnabled(), latest.getSyncFrom().toString(),
+        String nextSyncAt = enabled ? CodeStatsSupport.format(next) : null;
+        if (latest == null) {
+            return new CodeStatsModels.SyncInfo(enabled, properties.getCodeSyncFrom(), null, null, nextSyncAt, "NOT_STARTED", 0);
+        }
+        return new CodeStatsModels.SyncInfo(enabled, latest.getSyncFrom().toString(),
                 latest.getSyncTo().toString(), CodeStatsSupport.format(latest.getFinishedAt()),
-                CodeStatsSupport.format(next), latest.getStatus(), latest.getFinishedAt()==null || "CANCELLED".equals(latest.getStatus())
-                || "INTERRUPTED".equals(latest.getStatus()) ? 0 :
-                Math.max(0, Duration.between(now, latest.getFinishedAt().plusSeconds(
-                Math.max(0,properties.getCodeUserCooldownSeconds()))).getSeconds()), latest.getId(),
+                nextSyncAt, latest.getStatus(), manualSyncRetryAfter(latest, now), latest.getId(),
                 value(latest.getFailedRepos()), incompleteDiffs(scope, latest.getSyncFrom(), latest.getSyncTo()));
     }
 
@@ -142,29 +143,46 @@ class CodeScanService implements CodeBackfillTrigger {
         ScanJobEntity latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
         ScanJobEntity active = jobMapper.selectByActiveKey(activeKey(scope, ""));
         if (active != null) return new ScanTrigger(false, "ALREADY_RUNNING", List.of(), 0, scanState(scope, displayRange));
-        long wait = latest == null || latest.getFinishedAt() == null
-                || "CANCELLED".equals(latest.getStatus()) || "INTERRUPTED".equals(latest.getStatus()) ? 0
-                : Math.max(0, Duration.between(LocalDateTime.now(clock), latest.getFinishedAt()
-                .plusSeconds(Math.max(0, properties.getCodeUserCooldownSeconds()))).getSeconds());
+        long wait = manualSyncRetryAfter(latest, LocalDateTime.now(clock));
         boolean identityChanged = latest != null && !java.util.Objects.equals(latest.getIdentitySignature(), identities.signature(scope));
         if (wait > 0 && !identityChanged)
             return new ScanTrigger(false, "COOLDOWN", List.of(), wait, scanState(scope, displayRange));
-        java.time.LocalDate from = java.time.LocalDate.parse(properties.getCodeSyncFrom());
-        if (latest != null && latest.getSyncFrom() != null && latest.getSyncFrom().isBefore(from)) from = latest.getSyncFrom();
-        // 手动请求更早的月份代表扩展历史回补范围；普通查询永远不会扩展。
-        if (displayRange.from().isBefore(from)) from = displayRange.from().withDayOfMonth(1);
-        ScanJobEntity job = createAndSubmit(scope, YearMonth.now(clock), "SYNC", "CONTINUOUS", requestedBy, from);
-        return new ScanTrigger(job != null, job == null ? "ALREADY_RUNNING" : "STARTED", List.of(), 0,
+        ScanJobEntity job = createAndSubmit(scope, YearMonth.now(clock), "SYNC", "MANUAL", requestedBy, syncFrom(latest));
+        String reason = job != null ? "STARTED"
+                : jobMapper.selectByActiveKey(activeKey(scope, "")) == null ? "QUEUE_FULL" : "ALREADY_RUNNING";
+        return new ScanTrigger(job != null, reason, List.of(), 0,
                 scanState(scope, displayRange));
     }
 
-    void scheduledSync(CodeStatsModule.ScopeInfo scope, ScanJobEntity subscription) {
-        if (!hasToken(scope)) return;
-        if (jobMapper.selectByActiveKey(activeKey(scope,"")) != null) {
-            log.info("zhaogang scheduled sync skipped active scope, scopeType={}, scopeId={}",scope.scope(),scope.scopeId());
-            return;
+    private long manualSyncRetryAfter(ScanJobEntity latest, LocalDateTime now) {
+        if (latest == null || !"MANUAL".equals(latest.getRequestedMode()) || latest.getFinishedAt() == null
+                || STATUS_CANCELLED.equals(latest.getStatus()) || STATUS_INTERRUPTED.equals(latest.getStatus())) return 0;
+        return Math.max(0, Duration.between(now,
+                latest.getFinishedAt().plusSeconds(Math.max(0, properties.getCodeUserCooldownSeconds()))).getSeconds());
+    }
+
+    private LocalDate syncFrom(ScanJobEntity latest) {
+        LocalDate configured = LocalDate.parse(properties.getCodeSyncFrom());
+        return latest != null && latest.getSyncFrom() != null && latest.getSyncFrom().isBefore(configured)
+                ? latest.getSyncFrom() : configured;
+    }
+
+    boolean hasScheduledSyncCapacity() {
+        return executor.getActiveCount() < executor.getMaximumPoolSize() && executor.getQueue().isEmpty();
+    }
+
+    /** 活动任务结束或扫描线程空闲后，调度器继续处理暂缓的范围。 */
+    boolean scheduledSync(CodeStatsModule.ScopeInfo scope, LocalDateTime scheduledAt) {
+        var actor = scope.members().stream().filter(member -> StringUtils.isNotBlank(member.token())).findFirst();
+        if (actor.isEmpty()) return true;
+        if (jobMapper.selectByActiveKey(activeKey(scope, "")) != null || !hasScheduledSyncCapacity()) return false;
+        ScanJobEntity latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
+        if (latest != null && latest.getFinishedAt() != null && !latest.getFinishedAt().isBefore(scheduledAt)
+                && !STATUS_INTERRUPTED.equals(latest.getStatus()) && !STATUS_CANCELLED.equals(latest.getStatus())
+                && !"QUEUE_FULL".equals(latest.getErrorCode())) {
+            return true;
         }
-        createAndSubmit(scope, YearMonth.now(clock), "SYNC", "CONTINUOUS", subscription.getRequestedBy(), subscription.getSyncFrom());
+        return createAndSubmit(scope, YearMonth.now(clock), "SYNC", "AUTO", actor.get().userId(), syncFrom(latest)) != null;
     }
 
     ScanTrigger trigger(CodeStatsModule.ScopeInfo scope, ScanRequest request, CodeRange range, long requestedBy) {

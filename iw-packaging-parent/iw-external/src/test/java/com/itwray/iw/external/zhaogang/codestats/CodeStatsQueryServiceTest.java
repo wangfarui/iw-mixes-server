@@ -4,6 +4,7 @@ import com.itwray.iw.external.mapper.ZhaogangCodeCommitMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeIdentityMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanRepoMapper;
+import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarDefaults;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Day;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Schedule;
@@ -19,6 +20,7 @@ import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.SelfStatistics;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.TeamStatistics;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.CommitEntity;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.IdentityEntity;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -34,9 +36,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -75,41 +77,53 @@ class CodeStatsQueryServiceTest {
     }
 
     @Test
-    void teamStatisticsOwnsCommitsAndKeepsZeroCommitMemberLast() {
+    void teamStatisticsIncludesOnlyDevelopersAndKeepsZeroCommitDeveloperLast() {
         CodeStatsModule.ScopeInfo scope = teamScope();
         IdentityEntity email1 = mapping("EMAIL", "e1", 1L, false);
         IdentityEntity email2 = mapping("EMAIL", "e2", 2L, false);
         IdentityEntity ignored = mapping("EMAIL", "e3", null, true);
-        when(identityMapper.selectByScope(eq(100L), eq("SELF"), anyLong()))
-                .thenReturn(List.of(email1, email2, ignored));
+        when(identityMapper.selectByScope(100L, "SELF", 1L))
+                .thenReturn(List.of(email1, ignored, mapping("NAME", "n1", 1L, false)));
+        when(identityMapper.selectByScope(100L, "SELF", 2L)).thenReturn(List.of(email2));
+        when(identityMapper.selectByScope(100L, "SELF", 4L)).thenReturn(List.of(mapping("EMAIL", "qa", 4L, false)));
+        when(identityMapper.selectByScope(100L, "SELF", 5L)).thenReturn(List.of(mapping("EMAIL", "pm", 5L, false)));
+        when(identityMapper.selectByScope(100L, "SELF", 6L)).thenReturn(List.of(mapping("EMAIL", "unset", 6L, false)));
         when(commitMapper.selectForRange(anyLong(), anyString(), anyLong(), any(), any()))
                 .thenReturn(List.of(
                         commit("s1", "e1", "n1", "2026-10-02T10:00:00", "OK", 100, 20, 2, "main"),
                         commit("s2", "e1", "n1", "2026-10-05T11:00:00", "FAILED", null, null, null, "main"),
                         commit("s3", "e2", "n2", "2026-10-06T12:00:00", "OK", 50, 10, 1, "feature/a"),
                         commit("s4", "e9", "n9", "2026-10-07T12:00:00", "SKIPPED_UNMAPPED", null, null, null, "main"),
-                        commit("s5", "e3", "n3", "2026-10-08T12:00:00", "SKIPPED_UNMAPPED", null, null, null, "main")));
+                        commit("s5", "e3", "n3", "2026-10-08T12:00:00", "SKIPPED_UNMAPPED", null, null, null, "main"),
+                        commit("qa", "qa", "n1", "2026-10-09T12:00:00", "OK", 900, 200, 2, "main"),
+                        commit("pm", "pm", "pm", "2026-10-09T13:00:00", "OK", 700, 100, 2, "main"),
+                        commit("unset", "unset", "unset", "2026-10-09T14:00:00", "OK", 800, 300, 2, "main")));
 
         TeamStatistics statistics = service.teamStatistics(scope, range, completedScan(), false, true);
 
         assertEquals(3, statistics.members().size());
         MemberMonthly first = statistics.members().get(0);
+        MemberMonthly second = statistics.members().get(1);
         MemberMonthly third = statistics.members().get(2);
         assertEquals(1L, first.user().id());
         assertEquals(2, first.commitCount());
+        assertEquals(100, first.additions());
+        assertEquals(20, first.deletions());
+        assertEquals(2L, second.user().id());
+        assertEquals(1, second.commitCount());
+        assertEquals(50, second.additions());
+        assertEquals(10, second.deletions());
         assertEquals(3L, third.user().id());
         assertEquals(0, third.commitCount());
-        assertEquals(3, statistics.summary().commitCount());
-        assertEquals(150, statistics.summary().additions());
-        assertEquals(30, statistics.summary().deletions());
-        assertEquals(120, statistics.summary().netLines());
-        assertEquals(0, statistics.summary().unmappedCommitCount());
-        assertEquals(2, statistics.summary().activeMembers());
         assertEquals(0, statistics.coverage().excludedMergeCommitCount());
         assertEquals(1, statistics.coverage().memberIssues().size());
         assertEquals(1, statistics.coverage().failedDiffCount());
         assertTrue(statistics.coverage().memberIssues().get(0).reasonCode().equals("TOKEN_MISSING"));
         assertEquals(0.667D, statistics.coverage().diffCoverage());
+        assertEquals(1, service.memberStatistics(scope, range, 2L).summary().commitCount());
+        for (long excludedId : List.of(4L, 5L, 6L)) {
+            assertThrows(CodingOpenApiException.class, () -> service.memberStatistics(scope, range, excludedId));
+        }
     }
 
     @Test
@@ -190,7 +204,7 @@ class CodeStatsQueryServiceTest {
         assertEquals(0D, mine.coverage().diffCoverage());
         TeamStatistics team = service.teamStatistics(teamScope(), range, scan, false, false);
         assertTrue(team.dataReady());
-        assertEquals(1, team.summary().commitCount());
+        assertEquals(1, team.members().get(0).commitCount());
         assertTrue(team.coverage().partial());
     }
 
@@ -222,9 +236,10 @@ class CodeStatsQueryServiceTest {
         assertEquals("SKIPPED_REPOSITORY", entry.diffStatus());
         assertNull(entry.additions()); assertNull(entry.deletions()); assertNull(entry.filesChanged());
         TeamStatistics team = service.teamStatistics(teamScope(), range, completedScan(), false, true);
-        assertEquals(3, team.summary().commitCount());
-        assertEquals(120, team.summary().additions());
-        assertEquals(25, team.summary().deletions());
+        MemberMonthly developer = team.members().get(0);
+        assertEquals(3, developer.commitCount());
+        assertEquals(120, developer.additions());
+        assertEquals(25, developer.deletions());
         assertEquals(0, team.coverage().failedDiffCount());
     }
 
@@ -237,9 +252,12 @@ class CodeStatsQueryServiceTest {
     private CodeStatsModule.ScopeInfo teamScope() {
         return new CodeStatsModule.ScopeInfo(Scope.WORKBENCH_TEAM, 9L, 100L, "g-iijw5014",
                 "https://g-iijw5014.coding.net", "找钢后端组",
-                List.of(new CodeStatsModule.MemberCredential(1L, "张明远", "", "token1"),
-                        new CodeStatsModule.MemberCredential(2L, "李婷", "", "token2"),
-                        new CodeStatsModule.MemberCredential(3L, "王强", "", "")), true);
+                List.of(new CodeStatsModule.MemberCredential(1L, "张明远", "", "token1", CodingRole.BACKEND),
+                        new CodeStatsModule.MemberCredential(2L, "李婷", "", "token2", CodingRole.FRONTEND),
+                        new CodeStatsModule.MemberCredential(3L, "王强", "", "", CodingRole.BACKEND),
+                        new CodeStatsModule.MemberCredential(4L, "测试成员", "", "token4", CodingRole.QA),
+                        new CodeStatsModule.MemberCredential(5L, "产品成员", "", "token5", CodingRole.PRODUCT),
+                        new CodeStatsModule.MemberCredential(6L, "角色未设置", "", "token6")), true);
     }
 
     private ScanState completedScan() {

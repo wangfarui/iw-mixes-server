@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang;
 
+import com.itwray.iw.external.mapper.ZhaogangWorkbenchProfileMapper;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.Branch;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.Build;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.Plan;
@@ -8,6 +9,8 @@ import com.itwray.iw.external.zhaogang.ZhaogangModels.Project;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.SessionStatus;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.TokenValue;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.UpdateRole;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,17 +26,24 @@ class ZhaogangWorkbenchService {
     private final ZhaogangProperties properties;
 
     private final CodingCredentialService credentials;
+    private final ZhaogangWorkbenchProfileMapper profiles;
 
     ZhaogangWorkbenchService(CodingOpenApiPort coding, ZhaogangProperties properties) {
         this(coding, properties, null);
     }
 
-    @Autowired
     ZhaogangWorkbenchService(CodingOpenApiPort coding, ZhaogangProperties properties,
                              CodingCredentialService credentials) {
+        this(coding, properties, credentials, null);
+    }
+
+    @Autowired
+    ZhaogangWorkbenchService(CodingOpenApiPort coding, ZhaogangProperties properties,
+                             CodingCredentialService credentials, ZhaogangWorkbenchProfileMapper profiles) {
         this.coding = coding;
         this.properties = properties;
         this.credentials = credentials;
+        this.profiles = profiles;
     }
 
     ZhaogangSession bind(String token) {
@@ -74,8 +84,26 @@ class ZhaogangWorkbenchService {
         boolean tokenRotationRequired = credentials != null
                 && (session.teamId() == null || session.teamId() <= 0
                 || !credentials.exists(session.teamId(), session.userId()));
+        RolePreference role = RolePreference.UNSET;
+        if (profiles != null && session.teamId() != null && session.teamId() > 0 && session.userId() > 0) {
+            profiles.recordUse(session.teamId(), session.userId());
+            role = rolePreference(session);
+        }
         return new SessionStatus(true, session.userId(), session.userName(), session.avatar(), session.team(),
-                maskToken(session.token()), tokenRotationRequired, List.of());
+                maskToken(session.token()), tokenRotationRequired, List.of(), role);
+    }
+
+    RolePreference updateRole(ZhaogangSession session, UpdateRole command) {
+        if (session.teamId() == null || session.teamId() <= 0 || session.userId() <= 0) {
+            throw new ZhaogangSessionException("当前 CODING 身份不完整，请重新进入工作台");
+        }
+        profiles.saveRole(session.teamId(), session.userId(), command.codingRole(), command.initializeOnly());
+        return rolePreference(session);
+    }
+
+    private RolePreference rolePreference(ZhaogangSession session) {
+        RolePreference stored = profiles.findRole(session.teamId(), session.userId());
+        return stored == null ? RolePreference.UNSET : stored;
     }
 
     TokenValue tokenValue(ZhaogangSession session) {

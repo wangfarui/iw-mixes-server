@@ -37,14 +37,6 @@ public interface ZhaogangCodeScanJobMapper extends BaseMapper<ScanJobEntity> {
 
 
     @Select("""
-            select j.* from external_zhaogang_code_scan_job j
-             join (select coding_team_id, scope_type, scope_id, max(id) id
-                     from external_zhaogang_code_scan_job where scan_mode='SYNC_V2'
-                    group by coding_team_id,scope_type,scope_id) s on s.id=j.id
-            """)
-    List<ScanJobEntity> selectSyncSubscriptions();
-
-    @Select("""
             select * from external_zhaogang_code_scan_job
              where coding_team_id=#{codingTeamId} and scope_type=#{scopeType} and scope_id=#{scopeId}
                and scan_mode='SYNC_V2' order by id desc limit 1

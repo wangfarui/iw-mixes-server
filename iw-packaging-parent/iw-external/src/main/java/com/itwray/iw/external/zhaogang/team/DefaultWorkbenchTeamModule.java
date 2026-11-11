@@ -1,6 +1,8 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CreateCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.InvitationPreview;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.LeaveCommand;
@@ -11,6 +13,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ReorderCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamDetail;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogMember;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamOption;
@@ -26,6 +29,10 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
@@ -102,6 +109,14 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         StoredTeam stored = requireAdministrator(actor, require(teamId));
         requireVersion(command == null ? 0 : command.versionNo());
         return toDetail(actor, repository.rename(teamId, command.versionNo(), actor, normalizedName(command.name())));
+    }
+
+    @Override
+    public TeamDetail updateMemberRole(Actor actor, long teamId, long targetUserId, UpdateMemberRoleCommand command) {
+        StoredTeam stored = requireAdministrator(actor, require(teamId));
+        requireVersion(command == null ? 0 : command.versionNo());
+        requireMemberId(stored, targetUserId);
+        return toDetail(actor, repository.updateMemberRole(teamId, actor, targetUserId, command));
     }
 
     @Override
@@ -186,11 +201,22 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         validateActor(actor);
         repository.refreshProfile(actor);
         StoredTeam stored = requireMember(actor, require(teamId));
-        List<WorklogMember> members = stored.members().stream()
+        return new WorklogTeamScope(stored.team().getId(), stored.team().getName(),
+                stored.team().getCodingTeamHost(), scopeMembers(stored));
+    }
+
+    @Override
+    public Optional<CodeSyncTeam> findCodeSyncTeam(long codingTeamId, long teamId) {
+        return repository.findById(teamId)
+                .filter(stored -> stored.team().getCodingTeamId() == codingTeamId)
+                .map(stored -> new CodeSyncTeam(stored.team().getName(),
+                        stored.team().getCodingTeamKey(), stored.team().getCodingTeamHost(), scopeMembers(stored)));
+    }
+
+    private List<WorklogMember> scopeMembers(StoredTeam stored) {
+        return stored.members().stream()
                 .map(member -> new WorklogMember(member.getCodingUserId(), member.getUserName(), member.getAvatar()))
                 .toList();
-        return new WorklogTeamScope(stored.team().getId(), stored.team().getName(),
-                stored.team().getCodingTeamHost(), members);
     }
 
     @Override
@@ -268,8 +294,12 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
     private TeamDetail toDetail(Actor actor, StoredTeam stored) {
         requireMember(actor, stored);
         long administratorUserId = stored.team().getAdministratorUserId();
-        List<Member> members = stored.members().stream().map(member -> toMember(member, administratorUserId)).toList();
         boolean administrator = administratorUserId == actor.userId();
+        Map<Long, MemberProfile> profiles = repository.findMemberProfiles(stored.team().getId(), administrator).stream()
+                .collect(Collectors.toMap(MemberProfile::userId, Function.identity()));
+        List<Member> members = stored.members().stream()
+                .map(member -> toMember(member, administratorUserId, administrator, profiles.get(member.getCodingUserId())))
+                .toList();
         Permissions permissions = new Permissions(administrator, administrator, administrator, administrator,
                 !administrator || members.size() > 1, administrator);
         return new TeamDetail(stored.team().getId(), stored.team().getName(), stored.team().getInviteCode(),
@@ -278,9 +308,11 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                 permissions, stored.team().getCreateTime(), stored.team().getUpdateTime());
     }
 
-    private Member toMember(MemberEntity member, long administratorUserId) {
+    private Member toMember(MemberEntity member, long administratorUserId, boolean includeActivity,
+                            MemberProfile profile) {
         return new Member(member.getCodingUserId(), member.getUserName(), member.getAvatar(), member.getCreateTime(),
-                member.getCodingUserId() == administratorUserId);
+                member.getCodingUserId() == administratorUserId, profile == null ? null : profile.codingRole(),
+                includeActivity && profile != null ? profile.lastUsedAt() : null);
     }
 
     private String normalizedName(String name) {

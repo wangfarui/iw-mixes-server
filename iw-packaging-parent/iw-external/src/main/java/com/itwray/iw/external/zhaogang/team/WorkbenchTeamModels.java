@@ -1,5 +1,9 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,6 +22,9 @@ public final class WorkbenchTeamModels {
     public record RenameCommand(int versionNo, String name) {
     }
 
+    public record UpdateMemberRoleCommand(int versionNo, @JsonProperty(required = true) CodingRole codingRole) {
+    }
+
     public record TransferAdministratorCommand(int versionNo, long successorUserId) {
     }
 
@@ -34,7 +41,8 @@ public final class WorkbenchTeamModels {
     }
 
     public record Member(long userId, String userName, String avatar, LocalDateTime joinedAt,
-                         boolean administrator) {
+                         boolean administrator, CodingRole codingRole,
+                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt) {
     }
 
     public record Permissions(boolean administrator, boolean canRename, boolean canRemoveMembers,
@@ -63,6 +71,9 @@ public final class WorkbenchTeamModels {
     }
 
     public record WorklogTeamScope(long id, String name, String codingTeamHost, List<WorklogMember> members) {
+    }
+
+    public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<WorklogMember> members) {
     }
 
     public record IterationMemberOption(long userId, String userName, String avatar) {

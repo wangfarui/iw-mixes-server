@@ -1,5 +1,7 @@
 package com.itwray.iw.external.zhaogang;
 
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
+
 import java.util.List;
 
 /** 对 Web 保持稳定的找钢工作台返回模型。 */
@@ -9,7 +11,8 @@ public final class ZhaogangModels {
     }
 
     public record SessionStatus(boolean connected, Long userId, String userName, String avatar, String team,
-                                String tokenHint, boolean tokenRotationRequired, List<String> warnings) {
+                                String tokenHint, boolean tokenRotationRequired, List<String> warnings,
+                                RolePreference rolePreference) {
     }
 
     public record TokenValue(String token) {

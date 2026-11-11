@@ -16,12 +16,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public final class CodeStatsSupport {
 
     public static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
     public static final int MAX_BRANCH_NAMES = 50;
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Pattern CODING_REPOSITORY_GIT_URL =
+            Pattern.compile("https?://[^/?#]+/p/[^/?#]+/d/[^/?#]+/git");
 
     private CodeStatsSupport() {
     }
@@ -113,7 +116,8 @@ public final class CodeStatsSupport {
     public static String commitUrl(String depotWebUrl, String sha) {
         String base = StringUtils.removeEnd(StringUtils.trimToEmpty(depotWebUrl), "/");
         if (!base.startsWith("http://") && !base.startsWith("https://")) return "";
-        return base + "/git/commit/" + sha;
+        String gitUrl = CODING_REPOSITORY_GIT_URL.matcher(base).matches() ? base : base + "/git";
+        return gitUrl + "/commit/" + sha;
     }
 
     public static double ratio(long numerator, long denominator) {

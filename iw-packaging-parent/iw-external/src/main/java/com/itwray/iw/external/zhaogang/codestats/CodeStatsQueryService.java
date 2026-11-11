@@ -24,7 +24,6 @@ import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.SelfStatistics;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.SelfSummary;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.TeamStatistics;
-import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.TeamSummary;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.User;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.CommitEntity;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.IdentityEntity;
@@ -70,12 +69,9 @@ class CodeStatsQueryService {
                                   boolean refreshing, boolean dataReady) {
         List<CommitEntity> commits = commits(scope, range);
         Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
-        Set<Long> memberIds = new HashSet<>();
-        scope.members().forEach(member -> memberIds.add(member.userId()));
         Map<Long, MemberAccumulator> acc = new LinkedHashMap<>();
-        scope.members().forEach(member -> acc.put(member.userId(), new MemberAccumulator(member)));
-        int unmapped = 0;
-        int ownedCommitCount = 0;
+        scope.developmentMembers().forEach(member -> acc.put(member.userId(), new MemberAccumulator(member)));
+        Set<Long> memberIds = acc.keySet();
         long excludedMerges = commitMapper.selectMerges(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
                 range.from(), range.to()).stream().filter(row -> {
                     var owner = identities.resolve(mappingIndex, row.getAuthorEmailHash(), row.getAuthorNameKey());
@@ -86,25 +82,15 @@ class CodeStatsQueryService {
                     commit.getAuthorNameKey());
             if (resolved.ignored()) continue;
             MemberAccumulator member = resolved.memberId() == null ? null : acc.get(resolved.memberId());
-            if (member == null) {
-                unmapped++;
-                continue;
-            }
-            member.add(commit);
-            ownedCommitCount++;
+            if (member != null) member.add(commit);
         }
         List<MemberMonthly> members = acc.values().stream()
                 .sorted(Comparator.comparingLong((MemberAccumulator item) -> item.commitCount).reversed()
                         .thenComparing(item -> item.member.userName(), String.CASE_INSENSITIVE_ORDER))
                 .map(MemberAccumulator::view).toList();
-        long additions = members.stream().mapToLong(MemberMonthly::additions).sum();
-        long deletions = members.stream().mapToLong(MemberMonthly::deletions).sum();
-        int activeMembers = (int) members.stream().filter(member -> member.commitCount() > 0).count();
-        Coverage coverage = coverage(scope, range, scan, commits, mappingIndex, memberIds, unmapped,
-                excludedMerges);
-        return new TeamStatistics(dataReady || !commits.isEmpty() || excludedMerges > 0, refreshing, range.view(), scan, coverage,
-                new TeamSummary(ownedCommitCount, additions, deletions, additions - deletions, activeMembers,
-                        scope.members().size(), 0), members);
+        Coverage coverage = coverage(scope, range, scan, commits, mappingIndex, memberIds, excludedMerges);
+        return new TeamStatistics(dataReady || !commits.isEmpty() || excludedMerges > 0, refreshing,
+                range.view(), scan, coverage, members);
     }
 
     SelfStatistics selfStatistics(CodeStatsModule.ScopeInfo scope, CodeRange range, ScanState scan,
@@ -113,15 +99,12 @@ class CodeStatsQueryService {
         Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
         Set<Long> memberIds = Set.of(scope.scopeId());
         List<CommitEntity> mine = new ArrayList<>();
-        int unmatched = 0;
         for (CommitEntity commit : commits) {
             CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex, commit.getAuthorEmailHash(),
                     commit.getAuthorNameKey());
             if (resolved.ignored()) continue;
             if (resolved.memberId() != null && memberIds.contains(resolved.memberId())) {
                 mine.add(commit);
-            } else {
-                unmatched++;
             }
         }
         long excludedMerges = commitMapper.selectMerges(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
@@ -129,16 +112,16 @@ class CodeStatsQueryService {
                     var owner = identities.resolve(mappingIndex, row.getAuthorEmailHash(), row.getAuthorNameKey());
                     return !owner.ignored() && owner.memberId() != null && memberIds.contains(owner.memberId());
                 }).count();
-        Coverage coverage = coverage(scope, range, scan, mine, mappingIndex, memberIds, unmatched, excludedMerges);
+        Coverage coverage = coverage(scope, range, scan, mine, mappingIndex, memberIds, excludedMerges);
         SelfSummary summary = summary(mine);
         return new SelfStatistics(dataReady || !commits.isEmpty() || excludedMerges > 0, refreshing, range.view(), scan, coverage, summary, daily(range, mine, scope.codingTeamId()),
                 hourly(mine), repositories(mine), branches(mine));
     }
 
     MemberStatistics memberStatistics(CodeStatsModule.ScopeInfo scope, CodeRange range, long memberUserId) {
-        CodeStatsModule.MemberCredential member = scope.members().stream()
+        CodeStatsModule.MemberCredential member = scope.developmentMembers().stream()
                 .filter(item -> item.userId() == memberUserId).findFirst()
-                .orElseThrow(() -> new CodingOpenApiException("指定成员不在当前工作台团队中"));
+                .orElseThrow(() -> new CodingOpenApiException("指定成员不在当前团队代码统计范围内"));
         Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
         List<CommitEntity> mine = commits(scope, range).stream()
                 .filter(commit -> {
@@ -185,7 +168,7 @@ class CodeStatsQueryService {
 
     private Coverage coverage(CodeStatsModule.ScopeInfo scope, CodeRange range, ScanState scan,
                               List<CommitEntity> scopedCommits, Map<String, IdentityEntity> mappingIndex,
-                              Set<Long> memberIds, int unmapped, long excludedMerges) {
+                              Set<Long> memberIds, long excludedMerges) {
         Set<Long> depots = new LinkedHashSet<>();
         Set<String> branches = new LinkedHashSet<>();
         long ok = 0;

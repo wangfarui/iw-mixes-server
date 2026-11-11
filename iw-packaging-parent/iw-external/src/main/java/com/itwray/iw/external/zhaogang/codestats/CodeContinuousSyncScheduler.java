@@ -1,9 +1,7 @@
 package com.itwray.iw.external.zhaogang.codestats;
 
-import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
-import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
-import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
+import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.AutomaticSyncTarget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,51 +9,57 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/** 只调度显式启用的范围，重启后从数据库恢复；不会枚举所有凭证或隐式启用其他用户。 */
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Component
 class CodeContinuousSyncScheduler {
     private static final Logger log = LoggerFactory.getLogger(CodeContinuousSyncScheduler.class);
-    private final ZhaogangCodeScanJobMapper jobs;
-    private final CodingCredentialService credentials;
     private final CodeStatsScopeDirectory directory;
     private final CodeScanService scans;
     private final ZhaogangProperties properties;
+    private final Map<AutomaticSyncTarget, LocalDateTime> pending = new LinkedHashMap<>();
 
-    CodeContinuousSyncScheduler(ZhaogangCodeScanJobMapper jobs, CodingCredentialService credentials,
-                                CodeStatsScopeDirectory directory, CodeScanService scans, ZhaogangProperties properties) {
-        this.jobs=jobs; this.credentials=credentials; this.directory=directory; this.scans=scans; this.properties=properties;
+    CodeContinuousSyncScheduler(CodeStatsScopeDirectory directory, CodeScanService scans, ZhaogangProperties properties) {
+        this.directory = directory;
+        this.scans = scans;
+        this.properties = properties;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     void resumeAfterStartup() {
-        if (!properties.isCodeSyncEnabled()) return;
-        var now=java.time.LocalDateTime.now(CodeStatsSupport.CHINA_ZONE);
-        for (var job:jobs.selectSyncSubscriptions()) {
-            if ("RUNNING".equals(job.getStatus()) || "QUEUED".equals(job.getStatus())) continue;
-            if ("COMPLETED".equals(job.getStatus()) && job.getFinishedAt()!=null && job.getFinishedAt().plusHours(3).isAfter(now)) continue;
-            dispatch(job);
-        }
+        synchronize();
     }
 
     @Scheduled(cron = "0 0 */3 * * *", zone = "Asia/Shanghai")
-    void synchronize() {
+    synchronized void synchronize() {
         if (!properties.isCodeSyncEnabled()) return;
-        var subscriptions=jobs.selectSyncSubscriptions();
-        log.info("zhaogang three-hour sync tick, subscriptions={}",subscriptions.size());
-        for (var job:subscriptions) dispatch(job);
+        try {
+            LocalDateTime scheduledAt = LocalDateTime.now(CodeStatsSupport.CHINA_ZONE).withNano(0);
+            directory.automaticTargets().forEach(target -> pending.putIfAbsent(target, scheduledAt));
+        } catch (RuntimeException error) {
+            log.warn("Could not discover automatic code sync targets, error={}", error.getClass().getSimpleName());
+        }
+        dispatchPending();
     }
 
-    private void dispatch(com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.ScanJobEntity job) {
-        try {
-            long actor = Scope.SELF.name().equals(job.getScopeType()) ? job.getScopeId() : job.getRequestedBy();
-            String token = credentials.token(job.getCodingTeamId(), actor).orElse("");
-            if (token.isBlank()) return;
-            var context = new CodeStatsModule.Context(token, actor, "", "", job.getCodingTeamId(),job.getSyncTeamKey(),job.getSyncTeamHost());
-            var scope = Scope.valueOf(job.getScopeType());
-            scans.scheduledSync(directory.resolve(context, scope, scope == Scope.SELF ? null : job.getScopeId()), job);
-        } catch (RuntimeException error) {
-            log.warn("continuous code sync deferred, scopeType={}, scopeId={}, error={}",job.getScopeType(),job.getScopeId(),error.getClass().getSimpleName());
+    // 只在有空闲扫描线程时提交自动任务，给页面触发的同步保留扫描队列。
+    @Scheduled(fixedDelay = 5000)
+    synchronized void dispatchPending() {
+        if (!properties.isCodeSyncEnabled()) return;
+        var iterator = pending.entrySet().iterator();
+        while (iterator.hasNext() && scans.hasScheduledSyncCapacity()) {
+            var entry = iterator.next();
+            var target = entry.getKey();
+            try {
+                var scope = directory.resolveAutomatic(target);
+                if (scope.isPresent() && !scans.scheduledSync(scope.get(), entry.getValue())) continue;
+            } catch (RuntimeException error) {
+                log.warn("Automatic code sync deferred, scopeType={}, scopeId={}, error={}",
+                        target.scope(), target.scopeId(), error.getClass().getSimpleName());
+            }
+            iterator.remove();
         }
-
     }
 }

@@ -16,6 +16,8 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModule;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.UpdateRole;
 import com.itwray.iw.external.zhaogang.k8s.K8sTokenService;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.K8sTokenStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -109,6 +112,13 @@ public class ZhaogangController {
             sessionManager.bind(response, repaired);
         }
         return GeneralResponse.success(workbenchService.status(repaired));
+    }
+
+    @PutMapping("/profile/coding-role")
+    @Operation(summary = "更新当前用户的工作台 CODING 角色")
+    public GeneralResponse<RolePreference> updateRole(@RequestBody UpdateRole command,
+                                                       HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(workbenchService.updateRole(sessionManager.resolve(request, response), command));
     }
 
     @PostMapping("/session/token")

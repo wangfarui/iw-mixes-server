@@ -1,9 +1,12 @@
 package com.itwray.iw.external.zhaogang.team;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.itwray.iw.external.mapper.ZhaogangWorkbenchProfileMapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamMapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamMemberMapper;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.TeamEntity;
 import org.springframework.stereotype.Repository;
@@ -20,10 +23,14 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
     private final ZhaogangWorkbenchTeamMapper teamMapper;
     private final ZhaogangWorkbenchTeamMemberMapper memberMapper;
 
+    private final ZhaogangWorkbenchProfileMapper profileMapper;
+
     MybatisWorkbenchTeamRepository(ZhaogangWorkbenchTeamMapper teamMapper,
-                                   ZhaogangWorkbenchTeamMemberMapper memberMapper) {
+                                   ZhaogangWorkbenchTeamMemberMapper memberMapper,
+                                   ZhaogangWorkbenchProfileMapper profileMapper) {
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
+        this.profileMapper = profileMapper;
     }
 
     @Override
@@ -100,6 +107,19 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
         } else {
             memberMapper.updateProfile(actor.userId(), actor.userName(), actor.avatar());
         }
+        return require(teamId);
+    }
+
+    @Override
+    public List<MemberProfile> findMemberProfiles(long teamId, boolean includeActivity) {
+        return profileMapper.findMemberProfiles(teamId, includeActivity);
+    }
+
+    @Override
+    @Transactional
+    public StoredTeam updateMemberRole(long teamId, Actor actor, long targetUserId, UpdateMemberRoleCommand command) {
+        requireChanged(teamMapper.touchAsAdministrator(teamId, actor.userId(), command.versionNo()));
+        profileMapper.saveRole(actor.codingTeamId(), targetUserId, command.codingRole(), false);
         return require(teamId);
     }
 

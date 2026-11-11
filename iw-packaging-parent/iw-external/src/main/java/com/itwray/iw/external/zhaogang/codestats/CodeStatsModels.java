@@ -12,6 +12,9 @@ public final class CodeStatsModels {
         WORKBENCH_TEAM
     }
 
+    public record AutomaticSyncTarget(Scope scope, long codingTeamId, long scopeId) {
+    }
+
     public record TeamOption(long id, String name, int memberCount, boolean administrator) {
     }
 
@@ -78,10 +81,6 @@ public final class CodeStatsModels {
         }
     }
 
-    public record TeamSummary(long commitCount, long additions, long deletions, long netLines,
-                              int activeMembers, int memberCount, int unmappedCommitCount) {
-    }
-
     public record SelfSummary(long commitCount, long additions, long deletions, long netLines, int activeDays,
                               int repoCount, int branchCount) {
     }
@@ -106,7 +105,7 @@ public final class CodeStatsModels {
     }
 
     public record TeamStatistics(boolean dataReady, boolean refreshing, Range range, ScanState scan,
-                                 Coverage coverage, TeamSummary summary, List<MemberMonthly> members) {
+                                 Coverage coverage, List<MemberMonthly> members) {
         public TeamStatistics {
             members = members == null ? List.of() : List.copyOf(members);
         }

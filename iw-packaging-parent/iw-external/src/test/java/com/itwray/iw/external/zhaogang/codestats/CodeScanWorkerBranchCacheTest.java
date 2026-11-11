@@ -75,6 +75,20 @@ class CodeScanWorkerBranchCacheTest {
     }
 
     @Test
+    void scannedCommitsUseTheExistingGitRouteInTheRepositoryWebUrl() {
+        String repositoryUrl = "https://team.coding.net/p/project/d/repo/git";
+        when(coding.myDepots(anyString(), anyInt(), anyInt())).thenReturn(new CodingDepotPage(List.of(
+                new CodingDepot(1, 10, "project", "Project", "repo", repositoryUrl + "/", "git", "CODING")),
+                1, 1, 100));
+
+        assertEquals("COMPLETED", run(1, "2026-10").getStatus());
+        assertEquals(2, saved.size());
+        for (CommitEntity commit : saved) {
+            assertEquals(repositoryUrl + "/commit/" + commit.getSha(), commit.getCommitUrl());
+        }
+    }
+
+    @Test
     void coldScanCoalescesSameHeadAndWarmScanReadsNoCommitPages() {
         assertEquals("COMPLETED", run(1, "2026-10").getStatus());
         verify(coding, times(2)).commits(anyString(), any());

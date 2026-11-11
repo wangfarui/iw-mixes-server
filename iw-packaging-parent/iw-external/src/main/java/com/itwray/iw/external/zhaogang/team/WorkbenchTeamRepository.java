@@ -1,6 +1,8 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.TeamEntity;
 
@@ -24,6 +26,10 @@ interface WorkbenchTeamRepository {
     StoredTeam rename(long teamId, int versionNo, Actor actor, String name);
 
     StoredTeam join(long teamId, Actor actor);
+
+    List<MemberProfile> findMemberProfiles(long teamId, boolean includeActivity);
+
+    StoredTeam updateMemberRole(long teamId, Actor actor, long targetUserId, UpdateMemberRoleCommand command);
 
     StoredTeam removeMember(long teamId, int versionNo, Actor actor, long targetUserId);
 

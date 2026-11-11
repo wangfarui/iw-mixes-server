@@ -12,6 +12,7 @@ import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanState;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanTrigger;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.UpdateIdentityRequest;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
 
 import java.util.List;
 
@@ -52,13 +53,28 @@ public interface CodeStatsModule {
                    String codingTeamKey, String codingTeamHost) {
     }
 
-    record MemberCredential(long userId, String userName, String avatar, String token) {
+    record MemberCredential(long userId, String userName, String avatar, String token, CodingRole codingRole) {
+        public MemberCredential(long userId, String userName, String avatar, String token) {
+            this(userId, userName, avatar, token, null);
+        }
     }
 
     record ScopeInfo(Scope scope, long scopeId, long codingTeamId, String teamKey, String teamHost,
-                     String teamName, List<MemberCredential> members, boolean administrator) {
+                     String teamName, List<MemberCredential> members, boolean administrator,
+                     boolean automaticSyncEligible) {
+        public ScopeInfo(Scope scope, long scopeId, long codingTeamId, String teamKey, String teamHost,
+                         String teamName, List<MemberCredential> members, boolean administrator) {
+            this(scope, scopeId, codingTeamId, teamKey, teamHost, teamName, members, administrator, true);
+        }
+
         public ScopeInfo {
             members = members == null ? List.of() : List.copyOf(members);
+        }
+
+        List<MemberCredential> developmentMembers() {
+            return members.stream()
+                    .filter(member -> member.codingRole() == CodingRole.BACKEND || member.codingRole() == CodingRole.FRONTEND)
+                    .toList();
         }
     }
 }
