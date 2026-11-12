@@ -4,6 +4,7 @@ import com.itwray.iw.external.mapper.*;
 import com.itwray.iw.external.zhaogang.*;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.*;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.*;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
 import org.junit.jupiter.api.Test;
 import java.time.*;
 import java.util.*;
@@ -54,13 +55,104 @@ class CodeContinuousWorkerTest {
         when(repos.saveSyncCheckpoint(anyLong(),anyLong(),anyString())).thenAnswer(v->{checkpoint=v.getArgument(2);return 1;});
     }
     ScanJobEntity run(long id,String today) {
+        return run(id, today, scope, new CodeGitLineStats(coding, new ZhaogangProperties()));
+    }
+
+    private ScanJobEntity run(long id, String today, CodeStatsModule.ScopeInfo target, CodeGitLineStats git) {
+        return run(id, today, target, git, "AUTO", null);
+    }
+
+    private ScanJobEntity run(long id, String today, CodeStatsModule.ScopeInfo target, CodeGitLineStats git,
+                              String requestedMode, CodeRange fileTypePriority) {
         Clock clock=Clock.fixed(LocalDate.parse(today).atStartOfDay(CodeStatsSupport.CHINA_ZONE).toInstant(),CodeStatsSupport.CHINA_ZONE);
-        job=new ScanJobEntity();job.setId(id);job.setCodingTeamId(100L);job.setScopeType("SELF");job.setScopeId(1L);
+        job=new ScanJobEntity();job.setId(id);job.setCodingTeamId(100L);job.setScopeType(target.scope().name());job.setScopeId(target.scopeId());
         job.setMonth(YearMonth.now(clock).toString());job.setScanMode("SYNC");job.setSyncFrom(LocalDate.parse("2026-01-01"));job.setSyncTo(LocalDate.parse(today));
+        job.setRequestedMode(requestedMode);
         job.setTotalRepos(0);job.setDoneRepos(0);job.setTotalBranches(0);job.setDoneBranches(0);job.setTotalCommits(0);job.setDoneCommits(0);
         job.setTotalDiffs(0);job.setDoneDiffs(0);job.setFailedRepos(0);job.setFailedDiffs(0);job.setTruncated(false);
-        new CodeScanWorker(coding,jobs,repos,commits,identities,cache,new ZhaogangProperties(),clock)
-                .run(new CodeScanWorker.ScanInput(job,scope,YearMonth.now(clock),"SYNC",1));return job;
+        new CodeScanWorker(coding,jobs,repos,commits,identities,cache,new ZhaogangProperties(),clock,git)
+                .run(new CodeScanWorker.ScanInput(job, target, YearMonth.now(clock), "SYNC", 1,
+                        Map.of(), "", List.of(), fileTypePriority));
+        return job;
+    }
+
+    @Test
+    void teamSyncBackfillsIncompleteTypesWithGitOnlyWhenBothStoredTotalsMatch() {
+        var team = new CodeStatsModule.ScopeInfo(CodeStatsModels.Scope.WORKBENCH_TEAM, 9, 100, "team",
+                "https://example.com", "team",
+                List.of(new CodeStatsModule.MemberCredential(1, "one", "", "fixture-token", CodingRole.BACKEND)), true);
+        var incomplete = retryCommit(77L, a);
+        incomplete.setAdditions(22L);
+        incomplete.setDeletions(1L);
+        String partialTypes = CodeFileTypes.encode(Map.of(".java", new CodeFileTypes.Lines(0, 1)));
+        incomplete.setFileTypeStats(partialTypes);
+        var mismatched = retryCommit(78L, b);
+        mismatched.setAdditions(22L);
+        mismatched.setDeletions(1L);
+        when(commits.selectFileTypesBackfill(100L, 9L, LocalDateTime.parse("2026-11-01T00:00:00"),
+                LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), 30))
+                .thenReturn(List.of(incomplete, mismatched));
+        when(coding.commitDiff("fixture-token", 10L, 1L, a))
+                .thenReturn(new CodingCommitDiff(22, 1, 2, CodeFileTypes.decode(partialTypes)));
+        when(coding.commitDiff("fixture-token", 10L, 1L, b))
+                .thenThrow(new CodingOpenApiException("REQUEST_FAILED", "fixture"));
+        var git = mock(CodeGitLineStats.class);
+        var batch = mock(CodeGitLineStats.Batch.class);
+        when(git.batch(team)).thenReturn(batch);
+        var fullTypes = Map.of(".sql", new CodeFileTypes.Lines(22, 0), ".java", new CodeFileTypes.Lines(0, 1));
+        when(batch.count(incomplete, "fixture-token"))
+                .thenReturn(CodeGitLineStats.Result.ok(new CodingCommitDiff(22, 1, 2, fullTypes)));
+        when(batch.count(mismatched, "fixture-token")).thenReturn(CodeGitLineStats.Result.ok(
+                new CodingCommitDiff(21, 2, 1, Map.of(".sql", new CodeFileTypes.Lines(21, 2)))));
+
+        assertEquals("COMPLETED", run(1L, "2026-11-02", team, git).getStatus());
+        verify(commits).updateFileTypesBackfill(eq(77L), eq(22L), eq(1L), eq(partialTypes),
+                argThat(json -> fullTypes.equals(CodeFileTypes.decode(json))));
+        verify(commits).updateFileTypesBackfill(78L, 22L, 1L, null, null);
+        verify(commits, never()).updateDiff(anyLong(), any(), any(), any(), anyString(), any());
+    }
+
+    @Test
+    void manualTeamSyncKeepsSelectedDatesFirstInTheNextBatch() {
+        var team = new CodeStatsModule.ScopeInfo(CodeStatsModels.Scope.WORKBENCH_TEAM, 9, 100, "team",
+                "https://example.com", "team", List.of(
+                        new CodeStatsModule.MemberCredential(1, "one", "", "fixture-token", CodingRole.BACKEND),
+                        new CodeStatsModule.MemberCredential(2, "two", "", "fixture-two", CodingRole.FRONTEND)), true);
+        var firstBatch = new ArrayList<CommitEntity>();
+        for (int i = 0; i < 30; i++) {
+            var row = retryCommit(i + 10L, "%040x".formatted(i + 1));
+            row.setAdditions(5L);
+            row.setDeletions(0L);
+            firstBatch.add(row);
+        }
+        var secondMember = retryCommit(77L, b);
+        secondMember.setAdditions(22L);
+        secondMember.setDeletions(0L);
+        secondMember.setAuthorNameKey("two");
+        when(identities.resolve(anyMap(), nullable(String.class), eq("two")))
+                .thenReturn(new CodeIdentityResolver.Resolved(2L, false));
+        LocalDateTime startedAt = LocalDateTime.parse("2026-11-02T00:00:00");
+        var viewedRange = new CodeRange(LocalDate.parse("2026-10-06"), LocalDate.parse("2026-10-12"),
+                List.of(YearMonth.of(2026, 10)));
+        when(commits.selectFileTypesBackfill(100L, 9L, startedAt, viewedRange.from(), viewedRange.to(), 30))
+                .thenReturn(firstBatch, List.of(secondMember));
+        when(coding.commitDiff(eq("fixture-token"), eq(10L), eq(1L), anyString()))
+                .thenReturn(new CodingCommitDiff(5, 0, 1, Map.of(".java", new CodeFileTypes.Lines(5, 0))));
+        when(coding.commitDiff("fixture-two", 10L, 1L, b)).thenReturn(new CodingCommitDiff(22, 0, 1));
+        var git = mock(CodeGitLineStats.class);
+        var batch = mock(CodeGitLineStats.Batch.class);
+        when(git.batch(team)).thenReturn(batch);
+        when(batch.count(secondMember, "fixture-two"))
+                .thenReturn(CodeGitLineStats.Result.failed(CodeGitLineStats.Failure.PERMISSION_DENIED));
+        var sqlTypes = Map.of(".sql", new CodeFileTypes.Lines(22, 0));
+        when(batch.count(secondMember, "fixture-token"))
+                .thenReturn(CodeGitLineStats.Result.ok(new CodingCommitDiff(22, 0, 1, sqlTypes)));
+
+        assertEquals("COMPLETED", run(1L, "2026-11-02", team, git, "MANUAL", viewedRange).getStatus());
+        verify(commits, times(2)).selectFileTypesBackfill(100L, 9L, startedAt, viewedRange.from(), viewedRange.to(), 30);
+        verify(commits, times(30)).updateFileTypesBackfill(anyLong(), eq(5L), eq(0L), isNull(), anyString());
+        verify(commits).updateFileTypesBackfill(eq(77L), eq(22L), eq(0L), isNull(),
+                argThat(json -> sqlTypes.equals(CodeFileTypes.decode(json))));
     }
     @Test void sameHeadIsCoalescedAndRestartedCrossDaySyncReadsZeroCommitPages() throws Exception {
         assertEquals("COMPLETED",run(1,"2026-11-02").getStatus());

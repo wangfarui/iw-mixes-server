@@ -69,6 +69,24 @@ class DefaultWorkbenchTeamModuleTest {
     }
 
     @Test
+    void codeSyncTeamIncludesCurrentMemberRolesAndKeepsMembersWithoutRoles() {
+        WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
+        when(repository.findMemberProfiles(1L, false))
+                .thenReturn(List.of(new MemberProfile(200L, CodingRole.FRONTEND, null)));
+        var module = new DefaultWorkbenchTeamModule(repository);
+
+        var members = module.findCodeSyncTeam(10L, 1L).orElseThrow().members();
+
+        assertThat(members).hasSize(2);
+        assertThat(members).filteredOn(item -> item.userId() == 200L).singleElement()
+                .extracting(WorkbenchTeamModels.CodeSyncMember::codingRole).isEqualTo(CodingRole.FRONTEND);
+        assertThat(members).filteredOn(item -> item.userId() == 100L).singleElement()
+                .extracting(WorkbenchTeamModels.CodeSyncMember::codingRole).isNull();
+        verify(repository, never()).findMemberProfiles(1L, true);
+    }
+
+    @Test
     void roleEditRequiresCurrentTeamAdministratorAndTargetMembership() {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         StoredTeam stored = storedTeam();

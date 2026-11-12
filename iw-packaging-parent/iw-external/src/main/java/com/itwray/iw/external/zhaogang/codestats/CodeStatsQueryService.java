@@ -133,8 +133,10 @@ class CodeStatsQueryService {
         List<CodeStatsModels.CommitChange> commitChanges = new ArrayList<>();
         for (CommitEntity commit : mine) {
             if (!"OK".equals(commit.getDiffStatus()) || commit.getAdditions() == null || commit.getDeletions() == null) continue;
-            CodeFileTypes.decode(commit.getFileTypeStats()).forEach((type, lines) ->
-                    fileTypes.merge(type, lines, CodeFileTypes.Lines::plus));
+            Map<String, CodeFileTypes.Lines> types = CodeFileTypes.decode(commit.getFileTypeStats());
+            if (CodeFileTypes.remainder(types, commit.getAdditions(), commit.getDeletions()) != null) {
+                types.forEach((type, lines) -> fileTypes.merge(type, lines, CodeFileTypes.Lines::plus));
+            }
             if (commit.getFilesChanged() != null) {
                 commitChanges.add(new CodeStatsModels.CommitChange(commit.getSha(), commit.getDepotName(),
                         commit.getDepotId(), CodeStatsSupport.format(commit.getCommitAt()), commit.getMessage(),

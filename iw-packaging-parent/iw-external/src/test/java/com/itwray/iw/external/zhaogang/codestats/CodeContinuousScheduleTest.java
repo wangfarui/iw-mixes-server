@@ -3,10 +3,16 @@ package com.itwray.iw.external.zhaogang.codestats;
 import com.itwray.iw.external.mapper.ZhaogangCodeCommitMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanRepoMapper;
+import com.itwray.iw.external.mapper.ZhaogangCodeSyncTargetMapper;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.AutomaticSyncTarget;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.ScanJobEntity;
+import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
+import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncMember;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Scheduled;
 
@@ -34,6 +40,30 @@ import static org.mockito.Mockito.when;
 class CodeContinuousScheduleTest {
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-03T02:00:00Z"), CodeStatsSupport.CHINA_ZONE);
+
+    @Test
+    void automaticTeamSyncDispatchesWithDeveloperRolesAndKeepsOtherMembersForDiscovery() {
+        var teams = mock(WorkbenchTeamModule.class);
+        var credentials = mock(CodingCredentialService.class);
+        var targets = mock(ZhaogangCodeSyncTargetMapper.class);
+        var properties = new ZhaogangProperties();
+        var directory = new CodeStatsScopeDirectory(teams, credentials, targets, properties);
+        var scans = mock(CodeScanService.class);
+        var target = new AutomaticSyncTarget(Scope.WORKBENCH_TEAM, 100L, 8L);
+        when(targets.selectAutomaticTargets()).thenReturn(List.of(target));
+        when(teams.findCodeSyncTeam(100L, 8L)).thenReturn(Optional.of(new CodeSyncTeam(
+                "fixture", "team", "https://team.coding.net", List.of(
+                        new CodeSyncMember(1L, "dev", "", CodingRole.FRONTEND),
+                        new CodeSyncMember(2L, "qa", "", CodingRole.QA)))));
+        when(credentials.token(100L, 1L)).thenReturn(Optional.of("fixture-token"));
+        when(scans.hasScheduledSyncCapacity()).thenReturn(true);
+
+        new CodeContinuousSyncScheduler(directory, scans, properties).resumeAfterStartup();
+
+        verify(scans).scheduledSync(argThat(team -> team.members().size() == 2
+                && team.developmentMembers().stream().map(CodeStatsModule.MemberCredential::userId)
+                    .toList().equals(List.of(1L))), any());
+    }
 
     @Test
     void startupDiscoversBothScopesWithoutPreviousJobsAndDrainsWhenCapacityReturns() {
@@ -106,6 +136,24 @@ class CodeContinuousScheduleTest {
                     && latest.getSyncFrom().equals(job.getSyncFrom())
                     && LocalDate.now(clock).equals(job.getSyncTo())));
             verify(worker, timeout(1000)).run(any());
+        } finally {
+            service.shutdown();
+        }
+    }
+
+    @Test
+    void manualTeamSyncPassesSelectedDatesOnlyAsFileTypePriority() {
+        var jobs = mock(ZhaogangCodeScanJobMapper.class);
+        var worker = mock(CodeScanWorker.class);
+        var team = scope(Scope.WORKBENCH_TEAM, 8);
+        var viewedRange = new CodeRange(LocalDate.parse("2026-10-05"), LocalDate.parse("2026-10-11"),
+                List.of(YearMonth.of(2026, 10)));
+        var service = service(jobs, worker);
+        try {
+            assertTrue(service.triggerSync(team, viewedRange, 1).accepted());
+            verify(worker, timeout(1000)).run(argThat(input -> viewedRange.equals(input.fileTypePriority())
+                    && LocalDate.parse("2026-01-01").equals(input.job().getSyncFrom())
+                    && LocalDate.now(clock).equals(input.job().getSyncTo())));
         } finally {
             service.shutdown();
         }

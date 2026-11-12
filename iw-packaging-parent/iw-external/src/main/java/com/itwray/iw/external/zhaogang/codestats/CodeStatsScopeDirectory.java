@@ -79,7 +79,8 @@ class CodeStatsScopeDirectory {
                     var members = team.members().stream()
                             .map(member -> new CodeStatsModule.MemberCredential(member.userId(),
                                     member.userName(), member.avatar(),
-                                    credentials.token(target.codingTeamId(), member.userId()).orElse("")))
+                                    credentials.token(target.codingTeamId(), member.userId()).orElse(""),
+                                    member.codingRole()))
                             .toList();
                     return new CodeStatsModule.ScopeInfo(Scope.WORKBENCH_TEAM, target.scopeId(), target.codingTeamId(),
                             team.codingTeamKey(), team.codingTeamHost(), team.name(), members, false);

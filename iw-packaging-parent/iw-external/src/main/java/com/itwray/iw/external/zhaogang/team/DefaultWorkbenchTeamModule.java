@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.team;
 
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncMember;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CreateCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.InvitationPreview;
@@ -209,8 +210,16 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
     public Optional<CodeSyncTeam> findCodeSyncTeam(long codingTeamId, long teamId) {
         return repository.findById(teamId)
                 .filter(stored -> stored.team().getCodingTeamId() == codingTeamId)
-                .map(stored -> new CodeSyncTeam(stored.team().getName(),
-                        stored.team().getCodingTeamKey(), stored.team().getCodingTeamHost(), scopeMembers(stored)));
+                .map(stored -> {
+                    Map<Long, MemberProfile> profiles = memberProfiles(teamId, false);
+                    List<CodeSyncMember> members = stored.members().stream().map(member -> {
+                        MemberProfile profile = profiles.get(member.getCodingUserId());
+                        return new CodeSyncMember(member.getCodingUserId(), member.getUserName(), member.getAvatar(),
+                                profile == null ? null : profile.codingRole());
+                    }).toList();
+                    return new CodeSyncTeam(stored.team().getName(), stored.team().getCodingTeamKey(),
+                            stored.team().getCodingTeamHost(), members);
+                });
     }
 
     private List<WorklogMember> scopeMembers(StoredTeam stored) {
@@ -295,8 +304,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         requireMember(actor, stored);
         long administratorUserId = stored.team().getAdministratorUserId();
         boolean administrator = administratorUserId == actor.userId();
-        Map<Long, MemberProfile> profiles = repository.findMemberProfiles(stored.team().getId(), administrator).stream()
-                .collect(Collectors.toMap(MemberProfile::userId, Function.identity()));
+        Map<Long, MemberProfile> profiles = memberProfiles(stored.team().getId(), administrator);
         List<Member> members = stored.members().stream()
                 .map(member -> toMember(member, administratorUserId, administrator, profiles.get(member.getCodingUserId())))
                 .toList();
@@ -306,6 +314,11 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                 stored.team().getCodingTeamId(), stored.team().getCodingTeamKey(), stored.team().getCodingTeamHost(),
                 stored.team().getCreatorUserId(), administratorUserId, stored.team().getVersionNo(), members,
                 permissions, stored.team().getCreateTime(), stored.team().getUpdateTime());
+    }
+
+    private Map<Long, MemberProfile> memberProfiles(long teamId, boolean includeActivity) {
+        return repository.findMemberProfiles(teamId, includeActivity).stream()
+                .collect(Collectors.toMap(MemberProfile::userId, Function.identity()));
     }
 
     private Member toMember(MemberEntity member, long administratorUserId, boolean includeActivity,

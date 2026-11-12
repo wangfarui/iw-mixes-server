@@ -263,6 +263,8 @@ journalctl -u iw-external --since "1 hour ago" --no-pager
 journalctl -u iw-external -p err -n 100 --no-pager
 ```
 
+代码统计的 Git 补算需要支持 `GIT_CONFIG_COUNT`、`cat-file --batch-all-objects` 和 `--unordered` 的 Git。若系统 Git 版本较旧，可在 `iw-external.env` 中将 `IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE` 配置为兼容 Git 的绝对路径。
+
 ## Nginx 日志
 
 Nginx 部署在外网机器：

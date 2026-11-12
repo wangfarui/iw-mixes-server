@@ -40,9 +40,23 @@ public final class CodeFileTypes {
     static Map<String, Lines> decode(String value) {
         if (value == null) return Map.of();
         try {
-            return JSON.readValue(value, LINES);
+            Map<String, Lines> types = JSON.readValue(value, LINES);
+            return types == null ? Map.of() : types;
         } catch (JsonProcessingException e) {
             return Map.of();
         }
+    }
+
+    /** Returns the unclassified lines, or null if the breakdown cannot fit the stored totals. */
+    static Lines remainder(Map<String, Lines> types, long additions, long deletions) {
+        for (Lines lines : types.values()) {
+            if (lines == null || lines.additions() < 0 || lines.deletions() < 0
+                    || lines.additions() > additions || lines.deletions() > deletions) {
+                return null;
+            }
+            additions -= lines.additions();
+            deletions -= lines.deletions();
+        }
+        return new Lines(additions, deletions);
     }
 }

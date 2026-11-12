@@ -75,8 +75,11 @@ public class ZhaogangProperties {
     /** diff 请求超时时间。 */
     private int codeDiffTimeoutMs = 30000;
 
-    /** 仅在用户发起定向补算时，允许通过只读 HTTPS Git 获取缺失行数。 */
+    /** 允许通过只读 HTTPS Git 定向补算行数，以及在团队同步中补齐文件类型。 */
     private boolean codeGitLineStatsEnabled = true;
+
+    /** 支持运行时 Git 配置及对象大小检查的 Git 可执行文件绝对路径。 */
+    private String codeGitLineStatsExecutable = "/usr/bin/git";
 
     private int codeGitLineStatsTimeoutSeconds = 40;
 

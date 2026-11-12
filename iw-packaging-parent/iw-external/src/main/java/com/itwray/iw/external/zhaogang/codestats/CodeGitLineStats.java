@@ -55,7 +55,7 @@ class CodeGitLineStats {
     final class Batch {
         private final CodeStatsModule.ScopeInfo scope;
         private final Map<String, Optional<String>> usernames = new HashMap<>();
-        private final Set<Long> deniedDepots = new HashSet<>();
+        private final Map<String, Set<Long>> deniedDepots = new HashMap<>();
 
         private Batch(CodeStatsModule.ScopeInfo scope) {
             this.scope = scope;
@@ -66,14 +66,18 @@ class CodeGitLineStats {
             String sha = commit.getSha();
             String remote = repositoryUrl(properties.getTeam(), scope.teamKey(), commit.getProjectName(), commit.getDepotName());
             if (remote == null || sha == null || !SHA.matcher(sha).matches()) return Result.failed(Failure.INVALID_TARGET);
-            if (deniedDepots.contains(commit.getDepotId())) return Result.failed(Failure.PERMISSION_DENIED);
+            if (deniedDepots.getOrDefault(token, Set.of()).contains(commit.getDepotId())) {
+                return Result.failed(Failure.PERMISSION_DENIED);
+            }
             try {
                 if (!gitSlot.tryAcquire(5, TimeUnit.SECONDS)) return Result.failed(Failure.BUSY);
                 try {
                     String username = usernames.computeIfAbsent(token, this::resolveUsername).orElse(null);
                     if (username == null) return Result.failed(Failure.CREDENTIAL_UNAVAILABLE);
                     Result result = fetchAndCount(remote, sha.toLowerCase(Locale.ROOT), username, token);
-                    if (result.failure() == Failure.PERMISSION_DENIED) deniedDepots.add(commit.getDepotId());
+                    if (result.failure() == Failure.PERMISSION_DENIED) {
+                        deniedDepots.computeIfAbsent(token, ignored -> new HashSet<>()).add(commit.getDepotId());
+                    }
                     return result;
                 } finally {
                     gitSlot.release();
@@ -218,7 +222,11 @@ class CodeGitLineStats {
         if (System.nanoTime() >= deadline) throw new GitFailure(Failure.TIMEOUT);
         Path stdout = repo.resolve("iw-numstat.out");
         Path stderr = repo.resolve("iw-numstat.err");
-        List<String> args = new ArrayList<>(List.of("/usr/bin/git", "--no-replace-objects"));
+        String executable = properties.getCodeGitLineStatsExecutable();
+        if (executable == null || !executable.startsWith("/")) {
+            throw new GitFailure(Failure.EXECUTABLE_UNAVAILABLE);
+        }
+        List<String> args = new ArrayList<>(List.of(executable, "--no-replace-objects"));
         args.addAll(List.of(arguments));
         ProcessBuilder builder = new ProcessBuilder(args).directory(repo.toFile())
                 .redirectOutput(stdout.toFile()).redirectError(stderr.toFile());

@@ -52,6 +52,7 @@ iw:
       coding-issue-executor-concurrency: ${IW_CODING_ISSUE_EXECUTOR_CONCURRENCY:32}
       coding-issue-cache-seconds: ${IW_CODING_ISSUE_CACHE_SECONDS:30}
       code-git-line-stats-enabled: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_ENABLED:true}
+      code-git-line-stats-executable: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE:/usr/bin/git}
       code-git-line-stats-timeout-seconds: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_TIMEOUT_SECONDS:40}
       code-git-line-stats-max-bytes: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_MAX_BYTES:134217728}
       worklog-executor-concurrency: ${IW_WORKLOG_EXECUTOR_CONCURRENCY:8}

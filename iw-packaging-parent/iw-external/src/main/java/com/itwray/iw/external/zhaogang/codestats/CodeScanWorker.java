@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -48,6 +49,8 @@ class CodeScanWorker {
 
     private static final Logger log = LoggerFactory.getLogger(CodeScanWorker.class);
     static final String DIFF_RETRY = "DIFF_RETRY";
+    private static final int FILE_TYPES_BACKFILL_MAX_BATCHES = 4;
+    private static final long FILE_TYPES_BACKFILL_BUDGET = Duration.ofMinutes(2).toNanos();
 
     private final CodingOpenApiPort coding;
     private final ZhaogangCodeScanJobMapper jobMapper;
@@ -110,7 +113,8 @@ class CodeScanWorker {
             }
             List<IdentityEntity> selection = identities.mappings(input.scope());
             input = new ScanInput(input.job(), input.scope(), input.month(), input.mode(), input.requestedBy(),
-                    identities.mappingIndex(selection), identities.signature(selection), input.retryCommitIds());
+                    identities.mappingIndex(selection), identities.signature(selection), input.retryCommitIds(),
+                    input.fileTypePriority());
             job.setIdentitySignature(input.identitySignature());
             if (!retryOnly && !"SYNC".equals(input.mode())) pruneUnmatched(input);
             save(job);
@@ -846,39 +850,101 @@ class CodeScanWorker {
 
     private void backfillFileTypes(ScanInput input, ScanJobEntity job, Map<String, IdentityEntity> mappingIndex,
                                    Map<Long, MemberToken> memberTokens, Map<Long, List<String>> depotTokens) {
-        List<CommitEntity> historical = commitMapper.selectFileTypesBackfill(input.scope().codingTeamId(),
-                input.scope().scopeId());
         Set<Long> developerIds = new HashSet<>();
         input.scope().developmentMembers().forEach(member -> developerIds.add(member.userId()));
-        for (CommitEntity commit : historical) {
-            if (cancelled(job)) throw new ScanCancelledException();
-            var owner = identities.resolve(mappingIndex, commit.getAuthorEmailHash(), commit.getAuthorNameKey());
-            List<String> repositoryTokens = depotTokens.get(commit.getDepotId());
-            String stats = null;
-            if (!owner.ignored() && developerIds.contains(owner.memberId()) && repositoryTokens != null) {
-                List<String> tokens = diffTokens(memberTokens.get(owner.memberId()), repositoryTokens);
-                stats = readHistoricalFileTypes(commit, tokens);
+        if (developerIds.isEmpty()) return;
+        CodeGitLineStats.Batch gitBatch = properties.isCodeGitLineStatsEnabled()
+                ? gitLineStats.batch(input.scope()) : null;
+        LocalDateTime retryBefore = job.getStartedAt().withNano(0);
+        if (!"MANUAL".equals(job.getRequestedMode())) retryBefore = retryBefore.minusDays(1);
+        long started = System.nanoTime();
+        int batchSize = ZhaogangCodeCommitMapper.FILE_TYPES_BACKFILL_BATCH_SIZE;
+        for (int batch = 0; batch < FILE_TYPES_BACKFILL_MAX_BATCHES; batch++) {
+            CodeRange priority = input.fileTypePriority();
+            LocalDate priorityFrom = null;
+            LocalDate priorityTo = null;
+            if (priority != null) {
+                priorityFrom = priority.from();
+                priorityTo = priority.to();
+            } else if (batch == 0) {
+                // 自动同步首批优先补当月，后续继续消化历史积压。
+                priorityFrom = input.month().atDay(1);
+                priorityTo = input.month().atEndOfMonth();
             }
-            commitMapper.updateFileTypesBackfill(commit.getId(), stats);
+            List<CommitEntity> historical = commitMapper.selectFileTypesBackfill(input.scope().codingTeamId(),
+                    input.scope().scopeId(), retryBefore, priorityFrom, priorityTo, batchSize);
+            for (CommitEntity commit : historical) {
+                if (cancelled(job)) throw new ScanCancelledException();
+                if (System.nanoTime() - started >= FILE_TYPES_BACKFILL_BUDGET) return;
+                var owner = identities.resolve(mappingIndex, commit.getAuthorEmailHash(), commit.getAuthorNameKey());
+                List<String> repositoryTokens = depotTokens.get(commit.getDepotId());
+                String stats = null;
+                if (!owner.ignored() && developerIds.contains(owner.memberId()) && repositoryTokens != null) {
+                    List<String> tokens = diffTokens(memberTokens.get(owner.memberId()), repositoryTokens);
+                    stats = readHistoricalFileTypes(commit, tokens, job, gitBatch);
+                }
+                commitMapper.updateFileTypesBackfill(commit.getId(), commit.getAdditions(), commit.getDeletions(),
+                        commit.getFileTypeStats(), stats);
+                save(job);
+            }
+            if (historical.size() < batchSize || System.nanoTime() - started >= FILE_TYPES_BACKFILL_BUDGET) return;
         }
     }
 
-    private String readHistoricalFileTypes(CommitEntity commit, List<String> tokens) {
+    private String readHistoricalFileTypes(CommitEntity commit, List<String> tokens, ScanJobEntity job,
+                                           CodeGitLineStats.Batch gitBatch) {
+        String gitToken = null;
+        String codingFailure = "NO_CREDENTIAL";
         for (String token : new LinkedHashSet<>(tokens)) {
+            if (gitToken == null) gitToken = token;
             try {
                 CodingCommitDiff diff = coding.commitDiff(token, commit.getProjectId(), commit.getDepotId(), commit.getSha());
-                if (!diff.fileTypes().isEmpty()
-                        && Long.valueOf(diff.additions()).equals(commit.getAdditions())
-                        && Long.valueOf(diff.deletions()).equals(commit.getDeletions())) {
-                    return CodeFileTypes.encode(diff.fileTypes());
-                }
-                return null;
+                codingFailure = fileTypeMismatch(commit, diff);
+                if (codingFailure == null) return CodeFileTypes.encode(diff.fileTypes());
+                gitToken = token;
+                break;
             } catch (CodingOpenApiException e) {
                 if (Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
-                if (CodeDiffFailure.classify(e) != CodeDiffFailure.PERMISSION_DENIED) return null;
+                CodeDiffFailure reason = CodeDiffFailure.classify(e);
+                codingFailure = reason.name();
+                if (reason != CodeDiffFailure.PERMISSION_DENIED) {
+                    gitToken = token;
+                    break;
+                }
             }
         }
+        String gitFailure = gitBatch == null ? "DISABLED" : "NO_CREDENTIAL";
+        if (gitBatch != null && gitToken != null) {
+            Set<String> candidates = new LinkedHashSet<>();
+            candidates.add(gitToken);
+            candidates.addAll(tokens);
+            for (String token : candidates) {
+                if (cancelled(job)) throw new ScanCancelledException();
+                save(job);
+                CodeGitLineStats.Result git = gitBatch.count(commit, token);
+                if (cancelled(job) || Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
+                if (git.stats() != null) {
+                    gitFailure = fileTypeMismatch(commit, git.stats());
+                    if (gitFailure == null) return CodeFileTypes.encode(git.stats().fileTypes());
+                    break;
+                }
+                gitFailure = git.failure().name();
+                if (git.failure() != CodeGitLineStats.Failure.PERMISSION_DENIED
+                        && git.failure() != CodeGitLineStats.Failure.CREDENTIAL_UNAVAILABLE) break;
+            }
+        }
+        log.info("zhaogang code file types not backfilled, jobId={}, depotId={}, sha={}, coding={}, git={}",
+                job.getId(), commit.getDepotId(), diagnosticSha(commit.getSha()), codingFailure, gitFailure);
         return null;
+    }
+
+    private static String fileTypeMismatch(CommitEntity commit, CodingCommitDiff diff) {
+        if (diff.additions() != commit.getAdditions() || diff.deletions() != commit.getDeletions()) {
+            return "TOTAL_MISMATCH";
+        }
+        CodeFileTypes.Lines remainder = CodeFileTypes.remainder(diff.fileTypes(), diff.additions(), diff.deletions());
+        return remainder != null && remainder.additions() == 0 && remainder.deletions() == 0
+                ? null : "INCOMPLETE_FILE_TYPES";
     }
 
     private void fetchDiff(CommitEntity commit, List<String> candidates, ScanJobEntity job, CodeGitLineStats.Batch gitBatch) {
@@ -1057,9 +1123,14 @@ class CodeScanWorker {
 
     record ScanInput(ScanJobEntity job, CodeStatsModule.ScopeInfo scope, YearMonth month, String mode,
                      long requestedBy, Map<String, IdentityEntity> identityIndex, String identitySignature,
-                     List<Long> retryCommitIds) {
+                     List<Long> retryCommitIds, CodeRange fileTypePriority) {
+        ScanInput(ScanJobEntity job, CodeStatsModule.ScopeInfo scope, YearMonth month, String mode, long requestedBy,
+                  Map<String, IdentityEntity> identityIndex, String identitySignature, List<Long> retryCommitIds) {
+            this(job, scope, month, mode, requestedBy, identityIndex, identitySignature, retryCommitIds, null);
+        }
+
         ScanInput(ScanJobEntity job, CodeStatsModule.ScopeInfo scope, YearMonth month, String mode, long requestedBy) {
-            this(job, scope, month, mode, requestedBy, Map.of(), "", List.of());
+            this(job, scope, month, mode, requestedBy, Map.of(), "", List.of(), null);
         }
     }
 

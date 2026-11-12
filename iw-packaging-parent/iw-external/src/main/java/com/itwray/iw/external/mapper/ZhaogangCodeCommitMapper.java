@@ -10,9 +10,11 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
+    int FILE_TYPES_BACKFILL_BATCH_SIZE = 30;
 
     @Insert("""
             <script>
@@ -111,23 +113,43 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
                    @Param("fileTypeStats") String fileTypeStats);
 
     @Select("""
-            select * from external_zhaogang_code_commit
+            select c.* from external_zhaogang_code_commit c
              where coding_team_id = #{codingTeamId} and scope_type = 'WORKBENCH_TEAM' and scope_id = #{scopeId}
-               and is_merge = 0 and diff_status = 'OK' and file_type_stats is null
+               and is_merge = 0 and diff_status = 'OK'
                and binary depot_name <> 'online.base.apijar.service'
+               and additions is not null and deletions is not null
                and (additions > 0 or deletions > 0)
-               and (file_types_checked_at is null or file_types_checked_at < current_timestamp - interval 1 day)
-             order by file_types_checked_at, commit_date desc, id desc
-             limit 30
+               and (file_types_checked_at is null or file_types_checked_at < #{retryBefore})
+               and not exists (
+                   select 1
+                     from json_table(c.file_type_stats, '$.*' columns (
+                         added bigint path '$.additions', deleted bigint path '$.deletions'
+                     )) as classified
+                   having sum(added) = c.additions and sum(deleted) = c.deletions
+                      and min(added) >= 0 and min(deleted) >= 0
+                      and count(added) = count(*) and count(deleted) = count(*)
+               )
+             order by case when commit_date between #{priorityFrom} and #{priorityTo} then 0 else 1 end,
+                      file_types_checked_at, commit_date desc, id desc
+             limit #{batchSize}
             """)
-    List<CommitEntity> selectFileTypesBackfill(@Param("codingTeamId") long codingTeamId, @Param("scopeId") long scopeId);
+    List<CommitEntity> selectFileTypesBackfill(@Param("codingTeamId") long codingTeamId, @Param("scopeId") long scopeId,
+                                               @Param("retryBefore") LocalDateTime retryBefore,
+                                               @Param("priorityFrom") LocalDate priorityFrom,
+                                               @Param("priorityTo") LocalDate priorityTo,
+                                               @Param("batchSize") int batchSize);
 
     @Update("""
             update external_zhaogang_code_commit
-               set file_type_stats = #{fileTypeStats}, file_types_checked_at = current_timestamp
-             where id = #{id} and diff_status = 'OK' and file_type_stats is null
+               set file_type_stats = coalesce(cast(#{fileTypeStats} as json), file_type_stats),
+                   file_types_checked_at = current_timestamp
+             where id = #{id} and diff_status = 'OK'
+               and additions = #{additions} and deletions = #{deletions}
+               and file_type_stats <=> cast(#{previousStats} as json)
             """)
-    int updateFileTypesBackfill(@Param("id") long id, @Param("fileTypeStats") String fileTypeStats);
+    int updateFileTypesBackfill(@Param("id") long id, @Param("additions") long additions,
+                                @Param("deletions") long deletions, @Param("previousStats") String previousStats,
+                                @Param("fileTypeStats") String fileTypeStats);
 
     @Update("""
             update external_zhaogang_code_commit

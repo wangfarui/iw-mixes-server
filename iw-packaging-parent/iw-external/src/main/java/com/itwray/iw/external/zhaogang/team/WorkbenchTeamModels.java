@@ -73,7 +73,10 @@ public final class WorkbenchTeamModels {
     public record WorklogTeamScope(long id, String name, String codingTeamHost, List<WorklogMember> members) {
     }
 
-    public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<WorklogMember> members) {
+    public record CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole) {
+    }
+
+    public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members) {
     }
 
     public record IterationMemberOption(long userId, String userName, String avatar) {
