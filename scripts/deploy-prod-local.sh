@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 CORE_HOST="${IW_LOCAL_CORE_HOST:-aliyun87}"
-EXTERNAL_HOST="${IW_LOCAL_EXTERNAL_HOST:-aliyun183}"
+EXTERNAL_HOST="${IW_LOCAL_EXTERNAL_HOST:-aliyun87}"
 REMOTE_TMP_DIR="${IW_LOCAL_REMOTE_TMP_DIR:-/tmp/iw-mixes-server-local-deploy}"
 JAVA_VERSION="${IW_LOCAL_JAVA_VERSION:-17}"
 MVN_BIN="/usr/local/maven/apache-maven-3.8.6/bin/mvn"

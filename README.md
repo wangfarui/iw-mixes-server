@@ -108,7 +108,7 @@ bash scripts/deploy-prod-local.sh status core
 
 脚本使用 JDK 17、固定 Maven `/usr/local/maven/apache-maven-3.8.6/bin/mvn`、本地仓库 `/usr/local/maven/repository` 和临时中性 settings。发现环境变量或 `.mvn` 配置中的仓库冲突时停止。
 
-构建执行 `clean package`，清理历史版本 JAR。目标目录必须恰好有一个可发布 JAR，否则在上传前停止；上传前输出实际路径和 SHA-256。默认 SSH 主机为 core 的 `aliyun87` 和 external 的 `aliyun183`，可通过 `IW_LOCAL_CORE_HOST`、`IW_LOCAL_EXTERNAL_HOST` 覆盖。
+构建执行 `clean package`，清理历史版本 JAR。目标目录必须恰好有一个可发布 JAR，否则在上传前停止；上传前输出实际路径和 SHA-256。`core` 和 `external` 的默认 SSH 主机均为 `aliyun87`，可分别通过 `IW_LOCAL_CORE_HOST`、`IW_LOCAL_EXTERNAL_HOST` 覆盖。
 
 脚本上传后调用 `deploy/scripts/deploy-jar.sh`，更新服务 JAR 软链接并重启所选服务。`restart` 只重启现有包，更新代码必须使用 `deploy`。服务 active 仅说明进程存活，发布后还需验证业务接口。
 
