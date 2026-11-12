@@ -41,6 +41,7 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
               additions = case when values(diff_status) = 'SKIPPED_REPOSITORY' then null else additions end,
               deletions = case when values(diff_status) = 'SKIPPED_REPOSITORY' then null else deletions end,
               files_changed = case when values(diff_status) = 'SKIPPED_REPOSITORY' then null else files_changed end,
+              file_type_stats = case when values(diff_status) = 'SKIPPED_REPOSITORY' then null else file_type_stats end,
               diff_status = case when values(diff_status) = 'SKIPPED_REPOSITORY' then values(diff_status) else diff_status end,
               update_time = current_timestamp
             </script>
@@ -49,12 +50,12 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
 
     @Update("""
             update external_zhaogang_code_commit
-               set additions = null, deletions = null, files_changed = null,
+               set additions = null, deletions = null, files_changed = null, file_type_stats = null,
                    diff_status = 'SKIPPED_REPOSITORY', update_time = current_timestamp
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
                and month = #{month} and binary depot_name = binary #{depotName} and is_merge = 0
                and (diff_status <> 'SKIPPED_REPOSITORY' or additions is not null
-                    or deletions is not null or files_changed is not null)
+                    or deletions is not null or files_changed is not null or file_type_stats is not null)
             """)
     int applyCommitCountOnlyPolicy(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
                                   @Param("scopeId") long scopeId, @Param("month") String month,
@@ -101,11 +102,32 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
     @Update("""
             update external_zhaogang_code_commit
                set additions = #{additions}, deletions = #{deletions}, files_changed = #{filesChanged},
+                   file_type_stats = #{fileTypeStats},
                    diff_status = #{diffStatus}, update_time = current_timestamp
              where id = #{id}
             """)
     int updateDiff(@Param("id") long id, @Param("additions") Long additions, @Param("deletions") Long deletions,
-                   @Param("filesChanged") Integer filesChanged, @Param("diffStatus") String diffStatus);
+                   @Param("filesChanged") Integer filesChanged, @Param("diffStatus") String diffStatus,
+                   @Param("fileTypeStats") String fileTypeStats);
+
+    @Select("""
+            select * from external_zhaogang_code_commit
+             where coding_team_id = #{codingTeamId} and scope_type = 'WORKBENCH_TEAM' and scope_id = #{scopeId}
+               and is_merge = 0 and diff_status = 'OK' and file_type_stats is null
+               and binary depot_name <> 'online.base.apijar.service'
+               and (additions > 0 or deletions > 0)
+               and (file_types_checked_at is null or file_types_checked_at < current_timestamp - interval 1 day)
+             order by file_types_checked_at, commit_date desc, id desc
+             limit 30
+            """)
+    List<CommitEntity> selectFileTypesBackfill(@Param("codingTeamId") long codingTeamId, @Param("scopeId") long scopeId);
+
+    @Update("""
+            update external_zhaogang_code_commit
+               set file_type_stats = #{fileTypeStats}, file_types_checked_at = current_timestamp
+             where id = #{id} and diff_status = 'OK' and file_type_stats is null
+            """)
+    int updateFileTypesBackfill(@Param("id") long id, @Param("fileTypeStats") String fileTypeStats);
 
     @Update("""
             update external_zhaogang_code_commit

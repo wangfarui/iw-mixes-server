@@ -812,15 +812,13 @@ class CodeScanWorker {
             CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex,
                     commit.getAuthorEmailHash(), commit.getAuthorNameKey());
             if (CodeLinePolicy.commitCountOnly(commit.getDepotName())) {
-                commitMapper.updateDiff(commit.getId(), null, null, null, CodeLinePolicy.SKIPPED_REPOSITORY);
+                commitMapper.updateDiff(commit.getId(), null, null, null, CodeLinePolicy.SKIPPED_REPOSITORY, null);
             } else if (resolved.memberId() == null || !memberIds.contains(resolved.memberId())) {
                 if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
                 else commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
             } else {
-                List<String> candidates = new ArrayList<>();
-                MemberToken ownerToken = memberTokens.get(resolved.memberId());
-                if (ownerToken != null) candidates.add(ownerToken.token());
-                candidates.addAll(depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens));
+                List<String> candidates = diffTokens(memberTokens.get(resolved.memberId()),
+                        depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens));
                 if (candidates.isEmpty()) {
                     if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
                     else commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
@@ -832,8 +830,55 @@ class CodeScanWorker {
             job.setDoneDiffs(processed);
             if (retryOnly || processed % 25 == 0) save(job);
         }
+        if (!retryOnly && !depots.isEmpty() && input.scope().scope() == Scope.WORKBENCH_TEAM) {
+            backfillFileTypes(input, job, mappingIndex, memberTokens, depotTokens);
+        }
         job.setStage("AGGREGATING");
         save(job);
+    }
+
+    private List<String> diffTokens(MemberToken ownerToken, List<String> repositoryTokens) {
+        List<String> candidates = new ArrayList<>();
+        if (ownerToken != null) candidates.add(ownerToken.token());
+        candidates.addAll(repositoryTokens);
+        return candidates;
+    }
+
+    private void backfillFileTypes(ScanInput input, ScanJobEntity job, Map<String, IdentityEntity> mappingIndex,
+                                   Map<Long, MemberToken> memberTokens, Map<Long, List<String>> depotTokens) {
+        List<CommitEntity> historical = commitMapper.selectFileTypesBackfill(input.scope().codingTeamId(),
+                input.scope().scopeId());
+        Set<Long> developerIds = new HashSet<>();
+        input.scope().developmentMembers().forEach(member -> developerIds.add(member.userId()));
+        for (CommitEntity commit : historical) {
+            if (cancelled(job)) throw new ScanCancelledException();
+            var owner = identities.resolve(mappingIndex, commit.getAuthorEmailHash(), commit.getAuthorNameKey());
+            List<String> repositoryTokens = depotTokens.get(commit.getDepotId());
+            String stats = null;
+            if (!owner.ignored() && developerIds.contains(owner.memberId()) && repositoryTokens != null) {
+                List<String> tokens = diffTokens(memberTokens.get(owner.memberId()), repositoryTokens);
+                stats = readHistoricalFileTypes(commit, tokens);
+            }
+            commitMapper.updateFileTypesBackfill(commit.getId(), stats);
+        }
+    }
+
+    private String readHistoricalFileTypes(CommitEntity commit, List<String> tokens) {
+        for (String token : new LinkedHashSet<>(tokens)) {
+            try {
+                CodingCommitDiff diff = coding.commitDiff(token, commit.getProjectId(), commit.getDepotId(), commit.getSha());
+                if (!diff.fileTypes().isEmpty()
+                        && Long.valueOf(diff.additions()).equals(commit.getAdditions())
+                        && Long.valueOf(diff.deletions()).equals(commit.getDeletions())) {
+                    return CodeFileTypes.encode(diff.fileTypes());
+                }
+                return null;
+            } catch (CodingOpenApiException e) {
+                if (Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
+                if (CodeDiffFailure.classify(e) != CodeDiffFailure.PERMISSION_DENIED) return null;
+            }
+        }
+        return null;
     }
 
     private void fetchDiff(CommitEntity commit, List<String> candidates, ScanJobEntity job, CodeGitLineStats.Batch gitBatch) {
@@ -854,8 +899,7 @@ class CodeScanWorker {
                 if (Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
                 continue;
             }
-            commitMapper.updateDiff(commit.getId(), (long) diff.additions(), (long) diff.deletions(),
-                    diff.filesChanged(), "OK");
+            storeDiff(commit, diff);
             return;
         }
         CodeGitLineStats.Failure gitFailure = null;
@@ -865,8 +909,7 @@ class CodeScanWorker {
             if (cancelled(job) || Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
             if (git.stats() != null) {
                 CodingCommitDiff stats = git.stats();
-                commitMapper.updateDiff(commit.getId(), (long) stats.additions(), (long) stats.deletions(),
-                        stats.filesChanged(), "OK");
+                storeDiff(commit, stats);
                 log.info("zhaogang code diff filled, jobId={}, projectId={}, depotId={}, sha={}, source=GIT, additions={}, deletions={}, files={}",
                         job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
                         stats.additions(), stats.deletions(), stats.filesChanged());
@@ -877,11 +920,16 @@ class CodeScanWorker {
         CodeDiffFailure failure = failures.stream().map(DiffAttempt::reason)
                 .min(java.util.Comparator.comparingInt(CodeScanWorker::diffFailurePriority))
                 .orElse(CodeDiffFailure.REQUEST_FAILED);
-        commitMapper.updateDiff(commit.getId(), null, null, null, failure.status());
+        commitMapper.updateDiff(commit.getId(), null, null, null, failure.status(), null);
         log.info("zhaogang code diff failed, jobId={}, projectId={}, depotId={}, sha={}, reason={}, gitFallback={}, attempts={}",
                 job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
                 failure.name(), gitFailure, failures.stream().limit(8).toList());
         job.setFailedDiffs(job.getFailedDiffs() + 1);
+    }
+
+    private void storeDiff(CommitEntity commit, CodingCommitDiff diff) {
+        commitMapper.updateDiff(commit.getId(), (long) diff.additions(), (long) diff.deletions(), diff.filesChanged(),
+                "OK", diff.fileTypes().isEmpty() ? null : CodeFileTypes.encode(diff.fileTypes()));
     }
 
     private static boolean isGitFallbackCandidate(CodeDiffFailure reason, Integer httpStatus) {

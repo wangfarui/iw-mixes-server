@@ -211,7 +211,7 @@ class CodeScanWorkerBranchCacheTest {
         assertEquals("COMPLETED", run(2, "2026-10").getStatus());
         assertTrue(saved.stream().allMatch(row -> "SKIPPED_REPOSITORY".equals(row.getDiffStatus())));
         verify(coding, never()).commitDiff(anyString(), anyLong(), anyLong(), nullable(String.class));
-        verify(commits, atLeastOnce()).updateDiff(77L, null, null, null, "SKIPPED_REPOSITORY");
+        verify(commits, atLeastOnce()).updateDiff(77L, null, null, null, "SKIPPED_REPOSITORY", null);
     }
 
     @Test

@@ -129,8 +129,26 @@ class CodeStatsQueryService {
                             commit.getAuthorEmailHash(), commit.getAuthorNameKey());
                     return !resolved.ignored() && resolved.memberId() != null && resolved.memberId() == memberUserId;
                 }).toList();
+        Map<String, CodeFileTypes.Lines> fileTypes = new LinkedHashMap<>();
+        List<CodeStatsModels.CommitChange> commitChanges = new ArrayList<>();
+        for (CommitEntity commit : mine) {
+            if (!"OK".equals(commit.getDiffStatus()) || commit.getAdditions() == null || commit.getDeletions() == null) continue;
+            CodeFileTypes.decode(commit.getFileTypeStats()).forEach((type, lines) ->
+                    fileTypes.merge(type, lines, CodeFileTypes.Lines::plus));
+            if (commit.getFilesChanged() != null) {
+                commitChanges.add(new CodeStatsModels.CommitChange(commit.getSha(), commit.getDepotName(),
+                        commit.getDepotId(), CodeStatsSupport.format(commit.getCommitAt()), commit.getMessage(),
+                        commit.getAdditions(), commit.getDeletions(), commit.getFilesChanged(), commit.getCommitUrl()));
+            }
+        }
+        List<CodeStatsModels.FileTypeChange> fileTypeChanges = fileTypes.entrySet().stream()
+                .map(entry -> new CodeStatsModels.FileTypeChange(entry.getKey(),
+                        entry.getValue().additions(), entry.getValue().deletions()))
+                .sorted(Comparator.comparingLong(CodeStatsModels.FileTypeChange::changedLines).reversed()
+                        .thenComparing(CodeStatsModels.FileTypeChange::type))
+                .toList();
         return new MemberStatistics(new User(member.userId(), member.userName(), member.avatar()), summary(mine),
-                daily(range, mine, scope.codingTeamId()));
+                daily(range, mine, scope.codingTeamId()), fileTypeChanges, commitChanges);
     }
 
     static long entryMemberId(CodeStatsModule.ScopeInfo scope, Long memberUserId) {

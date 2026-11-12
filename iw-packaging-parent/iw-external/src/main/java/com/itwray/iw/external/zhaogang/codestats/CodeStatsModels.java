@@ -122,9 +122,22 @@ public final class CodeStatsModels {
         }
     }
 
-    public record MemberStatistics(User member, SelfSummary summary, List<Daily> daily) {
+    public record FileTypeChange(String type, long additions, long deletions) {
+        public long changedLines() {
+            return additions + deletions;
+        }
+    }
+
+    public record CommitChange(String sha, String depotName, long depotId, String commitAt, String message,
+                               long additions, long deletions, int filesChanged, String commitUrl) {
+    }
+
+    public record MemberStatistics(User member, SelfSummary summary, List<Daily> daily,
+                                   List<FileTypeChange> fileTypes, List<CommitChange> commitChanges) {
         public MemberStatistics {
             daily = daily == null ? List.of() : List.copyOf(daily);
+            fileTypes = fileTypes == null ? List.of() : List.copyOf(fileTypes);
+            commitChanges = commitChanges == null ? List.of() : List.copyOf(commitChanges);
         }
     }
 

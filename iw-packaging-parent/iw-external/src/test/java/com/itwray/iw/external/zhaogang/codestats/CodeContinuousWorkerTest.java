@@ -125,10 +125,10 @@ class CodeContinuousWorkerTest {
         doThrow(new CodingOpenApiException("FailedOperation","diff 修改文件过多，不宜在网页展示"))
                 .when(coding).commitDiff(anyString(),anyLong(),anyLong(),anyString());
         assertEquals("PARTIAL",run(1,"2026-11-03").getStatus());
-        verify(commits).updateDiff(77L, null, null, null, "DIFF_UPSTREAM_LIMIT");
+        verify(commits).updateDiff(77L, null, null, null, "DIFF_UPSTREAM_LIMIT", null);
         // 行数不可用不影响已完成元数据的可见范围清理，不能永久保留已不可达提交。
         verify(commits,times(11)).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
-        verify(commits,never()).updateDiff(77L,0L,0L,0,"OK");
+        verify(commits,never()).updateDiff(77L,0L,0L,0,"OK", null);
     }
 
     @Test void targetedRetryOnlyReadsSelectedFailedDiffWithoutScanningOrCleaningHistory() {
@@ -153,7 +153,7 @@ class CodeContinuousWorkerTest {
         assertEquals(1, job.getDoneDiffs());
         verify(coding).commitDiff("fixture-token", 10L, 1L, a);
         verifyNoMoreInteractions(coding);
-        verify(commits).updateDiff(77L, 1L, 0L, 1, "OK");
+        verify(commits).updateDiff(77L, 1L, 0L, 1, "OK", null);
         verify(commits, never()).cleanupFullScan(anyLong(), anyString(), anyLong(), anyString(), anyLong());
         verify(cache).bumpScanVersion("100:SELF:1", "diff-retry");
     }
@@ -192,10 +192,10 @@ class CodeContinuousWorkerTest {
         assertEquals("PARTIAL", job.getStatus());
         assertEquals(4, job.getDoneDiffs());
         assertEquals(2, job.getFailedDiffs());
-        verify(commits).updateDiff(77L, 1L, 0L, 1, "OK");
-        verify(commits).updateDiff(78L, 0L, 23954L, 1, "OK");
-        verify(commits).updateDiff(79L, null, null, null, "DIFF_UPSTREAM_LIMIT");
-        verify(commits).updateDiff(80L, null, null, null, "DIFF_PERMISSION_DENIED");
+        verify(commits).updateDiff(77L, 1L, 0L, 1, "OK", null);
+        verify(commits).updateDiff(78L, 0L, 23954L, 1, "OK", null);
+        verify(commits).updateDiff(79L, null, null, null, "DIFF_UPSTREAM_LIMIT", null);
+        verify(commits).updateDiff(80L, null, null, null, "DIFF_PERMISSION_DENIED", null);
         verify(batch, never()).count(eq(forbidden), anyString());
     }
 

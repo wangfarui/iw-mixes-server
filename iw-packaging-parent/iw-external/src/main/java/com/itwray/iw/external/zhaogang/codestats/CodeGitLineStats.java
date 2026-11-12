@@ -178,6 +178,7 @@ class CodeGitLineStats {
     static CodingCommitDiff parseNumstat(String output) throws GitFailure {
         String[] entries = output.split("\\x00", -1);
         int additions = 0, deletions = 0, files = 0;
+        Map<String, CodeFileTypes.Lines> fileTypes = new LinkedHashMap<>();
         if (!entries[entries.length - 1].isEmpty()) throw new GitFailure(Failure.INVALID_OUTPUT);
         try {
             for (int index = 0; index < entries.length - 1; index++) {
@@ -187,24 +188,29 @@ class CodeGitLineStats {
                 if (first <= 0 || second <= first + 1) throw new GitFailure(Failure.INVALID_OUTPUT);
                 String added = entry.substring(0, first);
                 String deleted = entry.substring(first + 1, second);
+                String oldPath = entry.substring(second + 1);
+                String newPath = oldPath;
+                if (oldPath.isEmpty()) {
+                    // -z 下重命名格式为 counts + NUL + oldPath + NUL + newPath + NUL。
+                    if (index + 2 >= entries.length - 1 || entries[index + 1].isEmpty()
+                            || entries[index + 2].isEmpty()) throw new GitFailure(Failure.INVALID_OUTPUT);
+                    oldPath = entries[++index];
+                    newPath = entries[++index];
+                }
                 if (!"-".equals(added) || !"-".equals(deleted)) {
                     int a = Integer.parseInt(added), d = Integer.parseInt(deleted);
                     if (a < 0 || d < 0) throw new GitFailure(Failure.INVALID_OUTPUT);
                     additions = Math.addExact(additions, a);
                     deletions = Math.addExact(deletions, d);
-                }
-                if (second == entry.length() - 1) {
-                    // -z 下重命名格式为 counts + NUL + oldPath + NUL + newPath + NUL。
-                    if (index + 2 >= entries.length - 1 || entries[index + 1].isEmpty()
-                            || entries[index + 2].isEmpty()) throw new GitFailure(Failure.INVALID_OUTPUT);
-                    index += 2;
+                    CodeFileTypes.add(fileTypes, newPath, a, 0);
+                    CodeFileTypes.add(fileTypes, oldPath, 0, d);
                 }
                 files++;
             }
         } catch (NumberFormatException | ArithmeticException invalid) {
             throw new GitFailure(Failure.INVALID_OUTPUT);
         }
-        return new CodingCommitDiff(additions, deletions, files);
+        return new CodingCommitDiff(additions, deletions, files, fileTypes);
     }
 
     private String command(Path repo, long deadline, Map<String, String> httpConfig, String... arguments)

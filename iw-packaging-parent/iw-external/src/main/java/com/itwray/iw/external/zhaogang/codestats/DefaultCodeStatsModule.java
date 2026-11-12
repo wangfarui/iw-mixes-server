@@ -119,7 +119,7 @@ class DefaultCodeStatsModule implements CodeStatsModule {
                                              long memberUserId) {
         ScopeInfo info = directory.resolve(context, Scope.WORKBENCH_TEAM, workbenchTeamId);
         CodeRange range = CodeRange.parse(from, to, properties.getCodeStatsRetentionMonths(), clock);
-        String key = "member:" + cache.scopeKey(info) + ":" + memberUserId + ":" + range.from() + ":" + range.to()
+        String key = "member-v2:" + cache.scopeKey(info) + ":" + memberUserId + ":" + range.from() + ":" + range.to()
                 + ":" + versions(info, range);
         Optional<MemberStatistics> cached = cache.get(key, MemberStatistics.class);
         if (cached.isPresent()) return cached.get();

@@ -1,7 +1,10 @@
 package com.itwray.iw.external.zhaogang;
 
+import com.itwray.iw.external.zhaogang.codestats.CodeFileTypes.Lines;
+
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /** CODING OpenAPI 的内部接口；业务模块不向 Controller 泄露其 Action 和原始字段。 */
 public interface CodingOpenApiPort {
@@ -239,7 +242,10 @@ public interface CodingOpenApiPort {
         }
     }
 
-    record CodingCommitDiff(int additions, int deletions, int filesChanged) {
+    record CodingCommitDiff(int additions, int deletions, int filesChanged, Map<String, Lines> fileTypes) {
+        public CodingCommitDiff(int additions, int deletions, int filesChanged) {
+            this(additions, deletions, filesChanged, Map.of());
+        }
     }
 }
 

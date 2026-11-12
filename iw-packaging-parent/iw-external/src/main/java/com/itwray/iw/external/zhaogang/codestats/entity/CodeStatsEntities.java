@@ -106,6 +106,7 @@ public final class CodeStatsEntities {
         private Long additions;
         private Long deletions;
         private Integer filesChanged;
+        private String fileTypeStats;
         private String diffStatus;
         private Boolean isMerge;
         private String commitUrl;

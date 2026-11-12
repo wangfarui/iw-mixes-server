@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,9 +34,11 @@ class CodeGitLineStatsTest {
         commit(source, "new branch head");
 
         Path rootFetch = fetch(source, root, 2, "root-bare");
-        assertEquals(new CodingCommitDiff(1, 0, 1), stats.countFetched(rootFetch, root, stats.deadline()));
+        assertEquals(new CodingCommitDiff(1, 0, 1, Map.of(".md", new CodeFileTypes.Lines(1, 0))),
+                stats.countFetched(rootFetch, root, stats.deadline()));
         Path largeFetch = fetch(source, large, 2, "large-bare");
-        assertEquals(new CodingCommitDiff(0, 23_954, 1), stats.countFetched(largeFetch, large, stats.deadline()));
+        assertEquals(new CodingCommitDiff(0, 23_954, 1, Map.of(".json", new CodeFileTypes.Lines(0, 23_954))),
+                stats.countFetched(largeFetch, large, stats.deadline()));
     }
 
     @Test

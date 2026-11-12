@@ -15,6 +15,7 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.TeamDirectory;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Worklog;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.WorklogPage;
+import com.itwray.iw.external.zhaogang.codestats.CodeFileTypes;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,11 +179,24 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         if (diffs.isEmpty()) diffs = array(response, "Diffs", "DiffList", "Files");
         int additions = 0;
         int deletions = 0;
+        Map<String, CodeFileTypes.Lines> fileTypes = new LinkedHashMap<>();
         for (JsonNode diff : diffs) {
-            additions += intValue(diff, "Insertions", "Additions", "Added");
-            deletions += intValue(diff, "Deletions", "Deleted");
+            int added = intValue(diff, "Insertions", "Additions", "Added");
+            int deleted = intValue(diff, "Deletions", "Deleted");
+            additions += added;
+            deletions += deleted;
+            String path = diffPath(diff, "Path", "FilePath", "FileName");
+            String oldPath = diffPath(diff, "OldPath", "OldFilePath", "old_path", "oldPath");
+            String newPath = diffPath(diff, "NewPath", "NewFilePath", "new_path", "newPath");
+            CodeFileTypes.add(fileTypes, StringUtils.firstNonBlank(newPath, path, oldPath), added, 0);
+            CodeFileTypes.add(fileTypes, StringUtils.firstNonBlank(oldPath, path, newPath), 0, deleted);
         }
-        return new CodingCommitDiff(additions, deletions, diffs.size());
+        return new CodingCommitDiff(additions, deletions, diffs.size(), fileTypes);
+    }
+
+    private String diffPath(JsonNode diff, String... keys) {
+        String path = text(diff, keys);
+        return "/dev/null".equals(path) ? null : path;
     }
 
     private boolean hasDiffArray(JsonNode node) {

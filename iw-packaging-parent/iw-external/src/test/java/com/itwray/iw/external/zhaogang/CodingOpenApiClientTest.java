@@ -670,7 +670,10 @@ class CodingOpenApiClientTest {
                 return;
             }
             respond(exchange, """
-                    {"Response":{"Diffs":[{"Insertions":10,"Deletions":2},{"Insertions":5,"Deletions":1}]}}
+                    {"Response":{"Diffs":[
+                      {"OldPath":"src/model.java","NewPath":"src/model.TS","Insertions":10,"Deletions":2},
+                      {"FilePath":"README","Insertions":5,"Deletions":1}
+                    ]}}
                     """);
         });
 
@@ -679,6 +682,10 @@ class CodingOpenApiClientTest {
         assertEquals(15, diff.additions());
         assertEquals(3, diff.deletions());
         assertEquals(2, diff.filesChanged());
+        assertEquals(10L, diff.fileTypes().get(".ts").additions());
+        assertEquals(2L, diff.fileTypes().get(".java").deletions());
+        assertEquals(5L, diff.fileTypes().get("无扩展名").additions());
+        assertEquals(1L, diff.fileTypes().get("无扩展名").deletions());
     }
 
     @Test

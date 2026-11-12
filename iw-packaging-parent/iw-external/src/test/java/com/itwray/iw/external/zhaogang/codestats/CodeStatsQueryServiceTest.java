@@ -129,6 +129,33 @@ class CodeStatsQueryServiceTest {
     }
 
     @Test
+    void memberChartsKeepHistoricalTotalsAndExcludeUnavailableDiffsAndOtherMembers() {
+        CodeStatsModule.ScopeInfo scope = teamScope();
+        when(identityMapper.selectByScope(100L, "SELF", 1L))
+                .thenReturn(List.of(mapping("EMAIL", "e1", 1L, false)));
+        when(identityMapper.selectByScope(100L, "SELF", 2L))
+                .thenReturn(List.of(mapping("EMAIL", "e2", 2L, false)));
+        CommitEntity categorized = commit("typed", "e1", "n1", "2026-10-02T10:00:00", "OK", 10, 3, 2, "main");
+        categorized.setFileTypeStats("""
+                {".java":{"additions":10,"deletions":2},".xml":{"additions":0,"deletions":1}}
+                """);
+        CommitEntity historical = commit("old", "e1", "n1", "2026-10-03T10:00:00", "OK", 9, 1, 1, "main");
+        CommitEntity unavailable = commit("failed", "e1", "n1", "2026-10-04T10:00:00", "FAILED", null, null, null, "main");
+        CommitEntity otherMember = commit("other", "e2", "n2", "2026-10-05T10:00:00", "OK", 10, 3, 2, "main");
+        otherMember.setFileTypeStats(categorized.getFileTypeStats());
+        when(commitMapper.selectForRange(anyLong(), anyString(), anyLong(), any(), any()))
+                .thenReturn(List.of(categorized, historical, unavailable, otherMember));
+
+        var result = service.memberStatistics(scope, range, 1L);
+
+        assertEquals(3, result.summary().commitCount());
+        assertEquals(23, result.summary().additions() + result.summary().deletions());
+        assertEquals(List.of("old", "typed"), result.commitChanges().stream().map(CodeStatsModels.CommitChange::sha).toList());
+        assertEquals(List.of(new CodeStatsModels.FileTypeChange(".java", 10, 2),
+                new CodeStatsModels.FileTypeChange(".xml", 0, 1)), result.fileTypes());
+    }
+
+    @Test
     void selfStatisticsFillsEveryDayAndUsesWorkCalendarDayType() {
         CodeStatsModule.ScopeInfo scope = selfScope();
         when(identityMapper.selectByScope(100L, "SELF", 1L))

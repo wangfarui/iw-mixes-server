@@ -457,6 +457,8 @@ create table external_zhaogang_code_commit
     additions            bigint unsigned null comment '新增行数；null=未统计',
     deletions            bigint unsigned null comment '删除行数；null=未统计',
     files_changed        int unsigned    null comment '修改文件数；null=未统计',
+    file_type_stats      json            null comment '各扩展名新增与删除行数，SQL NULL 表示未统计',
+    file_types_checked_at datetime       null comment '历史文件类型最近一次补算时间',
     diff_status          varchar(24)     not null comment 'PENDING/OK/SKIPPED_UNMAPPED/SKIPPED_MERGE/SKIPPED_REPOSITORY/FAILED/TOO_LARGE',
     is_merge             tinyint(1) default 0 not null comment '是否合并提交（Parents>1）',
     commit_url           varchar(768)    not null default '' comment 'CODING提交Web地址',
