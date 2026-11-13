@@ -12,6 +12,7 @@ import com.itwray.iw.external.zhaogang.ZhaogangModels.SessionStatus;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.TokenValue;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModule;
@@ -289,6 +290,18 @@ public class ZhaogangController {
                                                      HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(worklogModule.absences(worklogContext(sessionManager.resolve(request, response)),
                 month, scope, workbenchTeamId, refresh));
+    }
+
+    @GetMapping("/worklogs/issue-check")
+    @Operation(summary = "查询工时事项后台查验状态")
+    public GeneralResponse<IssueCheckStatus> worklogIssueCheck(
+            @RequestParam @NotBlank String scope,
+            @RequestParam(required = false) Long workbenchTeamId,
+            @RequestParam @NotBlank String checkId,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return GeneralResponse.success(worklogModule.issueCheck(worklogContext(sessionManager.resolve(request, response)),
+                scope, workbenchTeamId, checkId));
     }
 
     private String tokenFromAuthorization(String authorization) {

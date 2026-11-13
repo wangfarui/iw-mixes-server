@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.worklog;
 
+import com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader.IssueKey;
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.CodingPermissionError;
@@ -8,7 +9,7 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Worklog;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Day;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.DayType;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Schedule;
-import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
+import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Coverage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.DailyTotal;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
@@ -18,12 +19,15 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Item;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberDailyTotal;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberAbsence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberIssue;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MonthlySnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Project;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheck;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Scope;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Summary;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.User;
 import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -44,14 +48,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+@Slf4j
 @Component
 class WorklogQueryService {
 
@@ -64,32 +70,32 @@ class WorklogQueryService {
     private final Clock clock;
     private final ExecutorService memberExecutor;
     private final boolean ownsExecutor;
-    private final Map<IssueKey, CompletableFuture<IssueLookup>> issueRequests = new ConcurrentHashMap<>();
+    private final WorklogDeletedIssues deletedIssues;
+    private final WorklogIssueChecks issueChecks;
 
     @Autowired
     WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder,
-                        com.itwray.iw.external.zhaogang.ZhaogangProperties properties) {
+                        ZhaogangProperties properties, WorklogDeletedIssues deletedIssues, WorklogIssueChecks issueChecks) {
         this(coding, issueLinkBuilder, Clock.system(CHINA_ZONE),
                 Executors.newFixedThreadPool(Math.max(1, properties.getWorklogExecutorConcurrency()),
-                        daemonThreadFactory()), true);
-    }
-
-    WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder, Clock clock) {
-        this(coding, issueLinkBuilder, clock, ForkJoinPool.commonPool(), false);
+                        daemonThreadFactory()), true, deletedIssues, issueChecks);
     }
 
     WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder, Clock clock,
-                        ExecutorService memberExecutor) {
-        this(coding, issueLinkBuilder, clock, memberExecutor, false);
+                        WorklogDeletedIssues deletedIssues, WorklogIssueChecks issueChecks) {
+        this(coding, issueLinkBuilder, clock, ForkJoinPool.commonPool(), false, deletedIssues, issueChecks);
     }
 
     private WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder, Clock clock,
-                                ExecutorService memberExecutor, boolean ownsExecutor) {
+                                ExecutorService memberExecutor, boolean ownsExecutor,
+                                WorklogDeletedIssues deletedIssues, WorklogIssueChecks issueChecks) {
         this.coding = coding;
         this.issueLinkBuilder = issueLinkBuilder;
         this.clock = clock;
         this.memberExecutor = memberExecutor;
         this.ownsExecutor = ownsExecutor;
+        this.deletedIssues = deletedIssues;
+        this.issueChecks = issueChecks;
     }
 
     @PreDestroy
@@ -97,25 +103,68 @@ class WorklogQueryService {
         if (ownsExecutor) memberExecutor.shutdownNow();
     }
 
-    Statistics queryStatistics(WorklogModule.Context context, Team team, Scope scope, Long workbenchTeamId,
-                               List<WorklogModule.MemberCredential> requestedMembers, YearMonth month,
-                               Schedule schedule) {
-        return queryStatistics(context, team, scope, workbenchTeamId, requestedMembers, month, schedule, Map.of());
+    LocalDate today() {
+        return LocalDate.now(clock);
     }
 
-    Statistics queryStatistics(WorklogModule.Context context, Team team, Scope scope, Long workbenchTeamId,
+    MonthlySnapshot queryMonth(WorklogModule.Context context, Scope scope, Long workbenchTeamId,
                                List<WorklogModule.MemberCredential> requestedMembers, YearMonth month,
-                               Schedule schedule, Map<Long, Set<LocalDate>> leaveDatesByMember) {
+                               Schedule schedule, Map<Long, Set<LocalDate>> leaveDatesByMember, LocalDate today,
+                               long deletionRevision, boolean refresh) {
         List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
-        if (members.isEmpty() && scope == Scope.WORKBENCH_TEAM) {
-            return emptyStatistics(scope, workbenchTeamId, month, schedule);
-        }
         LocalDate from = month.atDay(1);
-        LocalDate toExclusive = month.plusMonths(1).atDay(1);
-        List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive);
-        List<ResolvedWorklog> worklogs = resolveWorklogs(team.host(), memberResults, from, toExclusive);
+        LocalDate monthEnd = month.plusMonths(1).atDay(1);
+        LocalDate absenceEnd = absenceEnd(month, today);
+        if (members.isEmpty() && scope == Scope.WORKBENCH_TEAM) {
+            return new MonthlySnapshot(emptyStatistics(scope, workbenchTeamId, month, schedule),
+                    emptyAbsence(scope, workbenchTeamId, month, absenceEnd));
+        }
+
+        long fetchStarted = System.nanoTime();
+        List<MemberLogs> memberResults = fetchMembers(members, from, monthEnd, today);
+        long lookupStarted = System.nanoTime();
+        List<PendingWorklog> monthItems = worklogsInRange(memberResults, from, monthEnd);
+        // 先按登记日期裁剪再去重，两个视图共享事项查验结果。
+        List<PendingWorklog> absenceItems = absenceEnd.equals(monthEnd) ? monthItems
+                : worklogsInRange(memberResults, from, absenceEnd);
+        var candidates = absenceItems == monthItems ? monthItems.stream()
+                : Stream.concat(monthItems.stream(), absenceItems.stream());
+        Set<Long> deleted = findDeleted(context, candidates);
+        List<PendingWorklog> monthWorklogs = excludeDeleted(monthItems, deleted);
+        List<PendingWorklog> absenceWorklogs = absenceItems == monthItems ? monthWorklogs
+                : excludeDeleted(absenceItems, deleted);
+        var check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
+                absenceItems == monthItems ? monthWorklogs.stream()
+                : Stream.concat(monthWorklogs.stream(), absenceWorklogs.stream()), deletionRevision, refresh);
+        long aggregationStarted = System.nanoTime();
+        String syncedAt = syncedAt();
+        Statistics statistics = statistics(scope, workbenchTeamId, members, month, schedule, leaveDatesByMember,
+                memberResults, monthWorklogs, from, monthEnd, today, syncedAt, check);
+        Absence absences = absenceEnd.equals(from)
+                ? emptyAbsence(scope, workbenchTeamId, month, absenceEnd)
+                : absences(scope, workbenchTeamId, members, month, schedule, leaveDatesByMember,
+                        memberResults, absenceWorklogs, from, absenceEnd, syncedAt, check);
+        log.debug("工时月度快照 scope={} members={} fetchMs={} localFilterMs={} aggregationMs={}",
+                scope, members.size(), TimeUnit.NANOSECONDS.toMillis(lookupStarted - fetchStarted),
+                TimeUnit.NANOSECONDS.toMillis(aggregationStarted - lookupStarted),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - aggregationStarted));
+        return new MonthlySnapshot(statistics, absences);
+    }
+
+    LocalDate absenceEnd(YearMonth month, LocalDate today) {
+        LocalDate from = month.atDay(1);
+        LocalDate monthEnd = month.plusMonths(1).atDay(1);
+        if (today.isBefore(from)) return from;
+        return today.isBefore(monthEnd) ? today : monthEnd;
+    }
+
+    private Statistics statistics(Scope scope, Long workbenchTeamId,
+                                  List<WorklogModule.MemberCredential> members, YearMonth month, Schedule schedule,
+                                  Map<Long, Set<LocalDate>> leaveDatesByMember, List<MemberLogs> memberResults,
+                                  List<PendingWorklog> worklogs, LocalDate from, LocalDate toExclusive,
+                                  LocalDate today, String syncedAt, IssueCheck check) {
         List<Worklog> allItems = distinctWorklogs(worklogs).stream()
-                .map(ResolvedWorklog::worklog).toList();
+                .map(PendingWorklog::worklog).toList();
         Map<Long, List<Worklog>> itemsByMember = worklogsByMember(worklogs);
         Map<Long, MemberLogs> resultsByMember = resultsByMember(memberResults);
         List<MemberDailyTotal> memberDailyTotals = scope == Scope.WORKBENCH_TEAM
@@ -125,7 +174,7 @@ class WorklogQueryService {
                             itemsByMember.getOrDefault(member.userId(), List.of()),
                             from, toExclusive, schedule);
                     return new MemberDailyTotal(new User(member.userId(), member.userName(), member.avatar()),
-                            totals, summary(totals, leaveDatesByMember.getOrDefault(member.userId(), Set.of())));
+                            totals, summary(totals, leaveDatesByMember.getOrDefault(member.userId(), Set.of()), today));
                 })
                 .toList()
                 : List.of();
@@ -137,62 +186,49 @@ class WorklogQueryService {
                     return result != null && !result.failed() && !result.partial();
                 })
                 .mapToInt(member -> eligibleWorkdayCount(schedule,
-                        leaveDatesByMember.getOrDefault(member.userId(), Set.of()), from, toExclusive))
+                        leaveDatesByMember.getOrDefault(member.userId(), Set.of()), from, toExclusive, today))
                 .sum();
         Summary aggregateSummary = scope == Scope.WORKBENCH_TEAM
                 ? aggregateMemberSummaries(memberDailyTotals, dailyTotals, aggregateWorkdayCount)
                 : summary(dailyTotals, aggregateWorkdayCount);
-        return new Statistics(coverage, month.toString(), schedule.versionNo(), syncedAt(),
+        return new Statistics(coverage, month.toString(), schedule.versionNo(), syncedAt,
                 aggregateSummary,
-                dailyTotals, memberDailyTotals);
+                dailyTotals, memberDailyTotals, check);
     }
 
     Entries queryEntries(WorklogModule.Context context, Team team, Scope scope, Long workbenchTeamId,
                          List<WorklogModule.MemberCredential> requestedMembers, LocalDate from,
-                         LocalDate toExclusive) {
+                         LocalDate toExclusive, long deletionRevision, boolean refresh) {
         List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
         if (members.isEmpty() && scope == Scope.WORKBENCH_TEAM) {
             return emptyEntries(scope, workbenchTeamId, from, toExclusive);
         }
-        List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive);
-        List<ResolvedWorklog> worklogs = distinctWorklogs(
-                resolveWorklogs(team.host(), memberResults, from, toExclusive));
+        List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive, today());
+        List<PendingWorklog> items = worklogsInRange(memberResults, from, toExclusive);
+        List<PendingWorklog> worklogs = distinctWorklogs(excludeDeleted(items, findDeleted(context, items.stream())));
+        var check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
+                worklogs.stream(), deletionRevision, refresh);
         Comparator<Worklog> byRegistrationTime = Comparator.comparingLong(this::sortStart).reversed()
                 .thenComparing(Comparator.comparingLong(this::sortSecondary).reversed())
                 .thenComparing(Comparator.comparingLong(Worklog::id).reversed());
         Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
                 (map, member) -> map.put(member.userId(), member), LinkedHashMap::putAll);
         List<Item> entries = worklogs.stream()
-                .sorted(Comparator.comparing(ResolvedWorklog::worklog, byRegistrationTime))
-                .map(item -> toItem(context, team, memberMap, item.lookup().issue(), item.worklog()))
+                .sorted(Comparator.comparing(PendingWorklog::worklog, byRegistrationTime))
+                .map(item -> toItem(context, team, memberMap, item.issueKey() == null ? null
+                        : issueChecks.cachedIssue(item.token(), item.issueKey()), item.worklog()))
                 .toList();
         BigDecimal totalHours = entries.stream().map(Item::hours).reduce(BigDecimal.ZERO, BigDecimal::add);
         Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
-                projectCount(worklogs.stream().map(ResolvedWorklog::worklog).toList()));
-        return new Entries(coverage, from.toString(), toExclusive.toString(), syncedAt(), normalizeHours(totalHours), entries);
+                projectCount(worklogs.stream().map(PendingWorklog::worklog).toList()));
+        return new Entries(coverage, from.toString(), toExclusive.toString(), syncedAt(),
+                normalizeHours(totalHours), entries, check);
     }
 
-    Absence queryAbsences(WorklogModule.Context context, Team team, Scope scope, Long workbenchTeamId,
-                          List<WorklogModule.MemberCredential> requestedMembers, YearMonth month,
-                          Schedule schedule) {
-        return queryAbsences(context, team, scope, workbenchTeamId, requestedMembers, month, schedule, Map.of());
-    }
-
-    Absence queryAbsences(WorklogModule.Context context, Team team, Scope scope, Long workbenchTeamId,
-                          List<WorklogModule.MemberCredential> requestedMembers, YearMonth month,
-                          Schedule schedule, Map<Long, Set<LocalDate>> leaveDatesByMember) {
-        List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
-        LocalDate from = month.atDay(1);
-        LocalDate monthEndExclusive = month.plusMonths(1).atDay(1);
-        LocalDate today = LocalDate.now(clock);
-        LocalDate toExclusive = today.isBefore(monthEndExclusive) ? today : monthEndExclusive;
-        if (toExclusive.isBefore(from)) toExclusive = from;
-        final LocalDate rangeEnd = toExclusive;
-        if (!rangeEnd.isAfter(from) || (members.isEmpty() && scope == Scope.WORKBENCH_TEAM)) {
-            return emptyAbsence(scope, workbenchTeamId, month, from, rangeEnd);
-        }
-        List<MemberLogs> memberResults = fetchMembers(members, from, monthEndExclusive);
-        List<ResolvedWorklog> worklogs = resolveWorklogs(team.host(), memberResults, from, rangeEnd);
+    private Absence absences(Scope scope, Long workbenchTeamId,
+                             List<WorklogModule.MemberCredential> members, YearMonth month, Schedule schedule,
+                             Map<Long, Set<LocalDate>> leaveDatesByMember, List<MemberLogs> memberResults,
+                             List<PendingWorklog> worklogs, LocalDate from, LocalDate rangeEnd, String syncedAt, IssueCheck check) {
         Map<Long, List<Worklog>> itemsByMember = worklogsByMember(worklogs);
         Map<Long, MemberLogs> resultsByMember = resultsByMember(memberResults);
         Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
@@ -210,8 +246,8 @@ class WorklogQueryService {
                 .filter(java.util.Objects::nonNull)
                 .toList();
         Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
-                projectCount(worklogs.stream().map(ResolvedWorklog::worklog).toList()));
-        return new Absence(coverage, month.toString(), from.toString(), rangeEnd.toString(), syncedAt(), absentMembers);
+                projectCount(worklogs.stream().map(PendingWorklog::worklog).toList()));
+        return new Absence(coverage, month.toString(), from.toString(), rangeEnd.toString(), syncedAt, absentMembers, check);
     }
 
     private List<WorklogModule.MemberCredential> normalizeMembers(List<WorklogModule.MemberCredential> requestedMembers) {
@@ -223,9 +259,9 @@ class WorklogQueryService {
     }
 
     private List<MemberLogs> fetchMembers(List<WorklogModule.MemberCredential> members, LocalDate from,
-                                          LocalDate toExclusive) {
+                                          LocalDate toExclusive, LocalDate today) {
         // CODING 按提交时间返回记录。拉取至今天结束，才能覆盖历史区间内的补登工时。
-        LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
+        LocalDate tomorrow = today.plusDays(1);
         LocalDate fetchToExclusive = toExclusive.isBefore(tomorrow) ? tomorrow : toExclusive;
         long requestFrom = from.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() - 1;
         long requestTo = fetchToExclusive.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() + 1;
@@ -244,9 +280,9 @@ class WorklogQueryService {
         return results;
     }
 
-    private Map<Long, List<Worklog>> worklogsByMember(List<ResolvedWorklog> items) {
-        return items.stream().collect(Collectors.groupingBy(ResolvedWorklog::memberId,
-                Collectors.mapping(ResolvedWorklog::worklog, Collectors.toList())));
+    private Map<Long, List<Worklog>> worklogsByMember(List<PendingWorklog> items) {
+        return items.stream().collect(Collectors.groupingBy(PendingWorklog::memberId,
+                Collectors.mapping(PendingWorklog::worklog, Collectors.toList())));
     }
 
     private Map<Long, MemberLogs> resultsByMember(List<MemberLogs> results) {
@@ -318,10 +354,9 @@ class WorklogQueryService {
                 toExclusive.toString(), syncedAt(), BigDecimal.ZERO, List.of());
     }
 
-    private Absence emptyAbsence(Scope scope, Long workbenchTeamId, YearMonth month, LocalDate from,
-                                 LocalDate toExclusive) {
+    Absence emptyAbsence(Scope scope, Long workbenchTeamId, YearMonth month, LocalDate toExclusive) {
         return new Absence(new Coverage(scope, workbenchTeamId, 0, 0, false, 0, ""), month.toString(),
-                from.toString(), toExclusive.toString(), syncedAt(), List.of());
+                month.atDay(1).toString(), toExclusive.toString(), syncedAt(), List.of());
     }
 
     private String syncedAt() {
@@ -336,8 +371,8 @@ class WorklogQueryService {
         return new ArrayList<>(deduplicated.values());
     }
 
-    private List<ResolvedWorklog> distinctWorklogs(List<ResolvedWorklog> items) {
-        Map<String, ResolvedWorklog> deduplicated = new LinkedHashMap<>();
+    private List<PendingWorklog> distinctWorklogs(List<PendingWorklog> items) {
+        Map<String, PendingWorklog> deduplicated = new LinkedHashMap<>();
         items.forEach(item -> deduplicated.putIfAbsent(worklogKey(item.worklog()), item));
         return new ArrayList<>(deduplicated.values());
     }
@@ -354,11 +389,6 @@ class WorklogQueryService {
                 .map(entry -> new DailyTotal(entry.getKey().toString(), normalizeHours(entry.getValue()),
                         dayTypes.getOrDefault(entry.getKey(), DayType.REST_DAY)))
                 .toList();
-    }
-
-    private List<AbsenceDay> absenceDays(List<Worklog> items, LocalDate from, LocalDate toExclusive,
-                                         Schedule schedule) {
-        return absenceDays(items, from, toExclusive, schedule, Set.of());
     }
 
     private List<AbsenceDay> absenceDays(List<Worklog> items, LocalDate from, LocalDate toExclusive,
@@ -379,14 +409,10 @@ class WorklogQueryService {
                 .toList();
     }
 
-    private Summary summary(List<DailyTotal> dailyTotals) {
-        return summary(dailyTotals, Set.of());
-    }
-
-    private Summary summary(List<DailyTotal> dailyTotals, Set<LocalDate> leaveDates) {
+    private Summary summary(List<DailyTotal> dailyTotals, Set<LocalDate> leaveDates, LocalDate today) {
         int workdayCount = (int) dailyTotals.stream()
                 .filter(item -> item.dayType() == DayType.WORKDAY)
-                .filter(item -> LocalDate.parse(item.date()).isBefore(LocalDate.now(clock)))
+                .filter(item -> LocalDate.parse(item.date()).isBefore(today))
                 .filter(item -> !leaveDates.contains(LocalDate.parse(item.date())))
                 .count();
         return summary(dailyTotals, workdayCount);
@@ -433,8 +459,7 @@ class WorklogQueryService {
     }
 
     private int eligibleWorkdayCount(Schedule schedule, Set<LocalDate> leaveDates,
-                                     LocalDate from, LocalDate toExclusive) {
-        LocalDate today = LocalDate.now(clock);
+                                     LocalDate from, LocalDate toExclusive, LocalDate today) {
         return (int) from.datesUntil(toExclusive)
                 .filter(date -> date.isBefore(today))
                 .filter(date -> !leaveDates.contains(date))
@@ -465,44 +490,39 @@ class WorklogQueryService {
         }
     }
 
-    private List<ResolvedWorklog> resolveWorklogs(String teamHost, List<MemberLogs> memberResults,
-                                                  LocalDate from, LocalDate toExclusive) {
-        List<ResolvedWorklog> items = new ArrayList<>();
-        Map<IssueKey, CompletableFuture<IssueLookup>> pending = new LinkedHashMap<>();
-        CompletableFuture<IssueLookup> unknown = CompletableFuture.completedFuture(IssueLookup.UNKNOWN);
+    private List<PendingWorklog> worklogsInRange(List<MemberLogs> memberResults, LocalDate from,
+                                                  LocalDate toExclusive) {
+        List<PendingWorklog> items = new ArrayList<>();
         for (MemberLogs member : memberResults) {
-            if (member.items().isEmpty()) continue;
-            String fingerprint = CodingCredentialService.fingerprint(member.token());
             for (Worklog item : deduplicate(member.items(), from, toExclusive)) {
-                CompletableFuture<IssueLookup> lookup = unknown;
-                if (item.issueCode() > 0 && StringUtils.isNotBlank(item.projectName())) {
-                    IssueKey key = new IssueKey(teamHost, item.projectName(), item.issueCode(), fingerprint);
-                    lookup = pending.computeIfAbsent(key, ignored -> requestIssue(member.token(), key));
-                }
-                items.add(new ResolvedWorklog(item, member.userId(), lookup));
+                IssueKey key = item.issueCode() > 0 && StringUtils.isNotBlank(item.projectName())
+                        ? new IssueKey(item.projectName(), item.issueCode()) : null;
+                items.add(new PendingWorklog(item, member.userId(), member.token(), key));
             }
         }
-        return items.stream()
-                .filter(item -> !item.lookup().missing())
-                .toList();
+        return items;
     }
 
-    private CompletableFuture<IssueLookup> requestIssue(String token, IssueKey key) {
-        // 合并并发查验，下一次重新计算工时时再向 CODING 确认事项是否存在。
-        CompletableFuture<IssueLookup> future = issueRequests.computeIfAbsent(key,
-                ignored -> CompletableFuture.supplyAsync(() -> fetchIssue(token, key), memberExecutor));
-        return future.whenComplete((ignored, error) -> issueRequests.remove(key, future));
+    private Set<Long> findDeleted(WorklogModule.Context context, Stream<PendingWorklog> items) {
+        Set<Long> ids = items.map(item -> item.worklog().issueId()).filter(id -> id > 0)
+                .collect(Collectors.toSet());
+        return ids.isEmpty() ? Set.of() : deletedIssues.find(context.codingTeamId(), ids);
     }
 
-    private IssueLookup fetchIssue(String token, IssueKey key) {
-        try {
-            return new IssueLookup(coding.issue(token, key.projectName(), key.issueCode()), false);
-        } catch (CodingOpenApiException error) {
-            boolean missing = "InvalidParameterValue".equals(error.code()) && "issue_not_exist".equals(error.getMessage());
-            return new IssueLookup(null, missing);
-        } catch (RuntimeException ignored) {
-            return IssueLookup.UNKNOWN;
-        }
+    private List<PendingWorklog> excludeDeleted(List<PendingWorklog> items, Set<Long> deleted) {
+        return items.stream().filter(item -> !deleted.contains(item.worklog().issueId())).toList();
+    }
+
+    private IssueCheck enqueueCheck(WorklogModule.Context context, Long workbenchTeamId, Stream<PendingWorklog> items,
+                                    long deletionRevision, boolean refresh) {
+        Map<String, Map<IssueKey, Set<Long>>> requested = new LinkedHashMap<>();
+        items.filter(item -> item.issueKey() != null && StringUtils.isNotBlank(item.token()))
+                .forEach(item -> {
+                    Set<Long> ids = requested.computeIfAbsent(item.token(), ignored -> new LinkedHashMap<>())
+                            .computeIfAbsent(item.issueKey(), ignored -> new LinkedHashSet<>());
+                    if (item.worklog().issueId() > 0) ids.add(item.worklog().issueId());
+                });
+        return new IssueCheck(deletionRevision, issueChecks.enqueue(context, workbenchTeamId, requested, refresh));
     }
 
     private Item toItem(WorklogModule.Context context, Team team,
@@ -572,17 +592,7 @@ class WorklogQueryService {
         }
     }
 
-    private record IssueKey(String teamHost, String projectName, long issueCode, String tokenFingerprint) {
-    }
-
-    private record IssueLookup(CodingOpenApiPort.Issue issue, boolean missing) {
-        private static final IssueLookup UNKNOWN = new IssueLookup(null, false);
-    }
-
-    private record ResolvedWorklog(Worklog worklog, long memberId, CompletableFuture<IssueLookup> pendingLookup) {
-        IssueLookup lookup() {
-            return pendingLookup.join();
-        }
+    private record PendingWorklog(Worklog worklog, long memberId, String token, IssueKey issueKey) {
     }
 
     private static ThreadFactory daemonThreadFactory() {

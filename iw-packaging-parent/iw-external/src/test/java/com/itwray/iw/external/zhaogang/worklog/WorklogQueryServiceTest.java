@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.worklog;
 
+import com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader.IssueKey;
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.CodingPermissionError;
@@ -38,6 +39,11 @@ import static org.mockito.Mockito.when;
 
 class WorklogQueryServiceTest {
 
+    private final WorklogDeletedIssues deletedIssues = mock(WorklogDeletedIssues.class);
+    private final WorklogIssueChecks issueChecks = mock(WorklogIssueChecks.class);
+    private final WorklogModule.Context viewer = new WorklogModule.Context("viewer", 100L, "用户", "", 10L,
+            "fixture", "https://fixture.invalid");
+
     private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Test
@@ -56,12 +62,12 @@ class WorklogQueryServiceTest {
         when(coding.worklogPage("member-token", 1787500799999L, 1788105600001L, 2L, 0, 1000))
                 .thenThrow(new CodingOpenApiException("DescribeAllProjectsIssueWorkLogList",
                         "UnauthorizedOperation", "permission denied"));
-        when(coding.issue("token", "project-a", 101L))
+        when(issueChecks.cachedIssue("token", new IssueKey("project-a", 101L)))
                 .thenReturn(new CodingOpenApiPort.Issue(101L, "REQUIREMENT", "需求", "第一项", "项目 A", false));
-        when(coding.issue("token", "project-a", 102L))
+        when(issueChecks.cachedIssue("token", new IssueKey("project-a", 102L)))
                 .thenReturn(new CodingOpenApiPort.Issue(102L, "MISSION", "任务", "第二项", "项目 A", false));
         Clock clock = Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
+        WorklogQueryService service = service(coding, clock);
         WorklogModule.Context context = new WorklogModule.Context("token", 1L, "张三", "avatar", 10L,
                 "g-iijw5014", "https://g-iijw5014.coding.net");
 
@@ -69,7 +75,7 @@ class WorklogQueryServiceTest {
                 new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
                 List.of(new WorklogModule.MemberCredential(1L, "张三", "avatar", "token"),
                         new WorklogModule.MemberCredential(2L, "李四", "", "member-token")),
-                java.time.LocalDate.of(2026, 8, 24), java.time.LocalDate.of(2026, 8, 31));
+                java.time.LocalDate.of(2026, 8, 24), java.time.LocalDate.of(2026, 8, 31), 0, false);
 
         assertThat(entries.coverage().partial()).isTrue();
         assertThat(entries.coverage().failedMemberCount()).isEqualTo(1);
@@ -98,16 +104,9 @@ class WorklogQueryServiceTest {
                         new Worklog(2L, 12L, 102L, "project-a", 1L, new BigDecimal("7"), "", start, start, start),
                         new Worklog(3L, 13L, 103L, "project-a", 1L, new BigDecimal("3"), "", start, start, start),
                         new Worklog(4L, 14L, 104L, "project-a", 1L, BigDecimal.ONE, "", start, start, start))));
-        when(coding.issue("token", "project-a", 101L))
-                .thenReturn(new CodingOpenApiPort.Issue(101L, "MISSION", "任务", "存在的事项", "项目 A", false));
-        when(coding.issue("token", "project-a", 102L))
-                .thenReturn(new CodingOpenApiPort.Issue(102L, "MISSION", "任务", "将删除的事项", "项目 A", false))
-                .thenThrow(new CodingOpenApiException("DescribeIssue", "InvalidParameterValue", "issue_not_exist"));
-        when(coding.issue("token", "project-a", 103L))
-                .thenThrow(new CodingOpenApiException("DescribeIssue", "UnauthorizedOperation", "permission denied"));
-        when(coding.issue("token", "project-a", 104L))
-                .thenThrow(new CodingOpenApiException("CODING 服务暂不可用", new java.io.IOException()));
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+        when(deletedIssues.find(eq(10L), org.mockito.ArgumentMatchers.anyCollection()))
+                .thenReturn(Set.of(), Set.of(12L));
+        WorklogQueryService service = service(coding,
                 Clock.fixed(Instant.parse("2026-08-28T05:00:00Z"), CHINA_ZONE));
         WorklogModule.Context context = new WorklogModule.Context("token", 1L, "成员", "", 10L,
                 "coding-team", "https://coding-team.coding.net");
@@ -117,12 +116,12 @@ class WorklogQueryServiceTest {
         YearMonth month = YearMonth.from(date);
         Schedule schedule = WorkCalendarDefaults.schedule(month);
 
-        Entries beforeDeletion = service.queryEntries(context, team, Scope.SELF, null, members, date, date.plusDays(1));
+        Entries beforeDeletion = service.queryEntries(context, team, Scope.SELF, null, members, date, date.plusDays(1), 0, false);
         assertThat(beforeDeletion.totalHours()).isEqualByComparingTo("13");
 
-        Entries entries = service.queryEntries(context, team, Scope.SELF, null, members, date, date.plusDays(1));
-        Statistics stats = service.queryStatistics(context, team, Scope.WORKBENCH_TEAM, 300L, members, month, schedule);
-        Absence absence = service.queryAbsences(context, team, Scope.SELF, null, members, month, schedule);
+        Entries entries = service.queryEntries(context, team, Scope.SELF, null, members, date, date.plusDays(1), 0, false);
+        Statistics stats = service.queryMonth(context, Scope.WORKBENCH_TEAM, 300L, members, month, schedule, Map.of(), service.today(), 0, false).statistics();
+        Absence absence = service.queryMonth(context, Scope.SELF, null, members, month, schedule, Map.of(), service.today(), 0, false).absences();
 
         assertThat(entries.items()).extracting(WorklogModels.Item::workLogId).containsExactly(4L, 3L, 1L);
         assertThat(entries.totalHours()).isEqualByComparingTo("6");
@@ -151,7 +150,7 @@ class WorklogQueryServiceTest {
                     return new WorklogPage(requestFrom <= monday && monday < requestTo
                             ? List.of(backdated, current, undated) : List.of(undated));
                 });
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+        WorklogQueryService service = service(coding,
                 Clock.fixed(Instant.parse("2026-11-02T05:00:00Z"), CHINA_ZONE));
         WorklogModule.Context context = new WorklogModule.Context("token", 1L, "成员", "", 10L,
                 "coding-team", "https://coding-team.coding.net");
@@ -162,9 +161,9 @@ class WorklogQueryServiceTest {
         YearMonth october = YearMonth.of(2026, 10);
 
         Entries entries = service.queryEntries(context, team, Scope.SELF, null,
-                members, weekStart, weekStart.plusWeeks(1));
-        Statistics statistics = service.queryStatistics(context, team, Scope.WORKBENCH_TEAM, 300L,
-                members, october, WorkCalendarDefaults.schedule(october));
+                members, weekStart, weekStart.plusWeeks(1), 0, false);
+        Statistics statistics = service.queryMonth(context, Scope.WORKBENCH_TEAM, 300L,
+                members, october, WorkCalendarDefaults.schedule(october), Map.of(), service.today(), 0, false).statistics();
 
         assertThat(entries.items()).singleElement()
                 .satisfies(item -> assertThat(item.startAt()).isEqualTo("2026-10-30T09:00:00+08:00"));
@@ -183,17 +182,14 @@ class WorklogQueryServiceTest {
                 .thenReturn(new WorklogPage(List.of()));
         when(coding.worklogPage(eq("bad-token"), anyLong(), anyLong(), eq(3L), eq(0), eq(1000)))
                 .thenThrow(new CodingOpenApiException("工时请求失败", new IllegalStateException("private detail")));
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+        WorklogQueryService service = service(coding,
                 Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE));
 
-        Statistics statistics = service.queryStatistics(
-                new WorklogModule.Context("good-token", 1L, "成员一", "", 10L,
-                        "g-iijw5014", "https://g-iijw5014.coding.net"),
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+        Statistics statistics = service.queryMonth(viewer, Scope.WORKBENCH_TEAM, 300L,
                 List.of(new WorklogModule.MemberCredential(1L, "成员一", "", "good-token"),
                         new WorklogModule.MemberCredential(2L, "成员二", "", ""),
                         new WorklogModule.MemberCredential(3L, "成员三", "", "bad-token")),
-                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)), Map.of(), service.today(), 0, false).statistics();
 
         assertThat(statistics.coverage().failedMemberCount()).isEqualTo(2);
         assertThat(statistics.coverage().memberIssues())
@@ -210,16 +206,13 @@ class WorklogQueryServiceTest {
         when(coding.worklogPage(eq("many-token"), anyLong(), anyLong(), eq(2L), anyInt(), eq(1000)))
                 .thenReturn(new WorklogPage(Collections.nCopies(1000,
                         new Worklog(1L, 1L, 1L, "project-a", 2L, BigDecimal.ONE, "工时", 0L, 0L, 0L))));
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+        WorklogQueryService service = service(coding,
                 Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE));
 
-        Statistics statistics = service.queryStatistics(
-                new WorklogModule.Context("good-token", 1L, "成员一", "", 10L,
-                        "g-iijw5014", "https://g-iijw5014.coding.net"),
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+        Statistics statistics = service.queryMonth(viewer, Scope.WORKBENCH_TEAM, 300L,
                 List.of(new WorklogModule.MemberCredential(1L, "成员一", "", "good-token"),
                         new WorklogModule.MemberCredential(2L, "成员二", "", "many-token")),
-                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)), Map.of(), service.today(), 0, false).statistics();
 
         assertThat(statistics.coverage().partial()).isTrue();
         assertThat(statistics.coverage().failedMemberCount()).isZero();
@@ -240,15 +233,12 @@ class WorklogQueryServiceTest {
                 .thenReturn(new WorklogPage(List.of(new Worklog(22L, 102L, 2L, "project-a", 1L,
                         new BigDecimal("4"), "成员二", memberTwoStart, memberTwoStart, memberTwoStart))));
         Clock clock = Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
-        WorklogModule.Context context = new WorklogModule.Context("token", 1L, "成员一", "avatar-a", 10L,
-                "g-iijw5014", "https://g-iijw5014.coding.net");
+        WorklogQueryService service = service(coding, clock);
 
-        Statistics statistics = service.queryStatistics(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+        Statistics statistics = service.queryMonth(viewer, Scope.WORKBENCH_TEAM, 300L,
                 List.of(new WorklogModule.MemberCredential(1L, "成员一", "avatar-a", "token"),
                         new WorklogModule.MemberCredential(2L, "成员二", "avatar-b", "member-token")), YearMonth.of(2026, 8),
-                WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+                WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)), Map.of(), service.today(), 0, false).statistics();
 
         assertThat(statistics.dailyTotals().get(9).hours()).isEqualByComparingTo("6.5");
         assertThat(statistics.memberDailyTotals()).extracting(total -> total.user().name())
@@ -268,16 +258,13 @@ class WorklogQueryServiceTest {
         when(coding.worklogPage("member-token", 1785513599999L, 1788192000001L, 2L, 0, 1000))
                 .thenReturn(new WorklogPage(List.of(new Worklog(22L, 2L, 2L, "project-a", 2L,
                         new BigDecimal("9"), "成员二", start, start, start))));
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(),
+        WorklogQueryService service = service(coding,
                 Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE));
 
-        Statistics statistics = service.queryStatistics(
-                new WorklogModule.Context("token", 1L, "成员一", "avatar-a", 10L,
-                        "g-iijw5014", "https://g-iijw5014.coding.net"),
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
+        Statistics statistics = service.queryMonth(viewer, Scope.WORKBENCH_TEAM, 300L,
                 List.of(new WorklogModule.MemberCredential(1L, "成员一", "avatar-a", "token"),
                         new WorklogModule.MemberCredential(2L, "成员二", "avatar-b", "member-token")),
-                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+                YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)), Map.of(), service.today(), 0, false).statistics();
 
         assertThat(statistics.memberDailyTotals()).extracting(total -> total.summary().overtimeDays())
                 .containsExactly(1, 1);
@@ -300,14 +287,11 @@ class WorklogQueryServiceTest {
                         new Worklog(3L, 1L, 1L, "project-a", 3L, new BigDecimal("0"), "周末", julyFourth,
                                 julyFourth, julyFourth))));
         Clock clock = Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
+        WorklogQueryService service = service(coding, clock);
 
-        Absence absence = service.queryAbsences(
-                new WorklogModule.Context("token", 1L, "张三", "avatar", 10L,
-                        "g-iijw5014", "https://g-iijw5014.coding.net"),
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.SELF, null,
+        Absence absence = service.queryMonth(viewer, Scope.SELF, null,
                 List.of(new WorklogModule.MemberCredential(1L, "张三", "avatar", "token")),
-                YearMonth.of(2026, 7), WorkCalendarDefaults.schedule(YearMonth.of(2026, 7)));
+                YearMonth.of(2026, 7), WorkCalendarDefaults.schedule(YearMonth.of(2026, 7)), Map.of(), service.today(), 0, false).absences();
 
         assertThat(absence.members()).hasSize(1);
         assertThat(absence.members().get(0).days()).extracting(day -> day.date())
@@ -333,18 +317,14 @@ class WorklogQueryServiceTest {
                             : new WorklogPage(List.of());
                 });
         Clock clock = Clock.fixed(Instant.parse("2026-08-28T05:55:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
-        WorklogModule.Context context = new WorklogModule.Context("token", 1L, "乐以", "avatar", 10L,
-                "g-iijw5014", "https://g-iijw5014.coding.net");
+        WorklogQueryService service = service(coding, clock);
         List<WorklogModule.MemberCredential> members = List.of(
                 new WorklogModule.MemberCredential(1L, "乐以", "avatar", "token"));
 
-        Statistics statistics = service.queryStatistics(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
-                members, YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
-        Absence absence = service.queryAbsences(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.WORKBENCH_TEAM, 300L,
-                members, YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)));
+        var snapshot = service.queryMonth(viewer, Scope.WORKBENCH_TEAM, 300L,
+                members, YearMonth.of(2026, 8), WorkCalendarDefaults.schedule(YearMonth.of(2026, 8)), Map.of(), service.today(), 0, false);
+        Statistics statistics = snapshot.statistics();
+        Absence absence = snapshot.absences();
 
         assertThat(statistics.memberDailyTotals().get(0).dailyTotals().get(23).hours()).isEqualByComparingTo("8");
         assertThat(absence.members()).hasSize(1);
@@ -367,21 +347,17 @@ class WorklogQueryServiceTest {
                         worklog(4L, new BigDecimal("7.5"), julyFourth),
                         worklog(5L, new BigDecimal("4"), julyFifth))));
         Clock clock = Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
+        WorklogQueryService service = service(coding, clock);
         Schedule schedule = scheduleWithOverrides(YearMonth.of(2026, 7),
                 new Day(LocalDate.of(2026, 7, 3), DayType.REST_DAY, true),
                 new Day(LocalDate.of(2026, 7, 4), DayType.WORKDAY, true));
-        WorklogModule.Context context = new WorklogModule.Context("token", 1L, "张三", "avatar", 10L,
-                "g-iijw5014", "https://g-iijw5014.coding.net");
         List<WorklogModule.MemberCredential> members = List.of(
                 new WorklogModule.MemberCredential(1L, "张三", "avatar", "token"));
 
-        Statistics statistics = service.queryStatistics(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.SELF, null,
-                members, YearMonth.of(2026, 7), schedule);
-        Absence absence = service.queryAbsences(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.SELF, null,
-                members, YearMonth.of(2026, 7), schedule);
+        var snapshot = service.queryMonth(viewer, Scope.SELF, null,
+                members, YearMonth.of(2026, 7), schedule, Map.of(), service.today(), 0, false);
+        Statistics statistics = snapshot.statistics();
+        Absence absence = snapshot.absences();
 
         assertThat(statistics.summary().overtimeHours()).isEqualByComparingTo("6.5");
         assertThat(statistics.summary().overtimeDays()).isEqualTo(2);
@@ -393,49 +369,30 @@ class WorklogQueryServiceTest {
     }
 
     @Test
-    void futureMonthReturnsEmptyAbsenceWithoutCallingCoding() {
-        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
-        Clock clock = Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
-
-        Absence absence = service.queryAbsences(
-                new WorklogModule.Context("token", 1L, "张三", "avatar", 10L,
-                        "g-iijw5014", "https://g-iijw5014.coding.net"),
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.SELF, null,
-                List.of(new WorklogModule.MemberCredential(1L, "张三", "avatar", "token")),
-                YearMonth.of(2026, 9), WorkCalendarDefaults.schedule(YearMonth.of(2026, 9)));
-
-        assertThat(absence.members()).isEmpty();
-        assertThat(absence.from()).isEqualTo("2026-09-01");
-        assertThat(absence.toExclusive()).isEqualTo("2026-09-01");
-        verify(coding, org.mockito.Mockito.never()).worklogPage(anyString(), anyLong(), anyLong(), anyLong(), anyInt(), anyInt());
-    }
-
-    @Test
     void personalLeaveSkipsAbsenceAndAverageDenominatorButKeepsWorkdayOvertimeRules() {
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         long leaveWorklog = Instant.parse("2026-07-01T03:00:00Z").toEpochMilli();
         when(coding.worklogPage(anyString(), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
                 .thenReturn(new WorklogPage(List.of(worklog(1L, new BigDecimal("7"), leaveWorklog))));
         Clock clock = Clock.fixed(Instant.parse("2026-08-24T04:00:00Z"), CHINA_ZONE);
-        WorklogQueryService service = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock);
-        WorklogModule.Context context = new WorklogModule.Context("token", 1L, "张三", "avatar", 10L,
-                "g-iijw5014", "https://g-iijw5014.coding.net");
+        WorklogQueryService service = service(coding, clock);
         List<WorklogModule.MemberCredential> members = List.of(
                 new WorklogModule.MemberCredential(1L, "张三", "avatar", "token"));
         Map<Long, Set<LocalDate>> leaveDates = Map.of(1L, Set.of(LocalDate.of(2026, 7, 1)));
 
-        Statistics statistics = service.queryStatistics(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.SELF, null,
-                members, YearMonth.of(2026, 7), WorkCalendarDefaults.schedule(YearMonth.of(2026, 7)), leaveDates);
-        Absence absence = service.queryAbsences(context,
-                new Team(100L, "产业数字中心", "https://g-iijw5014.coding.net"), Scope.SELF, null,
-                members, YearMonth.of(2026, 7), WorkCalendarDefaults.schedule(YearMonth.of(2026, 7)), leaveDates);
+        var snapshot = service.queryMonth(viewer, Scope.SELF, null,
+                members, YearMonth.of(2026, 7), WorkCalendarDefaults.schedule(YearMonth.of(2026, 7)), leaveDates, service.today(), 0, false);
+        Statistics statistics = snapshot.statistics();
+        Absence absence = snapshot.absences();
 
         assertThat(statistics.summary().averageHours()).isEqualByComparingTo("0.32");
         assertThat(absence.members()).hasSize(1);
         assertThat(absence.members().get(0).days()).extracting(day -> day.date())
                 .doesNotContain("2026-07-01");
+    }
+
+    private WorklogQueryService service(CodingOpenApiPort coding, Clock clock) {
+        return new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock, deletedIssues, issueChecks);
     }
 
     private Worklog worklog(long id, BigDecimal hours, long startAt) {

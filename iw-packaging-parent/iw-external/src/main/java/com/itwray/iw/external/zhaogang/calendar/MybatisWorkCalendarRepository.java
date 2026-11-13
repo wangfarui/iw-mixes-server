@@ -1,17 +1,20 @@
 package com.itwray.iw.external.zhaogang.calendar;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.itwray.iw.external.mapper.ZhaogangWorkCalendarDayMapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkCalendarLeaveMapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkCalendarMapper;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.DayType;
 import com.itwray.iw.external.zhaogang.calendar.entity.WorkCalendarEntities.CalendarDayEntity;
 import com.itwray.iw.external.zhaogang.calendar.entity.WorkCalendarEntities.CalendarEntity;
+import com.itwray.iw.external.zhaogang.calendar.entity.WorkCalendarEntities.CalendarLeaveEntity;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -66,6 +69,19 @@ class MybatisWorkCalendarRepository implements WorkCalendarRepository {
     public Set<LocalDate> findLeaveDates(long codingTeamId, long codingUserId, YearMonth month) {
         return leaveMapper.selectRange(codingTeamId, codingUserId, month.atDay(1), month.plusMonths(1).atDay(1))
                 .stream().collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public Map<Long, Set<LocalDate>> findLeaveDatesForMembers(long codingTeamId, List<Long> codingUserIds,
+                                                           YearMonth month) {
+        return leaveMapper.selectList(Wrappers.<CalendarLeaveEntity>lambdaQuery()
+                        .select(CalendarLeaveEntity::getCodingUserId, CalendarLeaveEntity::getLeaveDate)
+                        .eq(CalendarLeaveEntity::getCodingTeamId, codingTeamId)
+                        .in(CalendarLeaveEntity::getCodingUserId, codingUserIds)
+                        .ge(CalendarLeaveEntity::getLeaveDate, month.atDay(1))
+                        .lt(CalendarLeaveEntity::getLeaveDate, month.plusMonths(1).atDay(1)))
+                .stream().collect(Collectors.groupingBy(CalendarLeaveEntity::getCodingUserId,
+                        Collectors.mapping(CalendarLeaveEntity::getLeaveDate, Collectors.toUnmodifiableSet())));
     }
 
     @Override

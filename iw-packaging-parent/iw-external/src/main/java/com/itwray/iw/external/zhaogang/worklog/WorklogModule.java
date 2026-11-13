@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.worklog;
 
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
@@ -14,6 +15,8 @@ public interface WorklogModule {
     Entries entries(Context context, String from, String to, String scope, Long workbenchTeamId, boolean refresh);
 
     Absence absences(Context context, String month, String scope, Long workbenchTeamId, boolean refresh);
+
+    IssueCheckStatus issueCheck(Context context, String scope, Long workbenchTeamId, String checkId);
 
     record Context(String token, long userId, String userName, String avatar, long codingTeamId,
                    String codingTeamKey, String codingTeamHost) {

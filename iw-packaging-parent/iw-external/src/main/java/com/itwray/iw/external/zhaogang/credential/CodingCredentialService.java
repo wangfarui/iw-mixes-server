@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.credential;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.itwray.iw.external.mapper.ZhaogangCodingCredentialMapper;
 import com.itwray.iw.external.zhaogang.credential.entity.CodingCredentialEntity;
 import org.springframework.stereotype.Service;
@@ -8,7 +9,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Stores the plaintext PAT backup and exposes it only to server-side team worklog and
@@ -38,6 +42,17 @@ public class CodingCredentialService {
         CodingCredentialEntity entity = mapper.find(codingTeamId, codingUserId);
         return entity == null || entity.getTokenPlaintext() == null || entity.getTokenPlaintext().isBlank()
                 ? Optional.empty() : Optional.of(entity.getTokenPlaintext());
+    }
+
+    public Map<Long, String> tokens(long codingTeamId, List<Long> userIds) {
+        if (codingTeamId <= 0 || userIds.isEmpty()) return Map.of();
+        return mapper.selectList(Wrappers.<CodingCredentialEntity>lambdaQuery()
+                        .select(CodingCredentialEntity::getCodingUserId, CodingCredentialEntity::getTokenPlaintext)
+                        .eq(CodingCredentialEntity::getCodingTeamId, codingTeamId)
+                        .in(CodingCredentialEntity::getCodingUserId, userIds))
+                .stream().filter(row -> row.getTokenPlaintext() != null && !row.getTokenPlaintext().isBlank())
+                .collect(Collectors.toUnmodifiableMap(CodingCredentialEntity::getCodingUserId,
+                        CodingCredentialEntity::getTokenPlaintext));
     }
 
     public boolean exists(long codingTeamId, long codingUserId) {

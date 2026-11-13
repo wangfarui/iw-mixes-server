@@ -2,7 +2,11 @@ package com.itwray.iw.external.zhaogang.calendar;
 
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Component
 class MybatisPersonalLeaveResolver implements PersonalLeaveResolver {
@@ -14,9 +18,8 @@ class MybatisPersonalLeaveResolver implements PersonalLeaveResolver {
     }
 
     @Override
-    public LeaveSchedule resolve(long codingTeamId, long codingUserId, YearMonth month) {
-        if (codingTeamId <= 0 || codingUserId <= 0 || month == null) return LeaveSchedule.empty();
-        var dates = repository.findLeaveDates(codingTeamId, codingUserId, month);
-        return new LeaveSchedule(dates.hashCode(), dates);
+    public Map<Long, Set<LocalDate>> resolve(long codingTeamId, List<Long> codingUserIds, YearMonth month) {
+        if (codingTeamId <= 0 || codingUserIds.isEmpty() || month == null) return Map.of();
+        return repository.findLeaveDatesForMembers(codingTeamId, codingUserIds, month);
     }
 }

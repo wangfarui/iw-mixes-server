@@ -76,19 +76,41 @@ public final class WorklogModels {
 
     public record Statistics(Coverage coverage, String month, int calendarVersion, String syncedAt,
                              Summary summary, List<DailyTotal> dailyTotals,
-                             List<MemberDailyTotal> memberDailyTotals) {
+                             List<MemberDailyTotal> memberDailyTotals, IssueCheck issueCheck) {
+        public Statistics(Coverage coverage, String month, int calendarVersion, String syncedAt,
+                          Summary summary, List<DailyTotal> dailyTotals, List<MemberDailyTotal> memberDailyTotals) {
+            this(coverage, month, calendarVersion, syncedAt, summary, dailyTotals, memberDailyTotals, null);
+        }
+
         public Statistics(Coverage coverage, String month, String syncedAt, List<DailyTotal> dailyTotals,
                           List<MemberDailyTotal> memberDailyTotals) {
             this(coverage, month, 0, syncedAt, Summary.empty(), dailyTotals, memberDailyTotals);
         }
     }
 
+    public record IssueCheck(long deletionRevision, String checkId) {
+    }
+
+    public record IssueCheckStatus(long deletionRevision, boolean pending) {
+    }
+
+    record MonthlySnapshot(Statistics statistics, Absence absences) {
+    }
+
     public record Entries(Coverage coverage, String from, String toExclusive, String syncedAt,
-                          BigDecimal totalHours, List<Item> items) {
+                          BigDecimal totalHours, List<Item> items, IssueCheck issueCheck) {
+        public Entries(Coverage coverage, String from, String toExclusive, String syncedAt,
+                       BigDecimal totalHours, List<Item> items) {
+            this(coverage, from, toExclusive, syncedAt, totalHours, items, null);
+        }
     }
 
     public record Absence(Coverage coverage, String month, String from, String toExclusive, String syncedAt,
-                          List<MemberAbsence> members) {
+                          List<MemberAbsence> members, IssueCheck issueCheck) {
+        public Absence(Coverage coverage, String month, String from, String toExclusive, String syncedAt,
+                       List<MemberAbsence> members) {
+            this(coverage, month, from, toExclusive, syncedAt, members, null);
+        }
     }
 
     public record MemberAbsence(User user, int absenceDays, List<AbsenceDay> days) {

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-13T07:13:27.945907+00:00",
+  "repos": {
+    "iw-mixes-server": {
+      "head": "f1d7f1093acc4f6e7c270fb012f9701a5160579c",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "e9d05f5bb701a044acd27609d3c20eb680ed5bea",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/CodingIssueSnapshotLoader.java",
+      "sha256": "6483358c78829e90bdb9adaab340e35c5c7f439e8801dc881caa6798ae98205d",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogQueryService.java",
+      "sha256": "450c69fdb1ea6e1cb9329397c4acb05c60ea44b2c64deb10d4bcdf073884f396",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogViewCache.java",
+      "sha256": "4d8b0e528f9f30d90e38e7cfc6e4f6645ed5a8fc27385b390db7622062575689",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/components/worklog/WorklogDashboard.vue",
+      "sha256": "8caba30116a8a3096f2a5e13dd3645eb2f152073420e65f7a074052a62d300e0",
+      "tracked": true
+    }
+  ]
+}

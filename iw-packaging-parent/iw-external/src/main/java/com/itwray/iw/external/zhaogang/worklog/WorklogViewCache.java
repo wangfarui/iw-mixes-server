@@ -5,9 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
-import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MonthlySnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Scope;
-import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -19,17 +18,24 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Component
 class WorklogViewCache {
 
-    private static final String KEY_PREFIX = "zhaogang:worklog:v5:";
+    private static final String KEY_PREFIX = "zhaogang:worklog:v7:";
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final ZhaogangProperties properties;
+    private final Map<String, CompletableFuture<MonthlyLoad>> monthlyLoads = new ConcurrentHashMap<>();
 
     WorklogViewCache(StringRedisTemplate redis, ObjectMapper objectMapper, ZhaogangProperties properties) {
         this.redis = redis;
@@ -37,29 +43,50 @@ class WorklogViewCache {
         this.properties = properties;
     }
 
-    Optional<Statistics> getStatistics(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                                       int calendarVersion, List<WorklogModule.MemberCredential> members) {
-        return getStatistics(context, scope, scopeId, month, calendarVersion, 0, members);
+    MonthlySnapshot loadMonth(String key, boolean refresh, Supplier<MonthlySnapshot> loader) {
+        while (true) {
+            CompletableFuture<MonthlyLoad> flight = new CompletableFuture<>();
+            CompletableFuture<MonthlyLoad> running = monthlyLoads.putIfAbsent(key, flight);
+            if (running != null) {
+                MonthlyLoad result = awaitMonth(running);
+                if (!refresh || result.refreshed()) return result.snapshot();
+                // 普通查询可能复用了事项缓存，手动刷新需要重新查验。
+                continue;
+            }
+
+            MonthlyLoad result;
+            try {
+                Optional<MonthlySnapshot> cached = refresh ? Optional.empty() : getByKey(key, MonthlySnapshot.class);
+                if (cached.isPresent()) {
+                    result = new MonthlyLoad(cached.get(), false);
+                } else {
+                    MonthlySnapshot snapshot = loader.get();
+                    putByKey(key, snapshot);
+                    result = new MonthlyLoad(snapshot, refresh);
+                }
+            } catch (RuntimeException | Error e) {
+                monthlyLoads.remove(key, flight);
+                flight.completeExceptionally(e);
+                throw e;
+            }
+            monthlyLoads.remove(key, flight);
+            flight.complete(result);
+            return result.snapshot();
+        }
     }
 
-    Optional<Statistics> getStatistics(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                                       int calendarVersion, int leaveVersion, List<WorklogModule.MemberCredential> members) {
-        return getByKey(statisticsKey(context, scope, scopeId, month, calendarVersion, leaveVersion, members), Statistics.class);
+    private MonthlyLoad awaitMonth(CompletableFuture<MonthlyLoad> running) {
+        try {
+            return running.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException cause) throw cause;
+            if (e.getCause() instanceof Error cause) throw cause;
+            throw e;
+        }
     }
 
-    Optional<Entries> getEntries(WorklogModule.Context context, Scope scope, long scopeId, LocalDate from, LocalDate to,
-                                 List<WorklogModule.MemberCredential> members) {
-        return getByKey(entriesKey(context, scope, scopeId, from, to, members), Entries.class);
-    }
-
-    Optional<Absence> getAbsences(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                                  int calendarVersion, List<WorklogModule.MemberCredential> members) {
-        return getAbsences(context, scope, scopeId, month, calendarVersion, 0, members);
-    }
-
-    Optional<Absence> getAbsences(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                                  int calendarVersion, int leaveVersion, List<WorklogModule.MemberCredential> members) {
-        return getByKey(absencesKey(context, scope, scopeId, month, calendarVersion, leaveVersion, members), Absence.class);
+    Optional<Entries> getEntries(String key) {
+        return getByKey(key, Entries.class);
     }
 
     private <T> Optional<T> getByKey(String key, Class<T> type) {
@@ -79,71 +106,38 @@ class WorklogViewCache {
         }
     }
 
-    void putStatistics(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                       int calendarVersion, List<WorklogModule.MemberCredential> members, Statistics statistics) {
-        putStatistics(context, scope, scopeId, month, calendarVersion, 0, members, statistics);
+    void putEntries(String key, Entries entries) {
+        // 有待补齐详情的响应可以先展示，后台结束后重读时使用已查到的事项。
+        if (entries.issueCheck() == null || entries.issueCheck().checkId() == null) putByKey(key, entries);
     }
 
-    void putStatistics(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                       int calendarVersion, int leaveVersion, List<WorklogModule.MemberCredential> members,
-                       Statistics statistics) {
-        putByKey(statisticsKey(context, scope, scopeId, month, calendarVersion, leaveVersion, members), statistics);
-    }
-
-    void putEntries(WorklogModule.Context context, Scope scope, long scopeId, LocalDate from, LocalDate to,
-                    List<WorklogModule.MemberCredential> members, Entries entries) {
-        putByKey(entriesKey(context, scope, scopeId, from, to, members), entries);
-    }
-
-    void putAbsences(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                     int calendarVersion, List<WorklogModule.MemberCredential> members, Absence absence) {
-        putAbsences(context, scope, scopeId, month, calendarVersion, 0, members, absence);
-    }
-
-    void putAbsences(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                     int calendarVersion, int leaveVersion, List<WorklogModule.MemberCredential> members,
-                     Absence absence) {
-        putByKey(absencesKey(context, scope, scopeId, month, calendarVersion, leaveVersion, members), absence);
-    }
-
-    private void putByKey(String key, Object valueObject) {
+    private void putByKey(String key, Object result) {
         try {
-            String value = objectMapper.writeValueAsString(valueObject);
-            redis.opsForValue().set(key, value,
+            redis.opsForValue().set(key, objectMapper.writeValueAsString(result),
                     Duration.ofSeconds(Math.max(1, properties.getWorklogCacheSeconds())));
         } catch (JsonProcessingException | RuntimeException ignored) {
-            // Redis 短暂不可用时仍返回实时查询结果，避免影响工时主链路。
+            // Redis 短暂不可用时仍返回实时查询结果。
         }
     }
 
-    String statisticsKey(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                         int calendarVersion, List<WorklogModule.MemberCredential> members) {
-        return statisticsKey(context, scope, scopeId, month, calendarVersion, 0, members);
-    }
-
-    String statisticsKey(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                         int calendarVersion, int leaveVersion, List<WorklogModule.MemberCredential> members) {
-        return KEY_PREFIX + "statistics:" + context.userId() + ":" + memberFingerprint(members) + ":"
-                + scope.name() + ":" + scopeId + ":" + month + ":calendar-" + calendarVersion
-                + ":leave-" + leaveVersion;
+    String monthlyKey(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
+                      LocalDate today, int calendarVersion, Map<Long, Set<LocalDate>> leaveDates,
+                      List<WorklogModule.MemberCredential> members, long deletionRevision) {
+        String leaveMaterial = leaveDates.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + ":" + entry.getValue().stream().sorted()
+                        .map(LocalDate::toString).collect(Collectors.joining(",")))
+                .collect(Collectors.joining("|"));
+        return KEY_PREFIX + "monthly:" + context.codingTeamId() + ":" + context.userId() + ":"
+                + CodingCredentialService.fingerprint(context.token()) + ":" + memberFingerprint(members)
+                + ":" + scope.name() + ":" + scopeId + ":" + month
+                + ":deleted-" + deletionRevision + ":as-of-" + today + ":calendar-" + calendarVersion + ":leave-" + digest(leaveMaterial);
     }
 
     String entriesKey(WorklogModule.Context context, Scope scope, long scopeId, LocalDate from, LocalDate to,
-                      List<WorklogModule.MemberCredential> members) {
-        return KEY_PREFIX + "entries:" + context.userId() + ":" + memberFingerprint(members) + ":"
-                + scope.name() + ":" + scopeId + ":" + from + ":" + to;
-    }
-
-    String absencesKey(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                       int calendarVersion, List<WorklogModule.MemberCredential> members) {
-        return absencesKey(context, scope, scopeId, month, calendarVersion, 0, members);
-    }
-
-    String absencesKey(WorklogModule.Context context, Scope scope, long scopeId, YearMonth month,
-                       int calendarVersion, int leaveVersion, List<WorklogModule.MemberCredential> members) {
-        return KEY_PREFIX + "absences:" + context.userId() + ":" + memberFingerprint(members) + ":"
-                + scope.name() + ":" + scopeId + ":" + month + ":calendar-" + calendarVersion
-                + ":leave-" + leaveVersion;
+                      List<WorklogModule.MemberCredential> members, long deletionRevision) {
+        return KEY_PREFIX + "entries:" + context.codingTeamId() + ":" + context.userId() + ":"
+                + CodingCredentialService.fingerprint(context.token()) + ":" + memberFingerprint(members) + ":"
+                + scope.name() + ":" + scopeId + ":" + from + ":" + to + ":deleted-" + deletionRevision;
     }
 
     private String memberFingerprint(List<WorklogModule.MemberCredential> members) {
@@ -163,5 +157,7 @@ class WorklogViewCache {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("当前运行环境不支持 SHA-256", e);
         }
+    }
+    private record MonthlyLoad(MonthlySnapshot snapshot, boolean refreshed) {
     }
 }

@@ -123,7 +123,10 @@ public class ZhaogangProperties {
     /** 工时聚合结果的 Redis 缓存有效期，默认 1 分钟。 */
     private int worklogCacheSeconds = 60;
 
-    /** 团队工时成员查询的进程级并发线程数。 */
+    /** 事项删除对工时报表可见的缓存延迟上限。 */
+    private int worklogIssueDeletionDelaySeconds = 300;
+
+    /** 团队工时成员分页的进程级并发线程数。 */
     private int worklogExecutorConcurrency = 8;
 
     /** 当前唯一允许维护工作日历的 CODING 用户。 */

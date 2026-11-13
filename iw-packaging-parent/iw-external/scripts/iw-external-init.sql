@@ -504,3 +504,18 @@ create table if not exists external_zhaogang_workbench_profile
     last_used_at    datetime null comment '最近使用工作台的时间（北京时间）',
     primary key (coding_team_id, coding_user_id)
 ) engine = InnoDB default charset = utf8mb4 comment = '找钢工作台用户资料';
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deletion_revision (
+    coding_team_id BIGINT UNSIGNED NOT NULL,
+    revision BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (coding_team_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deleted_issue (
+    coding_team_id BIGINT UNSIGNED NOT NULL,
+    coding_issue_id BIGINT UNSIGNED NOT NULL,
+    project_name VARCHAR(255) NOT NULL,
+    issue_code BIGINT UNSIGNED NOT NULL,
+    first_confirmed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (coding_team_id, coding_issue_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

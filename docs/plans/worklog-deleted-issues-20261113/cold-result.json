@@ -1,0 +1,23 @@
+{
+  "kind": "local CODING fixture / real Java + MySQL + Redis",
+  "coding_team_id": 861102,
+  "workbench_team_id": 3,
+  "delay_seconds": 6,
+  "first_statistics_ms": [
+    150.96,
+    150.46
+  ],
+  "first_absence_ms": 34.56,
+  "first_entries_ms": 26.26,
+  "first_total_hours": 21,
+  "final_total_hours": 10,
+  "updated_statistics_ms": 47.81,
+  "deletion_revision": 1,
+  "background_wait_seconds": 6.07,
+  "retained_worklog_ids": [
+    3,
+    4
+  ],
+  "owner_pending": true,
+  "other_pat_pending": false
+}

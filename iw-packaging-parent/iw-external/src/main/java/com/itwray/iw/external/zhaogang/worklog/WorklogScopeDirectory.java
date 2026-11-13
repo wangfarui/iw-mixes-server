@@ -9,10 +9,10 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.TeamOption;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 class WorklogScopeDirectory {
@@ -21,11 +21,6 @@ class WorklogScopeDirectory {
 
     private final CodingCredentialService credentials;
 
-    WorklogScopeDirectory(WorkbenchTeamModule teams) {
-        this(teams, null);
-    }
-
-    @Autowired
     WorklogScopeDirectory(WorkbenchTeamModule teams, CodingCredentialService credentials) {
         this.teams = teams;
         this.credentials = credentials;
@@ -47,13 +42,19 @@ class WorklogScopeDirectory {
     }
 
     TeamSelection workbenchTeam(WorklogModule.Context context, long workbenchTeamId) {
+        WorklogTeamScope scope = requireWorkbenchTeam(context, workbenchTeamId);
+        Map<Long, String> tokens = credentials.tokens(context.codingTeamId(),
+                scope.members().stream().map(member -> member.userId()).toList());
+        List<WorklogModule.MemberCredential> members = scope.members().stream()
+                .map(member -> new WorklogModule.MemberCredential(member.userId(), member.userName(), member.avatar(),
+                        tokens.getOrDefault(member.userId(), "")))
+                .toList();
+        return new TeamSelection(new Team(scope.id(), scope.name(), scope.codingTeamHost()), members);
+    }
+
+    WorklogTeamScope requireWorkbenchTeam(WorklogModule.Context context, long workbenchTeamId) {
         try {
-            WorklogTeamScope scope = teams.resolveWorklogScope(actor(context), workbenchTeamId);
-            List<WorklogModule.MemberCredential> members = scope.members().stream()
-                    .map(member -> new WorklogModule.MemberCredential(member.userId(), member.userName(), member.avatar(),
-                            credentials == null ? "" : credentials.token(context.codingTeamId(), member.userId()).orElse("")))
-                    .toList();
-            return new TeamSelection(new Team(scope.id(), scope.name(), scope.codingTeamHost()), members);
+            return teams.resolveWorklogScope(actor(context), workbenchTeamId);
         } catch (WorkbenchTeamException error) {
             throw new CodingOpenApiException(error.getMessage());
         }

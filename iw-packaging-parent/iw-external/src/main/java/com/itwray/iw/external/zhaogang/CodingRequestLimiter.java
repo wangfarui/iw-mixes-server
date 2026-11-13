@@ -18,16 +18,19 @@ class CodingRequestLimiter {
     private static final long QPS_WINDOW_NANOS = Duration.ofSeconds(1).toNanos();
     private static final long ENTRY_RETENTION_NANOS = Duration.ofMinutes(30).toNanos();
     private static final int MAX_ENTRIES = 2048;
+    private static final int TEAM_ISSUE_QPS = 30;
 
     private final int concurrencyPerToken;
     private final int issueQpsPerToken;
     private final Map<String, TokenGate> gates = new ConcurrentHashMap<>();
+    private final RateWindow issueWindow;
     private final RateWindow commitWindow;
     private final RateWindow diffWindow;
 
     CodingRequestLimiter(ZhaogangProperties properties) {
         concurrencyPerToken = Math.max(1, properties.getCodingConcurrencyPerToken());
         issueQpsPerToken = Math.max(0, properties.getCodingIssueQpsPerToken());
+        issueWindow = new RateWindow(TEAM_ISSUE_QPS);
         commitWindow = new RateWindow(Math.max(0, properties.getCodeCommitQps()));
         diffWindow = new RateWindow(Math.max(0, properties.getCodeDiffQps()));
     }
@@ -45,6 +48,7 @@ class CodingRequestLimiter {
     }
 
     private RateWindow globalWindow(String action) {
+        if ("DescribeIssue".equals(action)) return issueWindow;
         if ("DescribeGitCommitsInPage".equals(action)) return commitWindow;
         if ("DescribeGitCommitDiff".equals(action)) return diffWindow;
         return RateWindow.NONE;

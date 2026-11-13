@@ -55,6 +55,7 @@ iw:
       code-git-line-stats-executable: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE:/usr/bin/git}
       code-git-line-stats-timeout-seconds: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_TIMEOUT_SECONDS:40}
       code-git-line-stats-max-bytes: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_MAX_BYTES:134217728}
+      worklog-issue-deletion-delay-seconds: ${IW_WORKLOG_ISSUE_DELETION_DELAY_SECONDS:300}
       worklog-executor-concurrency: ${IW_WORKLOG_EXECUTOR_CONCURRENCY:8}
       calendar-manager-user-id: ${IW_ZHAOGANG_CALENDAR_MANAGER_USER_ID:9292850}
       # Agent 票据兑换必须走 API 入口；web.itwray.com 仅提供前端静态资源。

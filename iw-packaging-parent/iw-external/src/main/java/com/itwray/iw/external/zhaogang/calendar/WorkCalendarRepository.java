@@ -5,6 +5,7 @@ import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.DayType;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 interface WorkCalendarRepository {
@@ -16,6 +17,8 @@ interface WorkCalendarRepository {
     void resetDay(long codingTeamId, LocalDate date);
 
     Set<LocalDate> findLeaveDates(long codingTeamId, long codingUserId, YearMonth month);
+
+    Map<Long, Set<LocalDate>> findLeaveDatesForMembers(long codingTeamId, List<Long> codingUserIds, YearMonth month);
 
     void saveLeaveDate(long codingTeamId, long codingUserId, LocalDate date);
 

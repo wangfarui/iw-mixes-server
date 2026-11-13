@@ -11,6 +11,7 @@ import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,7 +30,7 @@ class WorklogScopeDirectoryTest {
         when(teams.worklogTeams(actor())).thenReturn(List.of(
                 new WorklogTeamOption(1L, "研发团队", 2),
                 new WorklogTeamOption(2L, "产品团队", 3)));
-        WorklogScopeDirectory directory = new WorklogScopeDirectory(teams);
+        WorklogScopeDirectory directory = new WorklogScopeDirectory(teams, mock(CodingCredentialService.class));
 
         WorklogModels.Options options = directory.options(context);
 
@@ -47,7 +48,7 @@ class WorklogScopeDirectoryTest {
                 "https://g-iijw5014.coding.net", List.of(
                 new WorklogMember(100L, "管理员", "avatar-a"),
                 new WorklogMember(200L, "成员", "avatar-b"))));
-        WorklogScopeDirectory directory = new WorklogScopeDirectory(teams);
+        WorklogScopeDirectory directory = new WorklogScopeDirectory(teams, mock(CodingCredentialService.class));
 
         WorklogScopeDirectory.TeamSelection selection = directory.workbenchTeam(context, 1L);
 
@@ -59,23 +60,22 @@ class WorklogScopeDirectoryTest {
     }
 
     @Test
-    void selectedTeamLoadsEachMemberCredentialByTeamAndUser() {
+    void selectedTeamLoadsMemberCredentialsInOneTeamScopedQuery() {
         WorkbenchTeamModule teams = mock(WorkbenchTeamModule.class);
         CodingCredentialService credentials = mock(CodingCredentialService.class);
         when(teams.resolveWorklogScope(actor(), 1L)).thenReturn(new WorklogTeamScope(1L, "研发团队",
                 "https://g-iijw5014.coding.net", List.of(
                 new WorklogMember(100L, "管理员", "avatar-a"),
                 new WorklogMember(200L, "成员", "avatar-b"))));
-        when(credentials.token(10L, 100L)).thenReturn(java.util.Optional.of("admin-token"));
-        when(credentials.token(10L, 200L)).thenReturn(java.util.Optional.of("member-token"));
+        when(credentials.tokens(10L, List.of(100L, 200L)))
+                .thenReturn(Map.of(100L, "admin-token", 200L, "member-token"));
         WorklogScopeDirectory directory = new WorklogScopeDirectory(teams, credentials);
 
         WorklogScopeDirectory.TeamSelection selection = directory.workbenchTeam(context, 1L);
 
         assertThat(selection.members()).extracting(member -> member.token())
                 .containsExactly("admin-token", "member-token");
-        verify(credentials).token(10L, 100L);
-        verify(credentials).token(10L, 200L);
+        verify(credentials).tokens(10L, List.of(100L, 200L));
     }
 
     @Test
@@ -83,7 +83,7 @@ class WorklogScopeDirectoryTest {
         WorkbenchTeamModule teams = mock(WorkbenchTeamModule.class);
         when(teams.resolveWorklogScope(actor(), 1L))
                 .thenThrow(new WorkbenchTeamException("团队不存在或当前用户不是团队成员"));
-        WorklogScopeDirectory directory = new WorklogScopeDirectory(teams);
+        WorklogScopeDirectory directory = new WorklogScopeDirectory(teams, mock(CodingCredentialService.class));
 
         assertThatThrownBy(() -> directory.workbenchTeam(context, 1L))
                 .isInstanceOf(CodingOpenApiException.class)
