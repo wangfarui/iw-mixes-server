@@ -20,6 +20,7 @@ public class CodingOpenApiException extends RuntimeException {
             Map.entry("TriggerCodingCIBuild", List.of("持续集成构建（读写）")),
             Map.entry("DescribeAllProjectsIssueWorkLogList", List.of("项目协同（读写）")),
             Map.entry("DescribeIssue", List.of("项目协同（读写）")),
+            Map.entry("DescribeIssueListWithPage", List.of("项目协同（读写）")),
             Map.entry("DescribeProjectIssueTypeList", List.of("项目协同（读写）")),
             Map.entry("DescribeProjectIssueFieldList", List.of("项目协同（读写）")),
             Map.entry("DescribeProjectIssueStatusList", List.of("项目协同（读写）")),

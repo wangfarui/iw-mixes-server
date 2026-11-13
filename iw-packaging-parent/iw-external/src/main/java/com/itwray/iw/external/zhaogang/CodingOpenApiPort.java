@@ -69,6 +69,8 @@ public interface CodingOpenApiPort {
 
     Issue issue(String token, String projectName, long issueCode);
 
+    List<Issue> searchIssues(String token, String projectName, String keyword, int pageSize);
+
     List<IssueType> issueTypes(String token, String projectName);
 
     List<IssueField> issueFields(String token, String projectName, String issueType, long issueTypeId);
@@ -126,9 +128,15 @@ public interface CodingOpenApiPort {
     }
 
     record ModifyIssueRequest(String projectName, long issueCode, String name, String description, Long statusId,
-                              String priority, BigDecimal workingHours, List<CustomFieldValue> customFieldValues) {
+                              String priority, BigDecimal workingHours, List<CustomFieldValue> customFieldValues,
+                              Long parentCode) {
         public ModifyIssueRequest {
             customFieldValues = customFieldValues == null ? List.of() : List.copyOf(customFieldValues);
+        }
+
+        public ModifyIssueRequest(String projectName, long issueCode, String name, String description, Long statusId,
+                                  String priority, BigDecimal workingHours, List<CustomFieldValue> customFieldValues) {
+            this(projectName, issueCode, name, description, statusId, priority, workingHours, customFieldValues, null);
         }
     }
 

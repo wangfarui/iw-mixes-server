@@ -25,6 +25,8 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.StageComman
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.RemoveIssuesCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateIssueCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ChangeIssueParentCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ParentIssueOption;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateIssueStatusCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.SelectionOption;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UserSnapshot;
@@ -206,6 +208,27 @@ public class ZhaogangIterationController {
                                                               HttpServletRequest request,
                                                               HttpServletResponse response) {
         return GeneralResponse.success(module.updateIssueStatus(actor(request, response), iterationId, issueId,
+                command));
+    }
+
+    @GetMapping("/iterations/{iterationId}/issues/{issueId}/parent-options")
+    @Operation(summary = "在当前事项所属 CODING 项目中搜索可更换的父事项")
+    public GeneralResponse<List<ParentIssueOption>> parentOptions(@PathVariable long iterationId,
+                                                                  @PathVariable long issueId,
+                                                                  @RequestParam(defaultValue = "") String keyword,
+                                                                  HttpServletRequest request,
+                                                                  HttpServletResponse response) {
+        return GeneralResponse.success(module.searchParentIssues(actor(request, response), iterationId, issueId, keyword));
+    }
+
+    @PutMapping("/iterations/{iterationId}/issues/{issueId}/parent")
+    @Operation(summary = "更换迭代事项的父事项")
+    public GeneralResponse<IterationIssue> changeIssueParent(@PathVariable long iterationId,
+                                                             @PathVariable long issueId,
+                                                             @RequestBody ChangeIssueParentCommand command,
+                                                             HttpServletRequest request,
+                                                             HttpServletResponse response) {
+        return GeneralResponse.success(module.changeIssueParent(actor(request, response), iterationId, issueId,
                 command));
     }
 

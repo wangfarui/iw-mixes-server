@@ -79,6 +79,9 @@ interface TeamIterationRepository {
     IssueEntity updateIssue(long iterationId, long issueId, UpdateIssueCommand command,
                             Long expectedIssueCode, Actor actor);
 
+    IssueEntity updateIssueParent(long iterationId, long issueId, long parentId, Long codingParentCode,
+                                  boolean updateCodingParentCode, Actor actor);
+
     void updateIssuePrototypeUrl(long iterationId, long issueId, String prototypeUrl, Actor actor);
 
     boolean claimIssueSync(long iterationId, long issueId, Actor actor);

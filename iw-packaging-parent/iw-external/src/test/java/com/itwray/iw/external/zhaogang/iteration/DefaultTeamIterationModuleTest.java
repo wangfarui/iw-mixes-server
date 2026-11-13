@@ -7,6 +7,7 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssueCodingLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ChangeIssueParentCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueType;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CreateChildIssueCommand;
@@ -48,6 +49,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1593,6 +1595,177 @@ class DefaultTeamIterationModuleTest {
         assertThat(module.detail(actor, 1L).issues().get(0).prototypeUrl()).isEqualTo(issue.getPrototypeUrl());
         when(coding.issue("token", "project-a", 8001L)).thenThrow(new RuntimeException("unavailable"));
         assertThat(module.detail(actor, 1L).issues().get(0).prototypeUrl()).isEqualTo(issue.getPrototypeUrl());
+    }
+
+    @Test
+    void parentSearchQueriesCodingInsideCurrentProject() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity story = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 121L, "登录流程");
+        IssueEntity child = linkedChild(5L, 2L, CodingIssueType.REQUIREMENT, 123L, "下级需求");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(
+                linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系"), story, child))));
+        when(coding.searchIssues("token", "project-a", "消息", 20)).thenReturn(List.of(
+                codingIssue(300L, "REQUIREMENT", "需求", "消息中心", false),
+                codingIssue(121L, "USER_STORY", "用户故事", "登录流程", false),
+                codingIssue(123L, "REQUIREMENT", "需求", "下级需求", false),
+                codingIssue(400L, "TASK", "任务", "联调支持", false),
+                codingIssue(120L, "REQUIREMENT", "需求", "账号体系", false)));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThat(module.searchParentIssues(actor, 1L, 2L, "")).isEmpty();
+        assertThat(module.searchParentIssues(actor, 1L, 2L, "#消息"))
+                .extracting(TeamIterationModels.ParentIssueOption::issueCode)
+                .containsExactly(300L);
+        verify(coding).searchIssues("token", "project-a", "消息", 20);
+        verify(coding, never()).issue(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void numericParentSearchReadsIssueCodeWhenListMissesIt() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity story = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 121L, "登录流程");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(
+                linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系"), story))));
+        when(coding.searchIssues("token", "project-a", "867", 20)).thenReturn(List.of());
+        when(coding.issue("token", "project-a", 867L)).thenReturn(codingIssue(867L, "REQUIREMENT", "需求", "编号事项", false));
+        when(coding.searchIssues("token", "project-a", "400", 20)).thenReturn(List.of());
+        when(coding.issue("token", "project-a", 400L)).thenReturn(codingIssue(400L, "MISSION", "开发任务", "不能挂的任务", false));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThat(module.searchParentIssues(actor, 1L, 2L, "867"))
+                .extracting(TeamIterationModels.ParentIssueOption::issueCode)
+                .containsExactly(867L);
+        assertThatThrownBy(() -> module.searchParentIssues(actor, 1L, 2L, "400"))
+                .hasMessageContaining("不能作为当前事项的父事项");
+    }
+
+    @Test
+    void linkedIssueParentChangeWritesCodingBeforeLocalParent() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity currentParent = linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系");
+        IssueEntity story = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 121L, "登录流程");
+        IssueEntity nextParent = linkedIssue(3L, CodingIssueType.REQUIREMENT, 300L, "消息中心");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(currentParent, story, nextParent))));
+        when(coding.issue("token", "project-a", 300L)).thenReturn(codingIssue(300L, "REQUIREMENT", "需求", "消息中心", false));
+        when(coding.issue("token", "project-a", 121L)).thenReturn(codingIssue(121L, "USER_STORY", "用户故事", "登录流程", false));
+        when(coding.modifyIssue(eq("token"), any())).thenReturn(codingIssue(121L, "USER_STORY", "用户故事", "登录流程", false));
+        when(repository.findIssue(eq(1L), anyString())).thenReturn(Optional.of(nextParent));
+        when(repository.updateIssueParent(1L, 2L, 3L, 300L, true, actor)).thenAnswer(invocation -> {
+            story.setParentId(3L);
+            story.setCodingParentCode(300L);
+            return story;
+        });
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        var updated = module.changeIssueParent(actor, 1L, 2L, new ChangeIssueParentCommand(300L));
+
+        ArgumentCaptor<CodingOpenApiPort.ModifyIssueRequest> request = ArgumentCaptor.forClass(CodingOpenApiPort.ModifyIssueRequest.class);
+        verify(coding).modifyIssue(eq("token"), request.capture());
+        assertThat(request.getValue().parentCode()).isEqualTo(300L);
+        assertThat(request.getValue().projectName()).isEqualTo("project-a");
+        assertThat(request.getValue().issueCode()).isEqualTo(121L);
+        verify(repository).updateIssueParent(1L, 2L, 3L, 300L, true, actor);
+        assertThat(updated.parentId()).isEqualTo(3L);
+    }
+
+    @Test
+    void missingCodingParentIsImportedBeforeLocalMove() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity local = localIssue(4L, 1L, CodingIssueType.SUB_TASK, "登录接口");
+        IssueEntity imported = linkedIssue(3L, CodingIssueType.REQUIREMENT, 300L, "消息中心");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(
+                linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系"), local))));
+        when(coding.issue("token", "project-a", 300L)).thenReturn(codingIssue(300L, "REQUIREMENT", "需求", "消息中心", false));
+        when(repository.findIssue(eq(1L), anyString())).thenReturn(Optional.empty());
+        when(repository.upsertCodingSnapshot(eq(1L), isNull(), anyString(), anyString(), eq("project-a"),
+                anyLong(), eq(300L), eq(CodingIssueType.REQUIREMENT), anyString(), anyLong(), anyString(), any(),
+                isNull(), eq(actor))).thenReturn(imported);
+        when(repository.updateIssueParent(eq(1L), eq(4L), eq(3L), isNull(), eq(false), eq(actor))).thenAnswer(invocation -> {
+            local.setParentId(3L);
+            return local;
+        });
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThat(module.changeIssueParent(actor, 1L, 4L, new ChangeIssueParentCommand(300L)).parentId()).isEqualTo(3L);
+        verify(coding, never()).modifyIssue(anyString(), any());
+    }
+
+    @Test
+    void codingParentChangeFailureKeepsLocalParent() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity story = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 121L, "登录流程");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(
+                linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系"), story))));
+        when(coding.issue("token", "project-a", 300L)).thenReturn(codingIssue(300L, "REQUIREMENT", "需求", "消息中心", false));
+        when(coding.modifyIssue(eq("token"), any())).thenThrow(new CodingOpenApiException("父事项不存在"));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThatThrownBy(() -> module.changeIssueParent(actor, 1L, 2L, new ChangeIssueParentCommand(300L)))
+                .hasMessageContaining("CODING 父事项更新失败");
+        verify(repository, never()).updateIssueParent(anyLong(), anyLong(), anyLong(), any(), anyBoolean(), any());
+        verify(repository, never()).findIssue(anyLong(), anyString());
+    }
+
+    @Test
+    void manualAndLocalParentChangesStayInWorkbench() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity manual = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 130L, "找回密码");
+        manual.setManuallyLinked(true);
+        IssueEntity local = localIssue(4L, 1L, CodingIssueType.SUB_TASK, "登录接口");
+        IssueEntity nextParent = linkedIssue(3L, CodingIssueType.REQUIREMENT, 300L, "消息中心");
+        IssueEntity currentParent = linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(currentParent, manual, local, nextParent))));
+        when(coding.issue("token", "project-a", 300L)).thenReturn(codingIssue(300L, "REQUIREMENT", "需求", "消息中心", false));
+        when(repository.findIssue(eq(1L), anyString())).thenReturn(Optional.of(nextParent));
+        when(repository.updateIssueParent(eq(1L), eq(2L), eq(3L), isNull(), eq(false), eq(actor))).thenAnswer(invocation -> {
+            manual.setParentId(3L);
+            return manual;
+        });
+        when(repository.updateIssueParent(eq(1L), eq(4L), eq(3L), isNull(), eq(false), eq(actor))).thenAnswer(invocation -> {
+            local.setParentId(3L);
+            return local;
+        });
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+
+        assertThat(module.changeIssueParent(actor, 1L, 2L, new ChangeIssueParentCommand(300L)).parentId()).isEqualTo(3L);
+        assertThat(module.changeIssueParent(actor, 1L, 4L, new ChangeIssueParentCommand(300L)).parentId()).isEqualTo(3L);
+        verify(coding, never()).modifyIssue(anyString(), any());
+    }
+
+    @Test
+    void parentChangeRejectsInvalidTargetsBeforeCodingWrite() {
+        TeamIterationRepository repository = mock(TeamIterationRepository.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        IssueEntity requirement = linkedIssue(1L, CodingIssueType.REQUIREMENT, 120L, "账号体系");
+        IssueEntity story = linkedChild(2L, 1L, CodingIssueType.USER_STORY, 121L, "登录流程");
+        IssueEntity child = linkedChild(5L, 2L, CodingIssueType.REQUIREMENT, 123L, "下级需求");
+        IssueEntity task = linkedIssue(7L, CodingIssueType.TASK, 400L, "联调支持");
+        IssueEntity noProject = localIssue(8L, 1L, CodingIssueType.SUB_TASK, "无项目");
+        noProject.setProjectName("");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(
+                requirement, story, child, task, noProject))));
+        when(coding.issue("token", "project-a", 123L)).thenReturn(codingIssue(123L, "REQUIREMENT", "需求", "下级需求", false));
+        when(coding.issue("token", "project-a", 400L)).thenReturn(codingIssue(400L, "TASK", "任务", "联调支持", false));
+        when(coding.issue("token", "project-a", 120L)).thenReturn(codingIssue(120L, "REQUIREMENT", "需求", "账号体系", false));
+        DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThatThrownBy(() -> module.changeIssueParent(actor, 1L, 2L, new ChangeIssueParentCommand(123L)))
+                .hasMessageContaining("下级");
+        assertThatThrownBy(() -> module.changeIssueParent(actor, 1L, 2L, new ChangeIssueParentCommand(400L)))
+                .hasMessageContaining("不能接收");
+        assertThatThrownBy(() -> module.changeIssueParent(actor, 1L, 7L, new ChangeIssueParentCommand(120L)))
+                .hasMessageContaining("顶层");
+        assertThatThrownBy(() -> module.changeIssueParent(actor, 1L, 8L, new ChangeIssueParentCommand(120L)))
+                .hasMessageContaining("没有项目");
+        assertThatThrownBy(() -> module.changeIssueParent(actor, 1L, 2L, new ChangeIssueParentCommand(120L)))
+                .hasMessageContaining("已经是该父事项");
+        verify(coding, never()).modifyIssue(anyString(), any());
+        verify(repository, never()).updateIssueParent(anyLong(), anyLong(), anyLong(), any(), anyBoolean(), any());
     }
 
     private IssueEntity linkedIssue(long id, CodingIssueType type, long code, String title) {

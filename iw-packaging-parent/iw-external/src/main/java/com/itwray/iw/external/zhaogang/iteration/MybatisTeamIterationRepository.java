@@ -322,6 +322,23 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
 
     @Override
     @Transactional
+    public IssueEntity updateIssueParent(long iterationId, long issueId, long parentId, Long codingParentCode,
+                                         boolean updateCodingParentCode, Actor actor) {
+        LambdaUpdateWrapper<IssueEntity> update = new LambdaUpdateWrapper<IssueEntity>()
+                .eq(IssueEntity::getIterationId, iterationId)
+                .eq(IssueEntity::getId, issueId)
+                .ne(IssueEntity::getSyncStatus, IssueSyncStatus.SYNCING.name())
+                .set(IssueEntity::getParentId, parentId);
+        if (updateCodingParentCode) update.set(IssueEntity::getCodingParentCode, codingParentCode);
+        if (issueMapper.update(null, update) == 0) {
+            throw new TeamIterationException("事项的同步状态已变化，请刷新后重试");
+        }
+        iterationMapper.touch(iterationId, actor.userId(), actor.userName());
+        return findIssue(iterationId, issueId).orElseThrow(() -> new TeamIterationException("事项不存在"));
+    }
+
+    @Override
+    @Transactional
     public void updateIssuePrototypeUrl(long iterationId, long issueId, String prototypeUrl, Actor actor) {
         writePrototypeUrl(iterationId, issueId, prototypeUrl);
         iterationMapper.touch(iterationId, actor.userId(), actor.userName());

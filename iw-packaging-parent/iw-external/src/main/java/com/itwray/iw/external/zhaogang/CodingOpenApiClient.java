@@ -383,6 +383,22 @@ class CodingOpenApiClient implements CodingOpenApiPort {
     }
 
     @Override
+    public List<CodingOpenApiPort.Issue> searchIssues(String token, String projectName, String keyword, int pageSize) {
+        int size = Math.min(Math.max(pageSize, 1), 20);
+        JsonNode response = invoke(token, "DescribeIssueListWithPage", Map.of(
+                "ProjectName", projectName,
+                "IssueType", "ALL",
+                "PageNumber", 1,
+                "PageSize", size,
+                "ShowSubIssues", true,
+                "ExcludeSubTask", false,
+                "Conditions", List.of(Map.of("Key", "KEYWORD", "Value", keyword))));
+        List<JsonNode> items = array(response, "IssueList", "Issues", "IssueSet");
+        if (items.isEmpty()) items = array(response.path("Data"), "IssueList", "Issues", "IssueSet");
+        return items.stream().map(this::toIssue).filter(issue -> issue.code() > 0).limit(size).toList();
+    }
+
+    @Override
     public List<CodingOpenApiPort.IssueType> issueTypes(String token, String projectName) {
         JsonNode response = invoke(token, "DescribeProjectIssueTypeList", Map.of("ProjectName", projectName));
         List<CodingOpenApiPort.IssueType> result = new ArrayList<>();
@@ -485,6 +501,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         if (command.statusId() != null && command.statusId() > 0) request.put("StatusId", command.statusId());
         if (StringUtils.isNotBlank(command.priority())) request.put("Priority", command.priority());
         if (command.workingHours() != null) request.put("WorkingHours", command.workingHours());
+        if (command.parentCode() != null && command.parentCode() > 0) request.put("ParentCode", command.parentCode());
         if (!command.customFieldValues().isEmpty()) {
             request.put("CustomFieldValues", command.customFieldValues().stream()
                     .map(value -> Map.<String, Object>of("Id", value.id(), "Content", value.content())).toList());
@@ -510,7 +527,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         JsonNode project = item.path("Project");
         JsonNode parent = item.path("Parent");
         String type = StringUtils.defaultIfBlank(text(item, "Type", "IssueType"),
-                text(typeDetail, "SystemType", "Type", "Code"));
+                text(typeDetail, "IssueType", "SystemType", "Type"));
         String typeName = StringUtils.defaultIfBlank(text(typeDetail, "Name", "DisplayName", "TypeName"),
                 text(item, "TypeName", "IssueTypeName"));
         Long parentCode = positiveLong(item, "ParentCode", "ParentIssueCode");

@@ -163,6 +163,12 @@ public final class TeamIterationModels {
     public record UpdateIssueStatusCommand(long statusId) {
     }
 
+    public record ChangeIssueParentCommand(long parentIssueCode) {
+    }
+
+    public record ParentIssueOption(long issueCode, String title, CodingIssueType issueType, String issueTypeName) {
+    }
+
     public record RemoveIssuesCommand(List<Long> issueIds) {
         public RemoveIssuesCommand {
             issueIds = issueIds == null ? List.of() : issueIds.stream()
@@ -226,7 +232,8 @@ public final class TeamIterationModels {
                                  String taskType, Boolean onlineBug, String bugPriority,
                                  LocalDateTime syncedAt, LocalDateTime createdAt, List<IssueWorklog> worklogs,
                                  List<IterationIssue> children, BigDecimal recordedHours,
-                                 Integer recordedWorklogCount, String assigneeName, String priority, String prototypeUrl) {
+                                 Integer recordedWorklogCount, String assigneeName, String priority, String prototypeUrl,
+                                 boolean manuallyLinked) {
         public IterationIssue {
             worklogs = worklogs == null ? List.of() : List.copyOf(worklogs);
             children = children == null ? List.of() : List.copyOf(children);
@@ -245,7 +252,7 @@ public final class TeamIterationModels {
             this(id, parentId, source, url, projectName, issueId, issueCode, issueType, issueTypeName,
                     title, description, statusName, available, warning, syncStatus, syncMessage, developmentTeam,
                     definitionOfDone, estimatedHours, taskType, onlineBug, bugPriority, syncedAt, createdAt,
-                    worklogs, children, recordedHours, recordedWorklogCount, null, null, null);
+                    worklogs, children, recordedHours, recordedWorklogCount, null, null, null, false);
         }
 
         public IterationIssue(long id, Long parentId, IssueSource source, String url, String projectName,
@@ -259,7 +266,7 @@ public final class TeamIterationModels {
             this(id, parentId, source, url, projectName, issueId, issueCode, issueType, issueTypeName,
                     title, description, statusName, available, warning, syncStatus, syncMessage, developmentTeam,
                     definitionOfDone, estimatedHours, taskType, onlineBug, bugPriority, syncedAt, createdAt,
-                    worklogs, children, null, null, null, null, null);
+                    worklogs, children, null, null, null, null, null, false);
         }
     }
 

@@ -12,6 +12,8 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.Actor;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssueCodingLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.IssuePrototypeLink;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.AddReleasePlanCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ChangeIssueParentCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ParentIssueOption;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingIssueType;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingSyncFailure;
@@ -457,6 +459,98 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             throw codingUpdateException(error, "CODING 状态同步失败，请稍后重试");
         }
         return toIssue(actor, issue, Map.of(), worklogsByIssue(stored.worklogs()), new HashSet<>());
+    }
+
+    @Override
+    public List<ParentIssueOption> searchParentIssues(Actor actor, long iterationId, long issueId, String keyword) {
+        StoredIteration stored = requireStored(iterationId);
+        requireMember(actor, stored);
+        IssueEntity issue = findStoredIssue(stored, issueId);
+        String query = normalizeParentKeyword(keyword);
+        if (query.isEmpty()) return List.of();
+        requireParentChangeIssue(issue);
+        List<CodingOpenApiPort.Issue> found = new ArrayList<>();
+        try {
+            found.addAll(coding.searchIssues(actor.token(), issue.getProjectName(), query, 20));
+        } catch (CodingOpenApiException error) {
+            throw codingUpdateException(error, "查询 CODING 父事项失败，请稍后重试");
+        }
+        CodingOpenApiPort.Issue numberedIssue = numberedIssue(actor, issue.getProjectName(), query);
+        if (numberedIssue != null && found.stream().noneMatch(item -> item.code() == numberedIssue.code())) {
+            found.add(0, numberedIssue);
+        }
+        CodingIssueType childType = CodingIssueType.valueOf(issue.getIssueType());
+        Set<Long> excluded = descendantIssueCodes(stored.issues(), issue.getId());
+        if (issue.getIssueCode() != null && issue.getIssueCode() > 0) excluded.add(issue.getIssueCode());
+        Long currentParentCode = currentParentCode(stored.issues(), issue);
+        List<ParentIssueOption> options = new ArrayList<>();
+        CodingOpenApiPort.Issue rejectedNumber = null;
+        for (CodingOpenApiPort.Issue candidate : found) {
+            if (candidate.code() <= 0 || excluded.contains(candidate.code())) continue;
+            if (currentParentCode != null && currentParentCode == candidate.code()) continue;
+            CodingIssueType parentType = recognizedType(candidate);
+            if (parentType == null || !parentChangeAllowed(parentType, childType)) {
+                if (numberedIssue != null && candidate.code() == numberedIssue.code()) rejectedNumber = candidate;
+                continue;
+            }
+            options.add(new ParentIssueOption(candidate.code(), candidate.title(), parentType,
+                    displayTypeName(candidate, parentType)));
+        }
+        if (options.isEmpty() && rejectedNumber != null) {
+            throw new TeamIterationException("#" + rejectedNumber.code() + " "
+                    + StringUtils.defaultIfBlank(rejectedNumber.title(), "该事项") + "不能作为当前事项的父事项");
+        }
+        return options;
+    }
+
+    @Override
+    public IterationIssue changeIssueParent(Actor actor, long iterationId, long issueId,
+                                            ChangeIssueParentCommand command) {
+        StoredIteration stored = requireStored(iterationId);
+        requireMember(actor, stored);
+        if (command == null || command.parentIssueCode() <= 0) throw new TeamIterationException("请选择父事项");
+        IssueEntity issue = findStoredIssue(stored, issueId);
+        requireParentChangeIssue(issue);
+        if (IssueSyncStatus.SYNCING.name().equals(issue.getSyncStatus())) {
+            throw new TeamIterationException("事项正在同步，请稍后再更改父事项");
+        }
+        CodingOpenApiPort.Issue codingParent;
+        try {
+            codingParent = coding.issue(actor.token(), issue.getProjectName(), command.parentIssueCode());
+        } catch (CodingOpenApiException error) {
+            throw codingUpdateException(error, "读取 CODING 父事项失败，请稍后重试");
+        }
+        if (codingParent.code() <= 0) throw new TeamIterationException("CODING 父事项不存在");
+        CodingIssueType childType = CodingIssueType.valueOf(issue.getIssueType());
+        CodingIssueType parentType = supportedType(codingParent);
+        if (issue.getIssueCode() != null && issue.getIssueCode() == codingParent.code()) {
+            throw new TeamIterationException("不能选择当前事项");
+        }
+        if (descendantIssueCodes(stored.issues(), issue.getId()).contains(codingParent.code())) {
+            throw new TeamIterationException("不能选择当前事项的下级");
+        }
+        validateParentChange(parentType, childType);
+        Long currentParentCode = currentParentCode(stored.issues(), issue);
+        if (currentParentCode != null && currentParentCode == codingParent.code()) {
+            throw new TeamIterationException("当前已经是该父事项");
+        }
+        boolean writeCoding = isCodingBacked(issue) && !Boolean.TRUE.equals(issue.getManuallyLinked());
+        if (writeCoding) {
+            try {
+                coding.modifyIssue(actor.token(), new ModifyIssueRequest(issue.getProjectName(), issue.getIssueCode(),
+                        null, null, null, null, null, List.of(), codingParent.code()));
+                invalidateIssueSnapshot(issue.getProjectName(), issue.getIssueCode());
+            } catch (CodingOpenApiException error) {
+                throw codingUpdateException(error, "CODING 父事项更新失败，请稍后重试");
+            }
+        }
+        IssueEntity parent = ensureLocalParent(actor, iterationId, issue.getProjectName(), codingParent.code());
+        if (issue.getParentId() != null && issue.getParentId().equals(parent.getId())) {
+            throw new TeamIterationException("当前已经是该父事项");
+        }
+        IssueEntity updated = repository.updateIssueParent(iterationId, issueId, parent.getId(),
+                writeCoding ? codingParent.code() : null, writeCoding, actor);
+        return toIssue(actor, updated, Map.of(), worklogsByIssue(stored.worklogs()), new HashSet<>());
     }
 
     @Override
@@ -947,7 +1041,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                     recordedHours(entity, worklogs.get(entity.getId())), recordedWorklogCount(entity, worklogs.get(entity.getId())),
                     issue.assigneeName(), type == CodingIssueType.SUB_TASK
                             ? StringUtils.defaultIfBlank(issue.priority(), entity.getPriority()) : null,
-                    type == CodingIssueType.REQUIREMENT ? entity.getPrototypeUrl() : null);
+                    type == CodingIssueType.REQUIREMENT ? entity.getPrototypeUrl() : null,
+                    Boolean.TRUE.equals(entity.getManuallyLinked()));
         } catch (CodingOpenApiException error) {
             return snapshotIssue(actor, entity, false, error.isPermissionDenied()
                             ? error.permissionMessage() : "当前令牌无法读取该 CODING 事项",
@@ -999,7 +1094,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 hideBoundSnapshot ? null : recordedHours(entity, worklogs),
                 hideBoundSnapshot ? null : recordedWorklogCount(entity, worklogs), null,
                 hideBoundSnapshot ? null : entity.getPriority(),
-                CodingIssueType.REQUIREMENT.name().equals(entity.getIssueType()) ? entity.getPrototypeUrl() : null);
+                CodingIssueType.REQUIREMENT.name().equals(entity.getIssueType()) ? entity.getPrototypeUrl() : null,
+                Boolean.TRUE.equals(entity.getManuallyLinked()));
     }
 
     private IssueSource source(IssueEntity entity) {
@@ -1217,7 +1313,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         if (typeName.contains("需求") || "REQUIREMENT".equals(systemType)) return CodingIssueType.REQUIREMENT;
         if (typeName.contains("子工作项") || typeName.contains("子任务")
                 || "SUB_TASK".equals(systemType) || "WORK_ITEM".equals(systemType)) return CodingIssueType.SUB_TASK;
-        if (typeName.equals("任务") || "TASK".equals(systemType) || "ASSIGNMENT".equals(systemType)) {
+        if (typeName.equals("任务") || "TASK".equals(systemType) || "MISSION".equals(systemType)
+                || "ASSIGNMENT".equals(systemType)) {
             return CodingIssueType.TASK;
         }
         if (typeName.contains("缺陷") || "DEFECT".equals(systemType) || "BUG".equals(systemType)) {
@@ -1371,6 +1468,95 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         if (!allowed) {
             throw new TeamIterationException("该事项类型下不允许新增所选子事项");
         }
+    }
+
+    private void validateParentChange(CodingIssueType parent, CodingIssueType child) {
+        if (!parentChangeAllowed(parent, child)) throw new TeamIterationException("所选父事项不能接收这个事项类型");
+    }
+
+    private boolean parentChangeAllowed(CodingIssueType parent, CodingIssueType child) {
+        return switch (parent) {
+            case REQUIREMENT -> child == CodingIssueType.REQUIREMENT || child == CodingIssueType.USER_STORY
+                    || child == CodingIssueType.SUB_TASK;
+            case TASK -> child == CodingIssueType.SUB_TASK;
+            case USER_STORY -> child == CodingIssueType.SUB_TASK || child == CodingIssueType.DEFECT;
+            case SUB_TASK, DEFECT -> false;
+        };
+    }
+
+    private void requireParentChangeIssue(IssueEntity issue) {
+        if (StringUtils.isBlank(issue.getProjectName())) {
+            throw new TeamIterationException("当前事项没有项目，不能更改父事项");
+        }
+        if (CodingIssueType.valueOf(issue.getIssueType()) == CodingIssueType.TASK) {
+            throw new TeamIterationException("任务只能作为顶层事项");
+        }
+    }
+
+    private CodingOpenApiPort.Issue numberedIssue(Actor actor, String projectName, String keyword) {
+        if (!keyword.chars().allMatch(Character::isDigit)) return null;
+        long code;
+        try {
+            code = Long.parseLong(keyword);
+        } catch (NumberFormatException error) {
+            return null;
+        }
+        if (code <= 0) return null;
+        try {
+            CodingOpenApiPort.Issue issue = coding.issue(actor.token(), projectName, code);
+            return issue != null && issue.code() > 0 ? issue : null;
+        } catch (CodingOpenApiException ignored) {
+            return null;
+        }
+    }
+
+    private String normalizeParentKeyword(String keyword) {
+        String query = StringUtils.trimToEmpty(keyword);
+        if (query.startsWith("#")) query = query.substring(1).trim();
+        return query.length() > 100 ? query.substring(0, 100) : query;
+    }
+
+    private CodingIssueType recognizedType(CodingOpenApiPort.Issue issue) {
+        try {
+            return supportedType(issue);
+        } catch (TeamIterationException ignored) {
+            return null;
+        }
+    }
+
+    private Long currentParentCode(List<IssueEntity> issues, IssueEntity issue) {
+        if (issue.getParentId() == null) return issue.getCodingParentCode();
+        return issues.stream().filter(item -> issue.getParentId().equals(item.getId())).findFirst()
+                .map(IssueEntity::getIssueCode).filter(code -> code != null && code > 0)
+                .orElse(issue.getCodingParentCode());
+    }
+
+    private Set<Long> descendantIssueCodes(List<IssueEntity> issues, long ancestorId) {
+        Map<Long, List<IssueEntity>> children = new HashMap<>();
+        for (IssueEntity item : issues) {
+            if (item.getParentId() != null) children.computeIfAbsent(item.getParentId(), ignored -> new ArrayList<>()).add(item);
+        }
+        Set<Long> codes = new HashSet<>();
+        Set<Long> seen = new HashSet<>();
+        List<IssueEntity> pending = new ArrayList<>(children.getOrDefault(ancestorId, List.of()));
+        while (!pending.isEmpty()) {
+            IssueEntity current = pending.remove(pending.size() - 1);
+            if (current.getId() == null || !seen.add(current.getId())) continue;
+            if (current.getIssueCode() != null && current.getIssueCode() > 0) codes.add(current.getIssueCode());
+            pending.addAll(children.getOrDefault(current.getId(), List.of()));
+        }
+        return codes;
+    }
+
+    private IssueEntity ensureLocalParent(Actor actor, long iterationId, String projectName, long issueCode) {
+        return repository.findIssue(iterationId, issueHash(projectName, issueCode))
+                .orElseGet(() -> syncCodingSnapshot(actor, iterationId, projectName, issueCode,
+                        new HashMap<>(), new HashMap<>(), new HashSet<>()));
+    }
+
+    private IssueEntity findStoredIssue(StoredIteration stored, long issueId) {
+        return stored.issues().stream().filter(item -> item.getId() != null && item.getId() == issueId).findFirst()
+                .orElseThrow(() -> new TeamIterationException("事项不存在"));
     }
 
     private void validateWorklog(IssueEntity issue, RegisterWorklogCommand command) {

@@ -24,6 +24,8 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.CodingSyncR
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.StageCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateIssueCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ChangeIssueParentCommand;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.ParentIssueOption;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateIssueStatusCommand;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UserSnapshot;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.IterationTeamOption;
@@ -72,6 +74,10 @@ public interface TeamIterationModule {
                                                IssuePrototypeLink command);
 
     IterationIssue updateIssueStatus(Actor actor, long iterationId, long issueId, UpdateIssueStatusCommand command);
+
+    List<ParentIssueOption> searchParentIssues(Actor actor, long iterationId, long issueId, String keyword);
+
+    IterationIssue changeIssueParent(Actor actor, long iterationId, long issueId, ChangeIssueParentCommand command);
 
     IterationIssue syncIssue(Actor actor, long iterationId, long issueId);
 
