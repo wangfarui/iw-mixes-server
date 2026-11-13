@@ -50,6 +50,21 @@ class CodingOpenApiClientTest {
     }
 
     @Test
+    void reportProjectNamesUseCurrentUsersAccessibleProjects() throws Exception {
+        CodingOpenApiClient client = client(exchange -> {
+            JsonNode request = objectMapper.readTree(exchange.getRequestBody());
+            if (!"DescribeUserProjects".equals(request.path("Action").asText()) || request.path("UserId").asLong() != 101) {
+                respondContractError(exchange);
+                return;
+            }
+            respond(exchange, """
+                    {"Response":{"Projects":[{"Id":1,"Name":"yuncunzheng","DisplayName":"基础服务阿米巴"}]}}
+                    """);
+        });
+        assertEquals(java.util.Map.of("yuncunzheng","基础服务阿米巴"), client.projectDisplayNames("test-token",101));
+    }
+
+    @Test
     void teamDirectoryUsesOfficialDepartmentContract() throws Exception {
         CodingOpenApiClient client = client(exchange -> {
             JsonNode request = objectMapper.readTree(exchange.getRequestBody());

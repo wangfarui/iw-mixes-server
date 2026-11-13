@@ -1,0 +1,24 @@
+{
+  "teamId": 2,
+  "state": {
+    "state": "ACCEPTED",
+    "reason": "企微已受理全部消息",
+    "accepted": 3,
+    "total": 3,
+    "createdAt": 1794563995443,
+    "kind": "MANUAL"
+  },
+  "zero_rows_hidden": true,
+  "header_and_time": true,
+  "actual_project_query": [
+    {
+      "action": "DescribeUserProjects",
+      "userId": 101
+    }
+  ],
+  "merged_entries": true,
+  "separate_blocks": true,
+  "no_personal_timestamp": true,
+  "webhook_cleared": true,
+  "runtime": "isolated backend; mock CODING; local webhook fixture; dedicated test schema"
+}

@@ -30,7 +30,8 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.equals("/application/account") || path.startsWith("/application/account/")
+        return path.matches("/external-service/api/zhaogang/teams/[0-9]+/worklog-notification(?:/(?:test|send-now))?")
+                || path.equals("/application/account") || path.startsWith("/application/account/")
                 || path.equals("/auth-service/application/account") || path.startsWith("/auth-service/application/account/");
     }
 

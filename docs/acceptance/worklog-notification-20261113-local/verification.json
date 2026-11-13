@@ -1,0 +1,25 @@
+{
+  "backend_full_suite": {
+    "tests": 437,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "/tmp/iw-worklog-notification-final-all-tests.log"
+  },
+  "additional_suite": {
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "/tmp/iw-worklog-notification-additional-tests.log"
+  },
+  "mysql": "8.0.31, isolated schemas only",
+  "web_type_check": "passed",
+  "web_build": "passed; existing large chunk warning",
+  "runtime": "18037; CODING fixture 18136; MySQL 13316; Redis 16379 database 5; Web 5186",
+  "actual_wecom_delivery": "not executed; HTTP client mocked in sender tests",
+  "runtime_notification_config": "disabled; cipher cleared; batch count 0",
+  "core_external_compile": "passed",
+  "new_file_whitespace": "passed: 18 files",
+  "runtime_source_matches_workspace": true
+}

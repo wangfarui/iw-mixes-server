@@ -280,6 +280,17 @@ class WorklogQueryService {
         return results;
     }
 
+    // Notification collection reuses the browser query's pagination and StartAt rules without its view cache.
+    DailyRows dailyRows(WorklogModule.MemberCredential member, LocalDate date) {
+        long from = date.atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() - 1;
+        long to = date.plusDays(1).atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli() + 1;
+        MemberLogs result = fetchMember(member, from, to);
+        String warning = result.partial() ? memberIssue(member, result).reason() : "";
+        return new DailyRows(deduplicate(result.items(), date, date.plusDays(1)), !result.partial(), warning);
+    }
+
+    record DailyRows(List<Worklog> rows, boolean complete, String warning) { }
+
     private Map<Long, List<Worklog>> worklogsByMember(List<PendingWorklog> items) {
         return items.stream().collect(Collectors.groupingBy(PendingWorklog::memberId,
                 Collectors.mapping(PendingWorklog::worklog, Collectors.toList())));

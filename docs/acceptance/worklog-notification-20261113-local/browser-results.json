@@ -1,0 +1,10 @@
+{
+  "invalid_url_error_and_draft_retained": true,
+  "saved_input_cleared_and_webhook_not_returned": true,
+  "revision_conflict_and_draft_retained": true,
+  "test_confirmation_cancelled_no_group_send": true,
+  "viewport_390_no_document_overflow": true,
+  "late_response_after_team_switch_ignored": true,
+  "clear_disables_and_removes_cipher": true,
+  "long_chinese_english_emoji_team_name_no_overflow_390": true
+}

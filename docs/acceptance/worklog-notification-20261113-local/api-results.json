@@ -1,0 +1,9 @@
+{
+  "anonymous_denied": true,
+  "member_get_denied": true,
+  "member_save_denied": true,
+  "member_test_denied": true,
+  "invalid_url_rejected": true,
+  "malformed_sanitized": true,
+  "revision_unchanged": true
+}

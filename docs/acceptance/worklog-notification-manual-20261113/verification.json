@@ -1,0 +1,55 @@
+{
+  "date": "2026-11-13",
+  "tests": {
+    "external": 22,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "iw_web_logging_executed": 0
+  },
+  "backend_package": "passed",
+  "web_type_check": "passed",
+  "web_build": "passed; existing chunk warning",
+  "actual_click": "passed at 17:32 Asia/Shanghai with auto disabled and after daily cutoff",
+  "fixture_messages": 3,
+  "fixture_spacing_seconds": [
+    5.099981069564819,
+    5.084898948669434
+  ],
+  "runtime_db_rows": [
+    "MANUAL\tACCEPTED\t3\t1800000",
+    "0\t1\t2",
+    "1"
+  ],
+  "permissions": {
+    "anonymous": {
+      "http": 200,
+      "body": {
+        "code": 401,
+        "message": "请先绑定 CODING 个人令牌",
+        "data": null,
+        "success": false
+      }
+    },
+    "member": {
+      "http": 200,
+      "body": {
+        "code": 500,
+        "message": "只有团队管理员可以管理工时群通知",
+        "data": null,
+        "success": false
+      }
+    }
+  },
+  "active_new_request": "rejected",
+  "same_request_replay": "no additional batch or messages",
+  "stale_revision": "rejected",
+  "unsaved_url": "button disabled",
+  "mobile": {
+    "width": 390,
+    "scroll_width": 390
+  },
+  "cleanup": "Webhook cleared and auto off; synthetic data retained",
+  "actual_wecom": "not executed; temporary source copy sends to local fixture only",
+  "logs": "/tmp/iw-notification-manual-20261113"
+}

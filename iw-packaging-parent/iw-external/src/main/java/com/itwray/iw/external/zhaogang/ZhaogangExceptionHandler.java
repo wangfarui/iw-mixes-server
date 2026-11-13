@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         ZhaogangIterationController.class,
         ZhaogangReleaseReceiptController.class,
         com.itwray.iw.external.zhaogang.ai.ZhaogangAiController.class,
+        ZhaogangNotificationController.class,
         ZhaogangReleaseImportController.class
 })
 @Order(-1)

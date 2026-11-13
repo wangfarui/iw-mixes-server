@@ -22,6 +22,16 @@ public interface CodingOpenApiPort {
         return projects(token, userId).stream().map(CodingProject::name).toList();
     }
 
+    /** Project identifiers stay internal; reports use the user's accessible project display names. */
+    default Map<String, String> projectDisplayNames(String token, long userId) {
+        Map<String, String> names = new java.util.LinkedHashMap<>();
+        for (var project : projects(token, userId)) {
+            if (project.displayName() != null && !project.displayName().isBlank()
+                    && !project.displayName().equals(project.name())) names.put(project.name(), project.displayName());
+        }
+        return Map.copyOf(names);
+    }
+
     default CodingDepotPage myDepots(String token, int pageNumber, int pageSize) {
         throw new UnsupportedOperationException("当前 CODING 适配器未实现仓库发现");
     }
