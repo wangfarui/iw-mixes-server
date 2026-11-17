@@ -103,6 +103,7 @@ create table external_zhaogang_workbench_team_member
     avatar         varchar(512)                       null comment '成员头像快照',
     sort_no        int unsigned default 0             not null comment '当前用户的团队显示顺序',
     managed_statistics tinyint(1) not null default 0 comment '是否使用工作台团队管理令牌统计',
+    ignore_team_statistics tinyint(1) not null default 0 comment '是否忽略团队工时与代码统计',
     source_project_id bigint unsigned null comment '添加该成员时验证的CODING项目ID',
     create_time    datetime default current_timestamp not null comment '加入时间',
     update_time    datetime default current_timestamp not null on update current_timestamp comment '资料更新时间',

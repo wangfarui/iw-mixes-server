@@ -28,8 +28,8 @@ class WorklogScopeDirectoryTest {
     void optionsComeFromWorkbenchTeams() {
         WorkbenchTeamModule teams = mock(WorkbenchTeamModule.class);
         when(teams.worklogTeams(actor())).thenReturn(List.of(
-                new WorklogTeamOption(1L, "研发团队", 2),
-                new WorklogTeamOption(2L, "产品团队", 3)));
+                new WorklogTeamOption(1L, "研发团队", List.of(new WorklogMember(100L, "管理员", "avatar-a"))),
+                new WorklogTeamOption(2L, "产品团队", List.of())));
         WorklogScopeDirectory directory = new WorklogScopeDirectory(teams, mock(CodingCredentialService.class));
 
         WorklogModels.Options options = directory.options(context);
@@ -37,7 +37,8 @@ class WorklogScopeDirectoryTest {
         assertThat(options.teams()).extracting(WorklogModels.TeamOption::name)
                 .containsExactly("研发团队", "产品团队");
         assertThat(options.teams()).extracting(WorklogModels.TeamOption::memberCount)
-                .containsExactly(2, 3);
+                .containsExactly(1, 0);
+        assertThat(options.teams().get(0).members()).extracting(WorklogModels.User::id).containsExactly(100L);
         verify(teams).worklogTeams(actor());
     }
 

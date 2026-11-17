@@ -16,6 +16,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberStatisticsCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamOption;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamScope;
@@ -47,6 +48,8 @@ public interface WorkbenchTeamModule {
     TeamDetail updateMemberMobile(Actor actor, long teamId, long targetUserId, UpdateMemberMobileCommand command);
 
     TeamDetail updateMemberRole(Actor actor, long teamId, long targetUserId, UpdateMemberRoleCommand command);
+
+    TeamDetail updateMemberStatistics(Actor actor, long teamId, long targetUserId, UpdateMemberStatisticsCommand command);
 
     TeamDetail removeMember(Actor actor, long teamId, long targetUserId, VersionCommand command);
 

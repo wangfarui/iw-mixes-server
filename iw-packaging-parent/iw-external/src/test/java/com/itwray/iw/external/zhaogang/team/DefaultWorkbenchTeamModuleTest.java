@@ -17,6 +17,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.RenameCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ReorderCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberStatisticsCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamRepository.StoredTeam;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
@@ -114,6 +115,42 @@ class DefaultWorkbenchTeamModuleTest {
         when(repository.updateMemberRole(1L, administrator, 200L, command)).thenReturn(stored);
         module.updateMemberRole(administrator, 1L, 200L, command);
         verify(repository).updateMemberRole(1L, administrator, 200L, command);
+    }
+
+    @Test
+    void onlyAdministratorCanChangeStatisticsAndEveryoneGetsTheSameWorklogScope() throws Exception {
+        var repository = mock(WorkbenchTeamRepository.class);
+        var stored = storedTeam();
+        var ignored = stored.members().get(1);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored));
+        when(repository.findByMember(200L)).thenReturn(List.of(stored, storedTeam(2L, 10L, "另一个团队")));
+        var module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
+        var command = new UpdateMemberStatisticsCommand(3, true);
+
+        assertThatThrownBy(() -> module.updateMemberStatistics(member, 1L, 200L, command))
+                .isInstanceOf(WorkbenchTeamException.class).hasMessage("只有团队管理员可以执行此操作");
+        assertThatThrownBy(() -> module.updateMemberStatistics(administrator, 1L, 200L,
+                new UpdateMemberStatisticsCommand(2, true))).isInstanceOf(WorkbenchTeamException.class);
+        assertThatThrownBy(() -> module.updateMemberStatistics(administrator, 1L, 300L, command))
+                .isInstanceOf(WorkbenchTeamException.class).hasMessage("所选用户不是当前团队成员");
+        verify(repository, never()).updateMemberStatistics(anyLong(), any(), anyLong(), any());
+        when(repository.updateMemberStatistics(1L, administrator, 200L, command)).thenAnswer(invocation -> {
+            ignored.setIgnoreTeamStatistics(true);
+            return stored;
+        });
+
+        var adminDetail = module.updateMemberStatistics(administrator, 1L, 200L, command);
+        assertThat(adminDetail.members()).extracting(WorkbenchTeamModels.Member::ignoreTeamStatistics)
+                .containsExactly(false, true);
+        var memberDetail = module.detail(member, 1L);
+        assertThat(new ObjectMapper().findAndRegisterModules().writeValueAsString(memberDetail.members()))
+                .doesNotContain("ignoreTeamStatistics");
+        var scope = module.resolveWorklogScope(member, 1L);
+        assertThat(scope).isEqualTo(module.resolveWorklogScope(administrator, 1L));
+        assertThat(scope.members()).extracting(WorkbenchTeamModels.WorklogMember::userId).containsExactly(100L);
+        assertThat(module.worklogTeams(member)).extracting(option -> option.members().size()).containsExactly(1, 2);
+        assertThat(module.findCodeSyncTeam(10L, 1L).orElseThrow().members())
+                .extracting(WorkbenchTeamModels.CodeSyncMember::ignoreTeamStatistics).containsExactly(false, true);
     }
 
     @Test

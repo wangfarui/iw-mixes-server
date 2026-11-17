@@ -50,6 +50,14 @@ public interface ZhaogangWorkbenchTeamMemberMapper extends BaseMapper<MemberEnti
     int updateSortNo(@Param("codingUserId") long codingUserId, @Param("teamId") long teamId,
                      @Param("sortNo") int sortNo);
 
+    @Update("""
+            update external_zhaogang_workbench_team_member
+               set ignore_team_statistics = #{ignored}, update_time = current_timestamp
+             where team_id = #{teamId} and coding_user_id = #{codingUserId}
+            """)
+    int updateStatistics(@Param("teamId") long teamId, @Param("codingUserId") long codingUserId,
+                         @Param("ignored") boolean ignored);
+
     @Delete("""
             delete from external_zhaogang_workbench_team_member
              where team_id = #{teamId} and coding_user_id = #{codingUserId}

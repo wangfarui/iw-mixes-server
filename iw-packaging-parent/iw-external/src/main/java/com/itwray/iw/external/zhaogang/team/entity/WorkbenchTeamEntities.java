@@ -42,6 +42,7 @@ public final class WorkbenchTeamEntities {
         private String avatar;
         private Integer sortNo;
         private Boolean managedStatistics;
+        private Boolean ignoreTeamStatistics;
         private Long sourceProjectId;
         private LocalDateTime createTime;
         private LocalDateTime updateTime;

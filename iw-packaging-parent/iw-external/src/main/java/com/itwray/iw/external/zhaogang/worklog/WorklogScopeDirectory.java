@@ -11,6 +11,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.TeamOption;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.User;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,7 +32,9 @@ class WorklogScopeDirectory {
     Options options(WorklogModule.Context context) {
         try {
             List<TeamOption> options = teams.worklogTeams(actor(context)).stream()
-                    .map(team -> new TeamOption(team.id(), team.name(), team.memberCount()))
+                    .map(team -> new TeamOption(team.id(), team.name(), team.members().size(),
+                            team.members().stream().map(member ->
+                                    new User(member.userId(), member.userName(), member.avatar())).toList()))
                     .toList();
             return new Options(options);
         } catch (WorkbenchTeamException error) {

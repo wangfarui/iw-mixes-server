@@ -26,6 +26,10 @@ public final class WorkbenchTeamModels {
     public record UpdateMemberRoleCommand(int versionNo, @JsonProperty(required = true) CodingRole codingRole) {
     }
 
+    public record UpdateMemberStatisticsCommand(int versionNo,
+                                                @JsonProperty(required = true) Boolean ignoreTeamStatistics) {
+    }
+
     public record UpdateMemberMobileCommand(int versionNo, @JsonProperty(required = true) String mobile) {
         @Override public String toString() { return "UpdateMemberMobileCommand[versionNo=" + versionNo + ", mobile=[redacted]]"; }
     }
@@ -66,7 +70,9 @@ public final class WorkbenchTeamModels {
 
     public record Member(long userId, String userName, String avatar, LocalDateTime joinedAt,
                          boolean administrator, CodingRole codingRole,
-                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt, String mobile, boolean managedStatistics) {
+                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt, String mobile,
+                         boolean managedStatistics,
+                         @JsonInclude(JsonInclude.Include.NON_NULL) Boolean ignoreTeamStatistics) {
     }
 
     public record Permissions(boolean administrator, boolean canRename, boolean canRemoveMembers,
@@ -94,7 +100,7 @@ public final class WorkbenchTeamModels {
                                     boolean alreadyMember) {
     }
 
-    public record WorklogTeamOption(long id, String name, int memberCount) {
+    public record WorklogTeamOption(long id, String name, List<WorklogMember> members) {
     }
 
     public interface StatisticsMember {
@@ -128,20 +134,20 @@ public final class WorkbenchTeamModels {
     }
 
     public record CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole, String mobile,
-                                 boolean managedStatistics) implements StatisticsMember {
+                                 boolean managedStatistics, boolean ignoreTeamStatistics) implements StatisticsMember {
         public CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole) {
-            this(userId, userName, avatar, codingRole, null, false);
+            this(userId, userName, avatar, codingRole, null);
         }
 
         public CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole, String mobile) {
-            this(userId, userName, avatar, codingRole, mobile, false);
+            this(userId, userName, avatar, codingRole, mobile, false, false);
         }
     }
 
     public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members,
-                               @JsonIgnore TeamStatisticsCredential managementCredential) {
+                               @JsonIgnore TeamStatisticsCredential managementCredential, long administratorUserId) {
         public CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members) {
-            this(name, codingTeamKey, codingTeamHost, members, TeamStatisticsCredential.EMPTY);
+            this(name, codingTeamKey, codingTeamHost, members, TeamStatisticsCredential.EMPTY, 0);
         }
     }
 

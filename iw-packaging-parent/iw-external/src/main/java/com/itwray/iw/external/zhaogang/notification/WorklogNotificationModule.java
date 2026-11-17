@@ -184,7 +184,7 @@ public class WorklogNotificationModule {
                 }
                 var team=teams.findCodeSyncTeam(batch.codingTeamId(),batch.teamId()).orElse(null);
                 if (team==null || !"TEST".equals(batch.kind()) && !memberIds(team).equals(batch.members())) {
-                    store.stop(batch.id(),"CANCELLED","团队已解散、成员或手机号发生变化"); continue;
+                    store.stop(batch.id(),"CANCELLED","团队已解散、成员、手机号或统计范围发生变化"); continue;
                 }
                 if ("DAILY".equals(batch.kind()) && calendar.resolve(batch.codingTeamId(),YearMonth.now(ZONE)).days().stream()
                         .noneMatch(day->day.date().equals(LocalDate.now(ZONE)) && day.dayType()==DayType.WORKDAY)) {
@@ -202,7 +202,8 @@ public class WorklogNotificationModule {
     static String memberIds(CodeSyncTeam team) {
         return team.members().stream().sorted(Comparator.comparingLong(m -> m.userId()))
                 .map(m -> m.userId() + (m.mobile() == null || m.mobile().isBlank() ? "" : ":" +
-                        com.itwray.iw.external.zhaogang.credential.CodingCredentialService.fingerprint(m.mobile())))
+                        com.itwray.iw.external.zhaogang.credential.CodingCredentialService.fingerprint(m.mobile()))
+                        + (m.ignoreTeamStatistics() ? ":ignored" : ""))
                 .collect(Collectors.joining(","));
     }
     @PreDestroy void shutdown() { scheduler.shutdown(); manualReports.shutdownNow(); collection.shutdownNow(); }

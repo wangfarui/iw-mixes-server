@@ -16,6 +16,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberStatisticsCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import io.swagger.v3.oas.annotations.Operation;
@@ -127,6 +128,14 @@ public class ZhaogangTeamController {
             @PathVariable long teamId, @PathVariable long userId, @RequestBody UpdateMemberRoleCommand command,
             HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(module.updateMemberRole(actor(request, response), teamId, userId, command));
+    }
+
+    @PutMapping("/workbench-teams/{teamId}/members/{userId}/team-statistics")
+    @Operation(summary = "团队管理员设置成员是否忽略团队工时与代码统计")
+    public GeneralResponse<TeamDetail> updateMemberStatistics(
+            @PathVariable long teamId, @PathVariable long userId, @RequestBody UpdateMemberStatisticsCommand command,
+            HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.updateMemberStatistics(actor(request, response), teamId, userId, command));
     }
 
     @DeleteMapping("/workbench-teams/{teamId}/members/{userId}")

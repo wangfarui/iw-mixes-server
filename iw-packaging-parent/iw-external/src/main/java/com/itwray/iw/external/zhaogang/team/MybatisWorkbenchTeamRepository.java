@@ -12,6 +12,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenS
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidate;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberStatisticsCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.TeamEntity;
 import org.springframework.stereotype.Repository;
@@ -168,6 +169,18 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
     public StoredTeam updateMemberRole(long teamId, Actor actor, long targetUserId, UpdateMemberRoleCommand command) {
         requireChanged(teamMapper.touchAsAdministrator(teamId, actor.userId(), command.versionNo()));
         profileMapper.saveRole(actor.codingTeamId(), targetUserId, command.codingRole(), false);
+        return require(teamId);
+    }
+
+    @Override
+    @Transactional
+    public StoredTeam updateMemberStatistics(long teamId, Actor actor, long targetUserId,
+                                             UpdateMemberStatisticsCommand command) {
+        requireChanged(teamMapper.touchAsAdministrator(teamId, actor.userId(), command.versionNo()));
+        if (require(teamId).members().stream().noneMatch(member -> member.getCodingUserId() == targetUserId)) {
+            throw new WorkbenchTeamException("所选用户不是当前团队成员");
+        }
+        memberMapper.updateStatistics(teamId, targetUserId, command.ignoreTeamStatistics());
         return require(teamId);
     }
 

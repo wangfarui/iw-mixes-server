@@ -18,7 +18,7 @@ public final class WorklogModels {
         WORKBENCH_TEAM
     }
 
-    public record TeamOption(long id, String name, int memberCount) {
+    public record TeamOption(long id, String name, int memberCount, List<User> members) {
     }
 
     public record Options(List<TeamOption> teams) {

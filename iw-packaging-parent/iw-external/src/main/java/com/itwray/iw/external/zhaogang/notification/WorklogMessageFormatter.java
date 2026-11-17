@@ -30,7 +30,8 @@ final class WorklogMessageFormatter {
         category(report, "未登记", empty);
         category(report, "数据异常", abnormal);
         category(report, "请假", leave);
-        report.append("\n接下来逐人发送今日登记明细。\n本报告为采集时的登记进度，非最终缺勤结果。\n数据更新：")
+        report.append(snapshot.members().isEmpty() ? "\n当前团队没有参与工时统计的成员。" : "\n接下来逐人发送今日登记明细。")
+                .append("\n本报告为采集时的登记进度，非最终缺勤结果。\n数据更新：")
                 .append(safe(snapshot.collectedAt()));
         String heading = safe(snapshot.teamName()) + " ｜ " + snapshot.date() + " ｜ ";
         append(messages, split(heading + "今日工时报告汇总", report.toString()), summaryMemberId == null ? null : mobiles.get(summaryMemberId));

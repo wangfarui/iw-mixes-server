@@ -8,9 +8,7 @@ import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamException;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
-import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamDetail;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
-import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamStatisticsCredential;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import org.apache.commons.lang3.StringUtils;
@@ -51,20 +49,12 @@ class CodeStatsScopeDirectory {
             if (teams.list(actor).stream().noneMatch(item -> item.id() == workbenchTeamId)) {
                 throw new CodeStatsForbiddenException("你不是该工作台团队成员");
             }
-            TeamDetail team = teams.detail(actor, workbenchTeamId);
-            TeamStatisticsCredential managementCredential = team.members().stream().anyMatch(member -> member.managedStatistics())
-                    ? teams.findCodeSyncTeam(context.codingTeamId(), workbenchTeamId)
-                            .map(CodeSyncTeam::managementCredential).orElse(TeamStatisticsCredential.EMPTY)
-                    : TeamStatisticsCredential.EMPTY;
-            List<CodeStatsModule.MemberCredential> members = team.members().stream()
-                    .map(member -> new CodeStatsModule.MemberCredential(member.userId(), member.userName(),
-                            member.avatar(), credentials.token(context.codingTeamId(), member.userId()).orElse(""),
-                            member.codingRole(), member.managedStatistics()))
-                    .toList();
-            return new CodeStatsModule.ScopeInfo(scope, workbenchTeamId, context.codingTeamId(),
-                    context.codingTeamKey(), StringUtils.defaultIfBlank(team.codingTeamHost(),
-                    context.codingTeamHost()), team.name(), members, team.permissions().administrator(), true,
-                    managementCredential);
+            CodeSyncTeam team = teams.findCodeSyncTeam(context.codingTeamId(), workbenchTeamId)
+                    .filter(found -> found.members().stream().anyMatch(member -> member.userId() == context.userId()))
+                    .orElseThrow(() -> new CodeStatsForbiddenException("你不是该工作台团队成员"));
+            return teamScope(context.codingTeamId(), workbenchTeamId, context.codingTeamKey(),
+                    StringUtils.defaultIfBlank(team.codingTeamHost(), context.codingTeamHost()), team,
+                    team.administratorUserId() == context.userId());
         } catch (WorkbenchTeamException error) {
             throw new CodingOpenApiException(error.getMessage());
         }
@@ -82,17 +72,20 @@ class CodeStatsScopeDirectory {
                             List.of(new CodeStatsModule.MemberCredential(target.scopeId(), "", "", token)), false));
         }
         return teams.findCodeSyncTeam(target.codingTeamId(), target.scopeId())
-                .map(team -> {
-                    var members = team.members().stream()
-                            .map(member -> new CodeStatsModule.MemberCredential(member.userId(),
-                                    member.userName(), member.avatar(),
-                                    credentials.token(target.codingTeamId(), member.userId()).orElse(""),
-                                    member.codingRole(), member.managedStatistics()))
-                            .toList();
-                    return new CodeStatsModule.ScopeInfo(Scope.WORKBENCH_TEAM, target.scopeId(), target.codingTeamId(),
-                            team.codingTeamKey(), team.codingTeamHost(), team.name(), members, false, true,
-                            team.managementCredential());
-                });
+                .map(team -> teamScope(target.codingTeamId(), target.scopeId(), team.codingTeamKey(),
+                        team.codingTeamHost(), team, false));
+    }
+
+    private CodeStatsModule.ScopeInfo teamScope(long codingTeamId, long workbenchTeamId, String teamKey,
+                                                String teamHost, CodeSyncTeam team, boolean administrator) {
+        // Keep the full roster for author attribution and repository access, including shared repositories.
+        var members = team.members().stream()
+                .map(member -> new CodeStatsModule.MemberCredential(member.userId(), member.userName(),
+                        member.avatar(), credentials.token(codingTeamId, member.userId()).orElse(""),
+                        member.codingRole(), member.managedStatistics(), member.ignoreTeamStatistics()))
+                .toList();
+        return new CodeStatsModule.ScopeInfo(Scope.WORKBENCH_TEAM, workbenchTeamId, codingTeamId, teamKey, teamHost,
+                team.name(), members, administrator, true, team.managementCredential());
     }
 
     List<TeamListItem> teams(CodeStatsModule.Context context) {

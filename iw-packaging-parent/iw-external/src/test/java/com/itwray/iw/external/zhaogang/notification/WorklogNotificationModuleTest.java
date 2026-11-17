@@ -40,7 +40,7 @@ class WorklogNotificationModuleTest {
         when(store.config(1)).thenReturn(new NotificationStore.Config(1,10,true,"cipher","hash",2));
         module.deliver(); verify(store).stop("batch","CANCELLED","通知配置已停用或更新");
         when(store.config(1)).thenReturn(config); when(teams.findCodeSyncTeam(10,1)).thenReturn(Optional.of(new CodeSyncTeam("team","key","host",List.of())));
-        module.deliver(); verify(store).stop("batch","CANCELLED","团队已解散、成员或手机号发生变化");
+        module.deliver(); verify(store).stop("batch","CANCELLED","团队已解散、成员、手机号或统计范围发生变化");
         verify(store,never()).claim(any(),anyLong()); verify(webhook, never()).send(anyString(), any(NotificationMessage.class));
     }
     @Test void phoneChangeCancelsRemainingMessagesEvenWhenMembersAreUnchanged() {
@@ -53,7 +53,7 @@ class WorklogNotificationModuleTest {
         when(store.config(1)).thenReturn(config);
         when(teams.findCodeSyncTeam(10, 1)).thenReturn(Optional.of(after));
         module.deliver();
-        verify(store).stop("phone-change", "CANCELLED", "团队已解散、成员或手机号发生变化");
+        verify(store).stop("phone-change", "CANCELLED", "团队已解散、成员、手机号或统计范围发生变化");
         verify(store, never()).claim(any(), anyLong());
         verify(webhook, never()).send(anyString(), any(NotificationMessage.class));
     }
@@ -64,6 +64,21 @@ class WorklogNotificationModuleTest {
         var delivery=new NotificationStore.Delivery(b,0,"summary",1); when(store.claim(eq(b),anyLong())).thenReturn(delivery);
         var result=new WecomWebhook.Result(WecomWebhook.Outcome.ACCEPTED,"accepted"); when(webhook.send("cipher",NotificationMessage.markdown("summary"))).thenReturn(result);
         module.deliver(); verify(webhook).send("cipher",NotificationMessage.markdown("summary")); verify(store).complete(delivery,result);
+    }
+    @Test void statisticsScopeChangeCancelsMessagesCollectedWithTheOldScope() {
+        var now = System.currentTimeMillis();
+        var pending = new NotificationStore.Batch("scope-change", 1, 10, "MANUAL", 1, "hash",
+                WorklogNotificationModule.memberIds(team()), "READY", "", 2, now, now + 600_000);
+        var changed = new CodeSyncTeam("团队", "key", "host",
+                List.of(new CodeSyncMember(100, "张三", "", null, null, false, true)));
+        when(store.pending()).thenReturn(List.of(pending));
+        when(store.config(1)).thenReturn(config);
+        when(teams.findCodeSyncTeam(10, 1)).thenReturn(Optional.of(changed));
+
+        module.deliver();
+
+        verify(store).stop("scope-change", "CANCELLED", "团队已解散、成员、手机号或统计范围发生变化");
+        verify(store, never()).claim(any(), anyLong());
     }
     @Test void deniesNotificationAccessToOrdinaryMember() {
         var actor=new Actor(200,"member","",10,"key","host");
@@ -184,7 +199,7 @@ class WorklogNotificationModuleTest {
         var accepted=new WecomWebhook.Result(WecomWebhook.Outcome.ACCEPTED,"ok");when(webhook.send("cipher",NotificationMessage.markdown("report"))).thenReturn(accepted);
         module.deliver(); verify(store).complete(delivery,accepted);verifyNoInteractions(calendar);
         when(teams.findCodeSyncTeam(10,1)).thenReturn(Optional.of(new CodeSyncTeam("team","key","host",List.of())));
-        module.deliver();verify(store).stop("manual","CANCELLED","团队已解散、成员或手机号发生变化");
+        module.deliver();verify(store).stop("manual","CANCELLED","团队已解散、成员、手机号或统计范围发生变化");
     }
 
 }

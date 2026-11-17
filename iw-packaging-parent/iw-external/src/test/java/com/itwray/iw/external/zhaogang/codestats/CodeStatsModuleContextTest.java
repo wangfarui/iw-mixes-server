@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.codestats;
 
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingRequestLimiter;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanRepoMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeCommitMapper;
@@ -21,6 +22,7 @@ class CodeStatsModuleContextTest {
                 .withBean(ZhaogangCodeScanRepoMapper.class, () -> mock(ZhaogangCodeScanRepoMapper.class))
                 .withBean(ZhaogangCodeCommitMapper.class, () -> mock(ZhaogangCodeCommitMapper.class))
                 .withBean(CodeIdentityResolver.class, () -> mock(CodeIdentityResolver.class))
+                .withBean(CodingRequestLimiter.class)
                 .withBean(CodeGitLineStats.class)
                 .withBean(CodeScanWorker.class)
                 .withBean(CodeScanService.class)

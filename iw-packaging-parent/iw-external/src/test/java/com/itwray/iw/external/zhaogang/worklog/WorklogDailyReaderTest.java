@@ -35,8 +35,14 @@ class WorklogDailyReaderTest {
         var query=new WorklogQueryService(coding,mock(CodingIssueLinkBuilder.class),Clock.systemUTC(),deleted,mock(WorklogIssueChecks.class));
         try(var loader=new CodingIssueSnapshotLoader(coding,new ZhaogangProperties())) {
             var reader=new WorklogDailyReader(query,credentials,loader,deleted,leaves,coding);
-            var snapshot=reader.read(10,new CodeSyncTeam("团队","team","team.invalid",List.of(new CodeSyncMember(1,"张三","",null),new CodeSyncMember(2,"李四","",null),new CodeSyncMember(3,"王五","",null))),date);
-            assertThat(snapshot.members()).hasSize(3);
+            var team = new CodeSyncTeam("团队", "team", "team.invalid", List.of(
+                    new CodeSyncMember(1, "张三", "", null),
+                    new CodeSyncMember(2, "李四", "", null),
+                    new CodeSyncMember(3, "王五", "", null),
+                    new CodeSyncMember(4, "忽略成员", "", null, "13800000004", false, true)));
+            var snapshot = reader.read(10, team, date);
+            assertThat(snapshot.members()).extracting(WorklogDailyReader.Member::userId).containsExactly(1L, 2L, 3L);
+            verify(credentials).tokens(10L, List.of(1L, 2L, 3L));
             var member=snapshot.members().get(0);
             assertThat(snapshot.collectedAt()).matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
             assertThat(member.entries()).allSatisfy(e -> {

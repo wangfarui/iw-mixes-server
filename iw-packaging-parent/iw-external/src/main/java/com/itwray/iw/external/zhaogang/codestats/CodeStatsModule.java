@@ -57,13 +57,13 @@ public interface CodeStatsModule {
     }
 
     record MemberCredential(long userId, String userName, String avatar, String token, CodingRole codingRole,
-                            boolean managedStatistics) {
+                            boolean managedStatistics, boolean ignoreTeamStatistics) {
         public MemberCredential(long userId, String userName, String avatar, String token) {
             this(userId, userName, avatar, token, null);
         }
 
         public MemberCredential(long userId, String userName, String avatar, String token, CodingRole codingRole) {
-            this(userId, userName, avatar, token, codingRole, false);
+            this(userId, userName, avatar, token, codingRole, false, false);
         }
 
         @Override
@@ -100,6 +100,7 @@ public interface CodeStatsModule {
 
         List<MemberCredential> developmentMembers() {
             return members.stream()
+                    .filter(member -> !member.ignoreTeamStatistics())
                     .filter(member -> member.codingRole() == CodingRole.BACKEND || member.codingRole() == CodingRole.FRONTEND)
                     .toList();
         }

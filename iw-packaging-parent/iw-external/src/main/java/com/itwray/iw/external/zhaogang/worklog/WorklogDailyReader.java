@@ -40,9 +40,10 @@ public class WorklogDailyReader {
     }
 
     public Snapshot read(long codingTeamId, CodeSyncTeam team, LocalDate date) {
-        var ids = team.members().stream().map(m -> m.userId()).toList();
+        var reportedMembers = team.members().stream().filter(member -> !member.ignoreTeamStatistics()).toList();
+        var ids = reportedMembers.stream().map(member -> member.userId()).toList();
         var membersWithCredentials = WorklogScopeDirectory.memberCredentials(credentials, codingTeamId,
-                team.members(), team.managementCredential());
+                reportedMembers, team.managementCredential());
         var leaveDates = leaves.resolve(codingTeamId, ids, YearMonth.from(date));
         List<Member> members = new ArrayList<>();
         Map<Long, WorklogQueryService.DailyRows> rowsByMember = new LinkedHashMap<>();

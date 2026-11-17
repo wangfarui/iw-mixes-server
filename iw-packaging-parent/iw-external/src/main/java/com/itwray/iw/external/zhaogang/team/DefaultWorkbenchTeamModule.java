@@ -29,6 +29,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberStatisticsCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogMember;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamOption;
@@ -296,6 +297,18 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
     }
 
     @Override
+    public TeamDetail updateMemberStatistics(Actor actor, long teamId, long targetUserId,
+                                             UpdateMemberStatisticsCommand command) {
+        StoredTeam stored = requireAdministrator(actor, require(teamId));
+        requireCurrentVersion(stored, command == null ? 0 : command.versionNo());
+        requireMemberId(stored, targetUserId);
+        if (command.ignoreTeamStatistics() == null) {
+            throw new WorkbenchTeamException("请选择是否忽略团队统计");
+        }
+        return toDetail(actor, repository.updateMemberStatistics(teamId, actor, targetUserId, command));
+    }
+
+    @Override
     public TeamDetail removeMember(Actor actor, long teamId, long targetUserId, VersionCommand command) {
         StoredTeam stored = requireAdministrator(actor, require(teamId));
         requireVersion(command == null ? 0 : command.versionNo());
@@ -368,7 +381,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         return repository.findByMember(actor.userId()).stream()
                 .filter(stored -> stored.team().getCodingTeamId() == actor.codingTeamId())
                 .map(stored -> new WorklogTeamOption(stored.team().getId(), stored.team().getName(),
-                        stored.members().size()))
+                        scopeMembers(stored)))
                 .toList();
     }
 
@@ -391,15 +404,18 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                         MemberProfile profile = profiles.get(member.getCodingUserId());
                         return new CodeSyncMember(member.getCodingUserId(), member.getUserName(), member.getAvatar(),
                                 profile == null ? null : profile.codingRole(), profile == null ? null : profile.mobile(),
-                                Boolean.TRUE.equals(member.getManagedStatistics()));
+                                Boolean.TRUE.equals(member.getManagedStatistics()),
+                                Boolean.TRUE.equals(member.getIgnoreTeamStatistics()));
                     }).toList();
                     return new CodeSyncTeam(stored.team().getName(), stored.team().getCodingTeamKey(),
-                            stored.team().getCodingTeamHost(), members, statisticsCredential(stored));
+                            stored.team().getCodingTeamHost(), members, statisticsCredential(stored),
+                            stored.team().getAdministratorUserId());
                 });
     }
 
     private List<WorklogMember> scopeMembers(StoredTeam stored) {
         return stored.members().stream()
+                .filter(member -> !Boolean.TRUE.equals(member.getIgnoreTeamStatistics()))
                 .map(member -> new WorklogMember(member.getCodingUserId(), member.getUserName(), member.getAvatar(),
                         Boolean.TRUE.equals(member.getManagedStatistics())))
                 .toList();
@@ -548,12 +564,13 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                 .collect(Collectors.toMap(MemberProfile::userId, Function.identity()));
     }
 
-    private Member toMember(MemberEntity member, long administratorUserId, boolean includeActivity,
+    private Member toMember(MemberEntity member, long administratorUserId, boolean administratorView,
                             MemberProfile profile) {
         return new Member(member.getCodingUserId(), member.getUserName(), member.getAvatar(), member.getCreateTime(),
                 member.getCodingUserId() == administratorUserId, profile == null ? null : profile.codingRole(),
-                includeActivity && profile != null ? profile.lastUsedAt() : null, profile == null ? null : profile.mobile(),
-                Boolean.TRUE.equals(member.getManagedStatistics()));
+                administratorView && profile != null ? profile.lastUsedAt() : null, profile == null ? null : profile.mobile(),
+                Boolean.TRUE.equals(member.getManagedStatistics()),
+                administratorView ? Boolean.TRUE.equals(member.getIgnoreTeamStatistics()) : null);
     }
 
     private String normalizedName(String name) {

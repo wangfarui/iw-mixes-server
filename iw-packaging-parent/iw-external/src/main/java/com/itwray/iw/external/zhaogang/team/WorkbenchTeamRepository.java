@@ -7,6 +7,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenS
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidate;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberStatisticsCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.TeamEntity;
 
@@ -45,6 +46,8 @@ interface WorkbenchTeamRepository {
     StoredTeam updateMemberMobile(long teamId, Actor actor, long targetUserId, UpdateMemberMobileCommand command);
 
     StoredTeam updateMemberRole(long teamId, Actor actor, long targetUserId, UpdateMemberRoleCommand command);
+
+    StoredTeam updateMemberStatistics(long teamId, Actor actor, long targetUserId, UpdateMemberStatisticsCommand command);
 
     StoredTeam removeMember(long teamId, int versionNo, Actor actor, long targetUserId);
 
