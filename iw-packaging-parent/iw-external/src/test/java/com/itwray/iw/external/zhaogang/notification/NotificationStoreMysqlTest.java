@@ -27,6 +27,16 @@ class NotificationStoreMysqlTest {
         String sql=Files.readString(Path.of("scripts/iw-external-migrate-20261113-worklog-notification.sql"));
         for (int repeat=0;repeat<2;repeat++) for (String statement:sql.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
         jdbc.execute("CREATE TABLE IF NOT EXISTS external_zhaogang_workbench_team (id BIGINT PRIMARY KEY,coding_team_id BIGINT,administrator_user_id BIGINT)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS external_zhaogang_workbench_team_member (team_id BIGINT,coding_user_id BIGINT,PRIMARY KEY(team_id,coding_user_id))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS external_zhaogang_workbench_profile (coding_team_id BIGINT,coding_user_id BIGINT,PRIMARY KEY(coding_team_id,coding_user_id))");
+        String mobileSql = Files.readString(Path.of("scripts/iw-external-migrate-20261116-worklog-mobile.sql"));
+        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
+            try (var sqlStatement = connection.createStatement()) {
+                for (int repeat=0;repeat<2;repeat++) for (String statement:mobileSql.split(";"))
+                    if (!statement.isBlank()) sqlStatement.execute(statement);
+            }
+            return null;
+        });
         id=System.nanoTime(); jdbc.update("INSERT INTO external_zhaogang_workbench_team VALUES (?,10,100)",id);
         store=new NotificationStore(jdbc,tx); webhook=new WecomWebhook(new ObjectMapper(),new ZhaogangProperties());
     }
@@ -58,7 +68,7 @@ class NotificationStoreMysqlTest {
             store.complete(first,new WecomWebhook.Result(WecomWebhook.Outcome.ACCEPTED,"accepted"));
             assertThat(restarted.claim(b,System.currentTimeMillis())).isNull();
             var second=restarted.claim(b,System.currentTimeMillis()+5000);
-            assertThat(second.sequence()).isEqualTo(1); assertThat(second.content()).isEqualTo("member-one");
+            assertThat(second.sequence()).isEqualTo(1); assertThat(second.message().content()).isEqualTo("member-one");
             store.complete(second,new WecomWebhook.Result(WecomWebhook.Outcome.FAILED,"rejected"));
             assertThat(store.latest(id).state()).isEqualTo("FAILED"); assertThat(store.accepted(b.id())).isEqualTo(1);
         } finally {pool.shutdownNow();}
@@ -134,6 +144,56 @@ class NotificationStoreMysqlTest {
         assertThatThrownBy(()->store.createManual(c,"1",1,100,"manual-request-0002")).hasMessageContaining("刚刚已触发");
         jdbc.update("UPDATE "+NotificationStore.B+" SET created_at=created_at-11000 WHERE id=?",manual.id());
         assertThat(store.createManual(c,"1",1,100,"manual-request-0002").created()).isTrue();
+    }
+
+    @Test void persistsPhoneMentionsAndRejectsSummaryTargetsOutsideTeam() {
+        jdbc.update("INSERT INTO external_zhaogang_workbench_team_member VALUES (?,100)", id);
+        var initial = config();
+        assertThatThrownBy(() -> store.save(id, 10, 100,
+                new WorklogNotificationModule.Command(true, initial.revision(), null, false, 999L), webhook))
+                .hasMessageContaining("当前团队成员");
+        assertThat(store.config(id).revision()).isEqualTo(initial.revision());
+        var selected = store.save(id, 10, 100,
+                new WorklogNotificationModule.Command(true, initial.revision(), null, false, 100L), webhook);
+        assertThat(new NotificationStore(jdbc, tx).config(id).summaryMemberId()).isEqualTo(100L);
+        String batchId = store.create(selected, "mobile", "MANUAL", "100", System.currentTimeMillis()+600_000);
+        store.readyMessages(batchId, "{}", List.of(new NotificationMessage("text", "团队汇总", List.of("13800000001")), NotificationMessage.text("后续明细")));
+        var claimed = new NotificationStore(jdbc, tx).claim(batch(batchId), System.currentTimeMillis());
+        assertThat(claimed.message()).isEqualTo(new NotificationMessage("text", "团队汇总", List.of("13800000001")));
+    }
+    @Test void draftTestPreservesSavedConfigurationReservesChannelAndRecoversUnknown() {
+        var saved = config();
+        var draft = store.beginTest(id, 10, 100, saved.revision(), "draft-" + id, NotificationMessage.text("test"));
+        assertThat(store.config(id).cipher()).isEqualTo(saved.cipher());
+        assertThat(store.config(id).revision()).isEqualTo(saved.revision());
+        assertThat(store.latest(id).state()).isEqualTo("TESTING");
+        assertThatThrownBy(() -> store.beginTest(id, 10, 100, saved.revision(), "draft-" + id, NotificationMessage.text("test"))).hasMessageContaining("处理中");
+        String report = store.create(saved, "report", "MANUAL", "100", System.currentTimeMillis()+600_000);
+        store.ready(report, "{}", List.of("report"));
+        var sameChannel = new NotificationStore.Batch(report, id, 10, "MANUAL", saved.revision(), "draft-" + id, "100", "READY", "", 1, 1, Long.MAX_VALUE);
+        assertThat(store.claim(sameChannel, System.currentTimeMillis()+5000)).isNull();
+        jdbc.update("UPDATE " + NotificationStore.M + " SET updated_at=0 WHERE batch_id=?", draft.batch().id());
+        store.recoverUnknown(System.currentTimeMillis());
+        assertThat(store.recent(id)).filteredOn(b -> b.id().equals(draft.batch().id())).singleElement()
+                .extracting(NotificationStore.Batch::state).isEqualTo("UNKNOWN");
+    }
+    @Test void draftTestSupportsFirstConfigurationAndHistoryIsBoundedAndOrdered() {
+        assertThatThrownBy(() -> store.beginTest(id, 10, 200, 0, "hash", NotificationMessage.text("test"))).hasMessageContaining("管理员");
+        assertThatThrownBy(() -> store.beginTest(id, 10, 100, 99, "hash", NotificationMessage.text("test"))).hasMessageContaining("已变化");
+        var delivery = store.beginTest(id, 10, 100, 0, "new-" + id, NotificationMessage.text("test"));
+        store.complete(delivery, new WecomWebhook.Result(WecomWebhook.Outcome.ACCEPTED, "accepted"));
+        assertThat(store.config(id).cipher()).isNull();
+        assertThat(store.config(id).enabled()).isFalse();
+        assertThat(store.config(id).revision()).isZero();
+        assertThat(store.latest(id).state()).isEqualTo("ACCEPTED");
+        var configured = config();
+        var created = new ArrayList<String>();
+        for (int i=0; i<4; i++) {
+            String batchId = store.create(configured, "history-" + i, "MANUAL", "", 100_000);
+            jdbc.update("UPDATE " + NotificationStore.B + " SET created_at=? WHERE id=?", System.currentTimeMillis() + 1000*(i+1), batchId);
+            created.add(batchId);
+        }
+        assertThat(store.recent(id)).extracting(NotificationStore.Batch::id).containsExactly(created.get(3), created.get(2), created.get(1));
     }
 
 }

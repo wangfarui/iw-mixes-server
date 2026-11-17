@@ -5,12 +5,15 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** WeCom Markdown has a UTF-8 byte budget, including the repeated continuation header. */
+/** WeCom text has a UTF-8 byte budget, including the repeated continuation header. */
 final class WorklogMessageFormatter {
-    static final int LIMIT = 4096;
+    static final int LIMIT = 2048;
     private static final BigDecimal TARGET = BigDecimal.valueOf(8);
     List<String> format(Snapshot snapshot) {
-        List<String> messages = new ArrayList<>();
+        return format(snapshot, null, Map.of()).stream().map(NotificationMessage::content).toList();
+    }
+    List<NotificationMessage> format(Snapshot snapshot, Long summaryMemberId, Map<Long, String> mobiles) {
+        List<NotificationMessage> messages = new ArrayList<>();
         int met = 0;
         List<String> leave = new ArrayList<>(), insufficient = new ArrayList<>(), empty = new ArrayList<>(), abnormal = new ArrayList<>();
         for (var member : snapshot.members()) {
@@ -30,7 +33,7 @@ final class WorklogMessageFormatter {
         report.append("\n接下来逐人发送今日登记明细。\n本报告为采集时的登记进度，非最终缺勤结果。\n数据更新：")
                 .append(safe(snapshot.collectedAt()));
         String heading = safe(snapshot.teamName()) + " ｜ " + snapshot.date() + " ｜ ";
-        messages.addAll(split(heading + "今日工时报告汇总", report.toString()));
+        append(messages, split(heading + "今日工时报告汇总", report.toString()), summaryMemberId == null ? null : mobiles.get(summaryMemberId));
         for (var member : snapshot.members()) {
             StringBuilder body = new StringBuilder(status(member)).append("\n");
             if (!member.complete()) body.append(safe(member.warning())).append("\n");
@@ -46,9 +49,16 @@ final class WorklogMessageFormatter {
                         .append(safe(first.title())).append("\n登记工时：");
                 body.append(group.stream().map(e -> hours(e.hours()) + "h").collect(java.util.stream.Collectors.joining("、"))).append("\n");
             }
-            messages.addAll(split(heading + safe(member.name()), body.toString()));
+            boolean remind = !member.leave() && member.complete() && member.hours().compareTo(TARGET) < 0;
+            append(messages, split(heading + safe(member.name()), body.toString()), remind ? mobiles.get(member.userId()) : null);
         }
         return List.copyOf(messages);
+    }
+    private void append(List<NotificationMessage> messages, List<String> parts, String mobile) {
+        for (int i = 0; i < parts.size(); i++) {
+            messages.add(new NotificationMessage("text", parts.get(i),
+                    i == 0 && mobile != null && !mobile.isBlank() ? List.of(mobile) : List.of()));
+        }
     }
     private void category(StringBuilder report, String label, List<String> members) {
         if (members.isEmpty()) return;

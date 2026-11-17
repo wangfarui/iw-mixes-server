@@ -25,6 +25,10 @@ public final class WorkbenchTeamModels {
     public record UpdateMemberRoleCommand(int versionNo, @JsonProperty(required = true) CodingRole codingRole) {
     }
 
+    public record UpdateMemberMobileCommand(int versionNo, @JsonProperty(required = true) String mobile) {
+        @Override public String toString() { return "UpdateMemberMobileCommand[versionNo=" + versionNo + ", mobile=[redacted]]"; }
+    }
+
     public record TransferAdministratorCommand(int versionNo, long successorUserId) {
     }
 
@@ -42,7 +46,7 @@ public final class WorkbenchTeamModels {
 
     public record Member(long userId, String userName, String avatar, LocalDateTime joinedAt,
                          boolean administrator, CodingRole codingRole,
-                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt) {
+                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt, String mobile) {
     }
 
     public record Permissions(boolean administrator, boolean canRename, boolean canRemoveMembers,
@@ -73,7 +77,10 @@ public final class WorkbenchTeamModels {
     public record WorklogTeamScope(long id, String name, String codingTeamHost, List<WorklogMember> members) {
     }
 
-    public record CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole) {
+    public record CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole, String mobile) {
+        public CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole) {
+            this(userId, userName, avatar, codingRole, null);
+        }
     }
 
     public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members) {

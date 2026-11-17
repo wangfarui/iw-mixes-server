@@ -15,6 +15,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamDetail;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogMember;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamOption;
@@ -110,6 +111,16 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         StoredTeam stored = requireAdministrator(actor, require(teamId));
         requireVersion(command == null ? 0 : command.versionNo());
         return toDetail(actor, repository.rename(teamId, command.versionNo(), actor, normalizedName(command.name())));
+    }
+
+    @Override
+    public TeamDetail updateMemberMobile(Actor actor, long teamId, long targetUserId, UpdateMemberMobileCommand command) {
+        StoredTeam stored = requireAdministrator(actor, require(teamId));
+        requireVersion(command == null ? 0 : command.versionNo());
+        requireMemberId(stored, targetUserId);
+        String mobile = com.itwray.iw.external.zhaogang.profile.WorkbenchMobile.normalize(command.mobile());
+        return toDetail(actor, repository.updateMemberMobile(teamId, actor, targetUserId,
+                new UpdateMemberMobileCommand(command.versionNo(), mobile)));
     }
 
     @Override
@@ -215,7 +226,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                     List<CodeSyncMember> members = stored.members().stream().map(member -> {
                         MemberProfile profile = profiles.get(member.getCodingUserId());
                         return new CodeSyncMember(member.getCodingUserId(), member.getUserName(), member.getAvatar(),
-                                profile == null ? null : profile.codingRole());
+                                profile == null ? null : profile.codingRole(), profile == null ? null : profile.mobile());
                     }).toList();
                     return new CodeSyncTeam(stored.team().getName(), stored.team().getCodingTeamKey(),
                             stored.team().getCodingTeamHost(), members);
@@ -325,7 +336,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                             MemberProfile profile) {
         return new Member(member.getCodingUserId(), member.getUserName(), member.getAvatar(), member.getCreateTime(),
                 member.getCodingUserId() == administratorUserId, profile == null ? null : profile.codingRole(),
-                includeActivity && profile != null ? profile.lastUsedAt() : null);
+                includeActivity && profile != null ? profile.lastUsedAt() : null, profile == null ? null : profile.mobile());
     }
 
     private String normalizedName(String name) {

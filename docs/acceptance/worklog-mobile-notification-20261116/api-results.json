@@ -1,0 +1,11 @@
+{
+  "admin_edits_and_cross_team_shared": true,
+  "stale_version_nonadmin_nonmember_denied": true,
+  "self_edit_identity_validation_role_preserved_and_member_visibility": true,
+  "summary_recipient_membership_and_permission_checked": true,
+  "real_queue_text_payload_summary_phone_shortfall_phone_and_no_userid": true,
+  "teamId": 3,
+  "secondTeamId": 4,
+  "notificationRevision": 1,
+  "accepted": 3
+}

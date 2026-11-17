@@ -8,6 +8,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.LeaveCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.RenameCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ReorderCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamRepository.StoredTeam;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -266,4 +268,27 @@ class DefaultWorkbenchTeamModuleTest {
         member.setCreateTime(LocalDateTime.now());
         return member;
     }
+    @Test void mobileIsVisibleToAllMembersAndOnlyAdministratorCanEditThroughTeam() {
+        var repository = mock(WorkbenchTeamRepository.class);
+        var stored = storedTeam();
+        when(repository.findById(1L)).thenReturn(Optional.of(stored));
+        var profile = new MemberProfile(200L, CodingRole.QA, null, "13800000002");
+        when(repository.findMemberProfiles(1L, true)).thenReturn(List.of(profile));
+        when(repository.findMemberProfiles(1L, false)).thenReturn(List.of(profile));
+        var module = new DefaultWorkbenchTeamModule(repository);
+        assertThat(module.detail(member,1L).members()).filteredOn(m -> m.userId()==200L).singleElement()
+                .extracting(WorkbenchTeamModels.Member::mobile).isEqualTo("13800000002");
+        assertThat(module.findCodeSyncTeam(10L,1L).orElseThrow().members()).filteredOn(m -> m.userId()==200L).singleElement()
+                .extracting(WorkbenchTeamModels.CodeSyncMember::mobile).isEqualTo("13800000002");
+        var command = new WorkbenchTeamModels.UpdateMemberMobileCommand(3,"13800000002");
+        assertThatThrownBy(() -> module.updateMemberMobile(member,1L,200L,command)).hasMessageContaining("只有团队管理员");
+        assertThatThrownBy(() -> module.updateMemberMobile(administrator,1L,999L,command)).hasMessageContaining("不是当前团队成员");
+        assertThatThrownBy(() -> module.updateMemberMobile(administrator,1L,200L,
+                new WorkbenchTeamModels.UpdateMemberMobileCommand(3,"@all"))).hasMessageContaining("11位手机号");
+        verify(repository, never()).updateMemberMobile(anyLong(), any(), anyLong(), any());
+        when(repository.updateMemberMobile(1L,administrator,200L,command)).thenReturn(stored);
+        module.updateMemberMobile(administrator,1L,200L,new WorkbenchTeamModels.UpdateMemberMobileCommand(3," 13800000002 "));
+        verify(repository).updateMemberMobile(1L,administrator,200L,command);
+    }
+
 }

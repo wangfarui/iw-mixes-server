@@ -23,8 +23,10 @@ public class ZhaogangNotificationController {
     @PutMapping public GeneralResponse<Status> save(@PathVariable long teamId,@RequestBody Command command,HttpServletRequest request,HttpServletResponse response) {
         return GeneralResponse.success(module.save(actor(request,response),teamId,command));
     }
-    @PostMapping("/test") public GeneralResponse<Status> test(@PathVariable long teamId,@RequestBody TestCommand command,HttpServletRequest request,HttpServletResponse response) {
-        return GeneralResponse.success(module.test(actor(request,response),teamId,command.revision()));
+    @PostMapping("/test") public GeneralResponse<?> test(@PathVariable long teamId,@RequestBody TestCommand command,HttpServletRequest request,HttpServletResponse response) {
+        if (command.webhook() == null || command.webhook().isBlank())
+            return GeneralResponse.success(module.test(actor(request,response),teamId,command.revision()));
+        return GeneralResponse.success(module.test(actor(request,response),teamId,command));
     }
     @PostMapping("/send-now") public GeneralResponse<Status> sendNow(@PathVariable long teamId,@RequestBody SendNowCommand command,HttpServletRequest request,HttpServletResponse response) {
         return GeneralResponse.success(module.sendNow(actor(request,response),teamId,command));

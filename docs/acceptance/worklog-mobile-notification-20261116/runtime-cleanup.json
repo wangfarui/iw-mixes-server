@@ -1,0 +1,16 @@
+{
+  "listening": {
+    "5196": false,
+    "18148": false,
+    "16479": false,
+    "13326": false,
+    "18050": false,
+    "18048": true,
+    "18049": true
+  },
+  "fakeWebhookCleared": true,
+  "notificationEnabled": false,
+  "preservedIsolatedDatabaseFiles": true,
+  "normalServices18000and18006Touched": false,
+  "note": "Early isolated Java processes on 18048 and 18049 could not be stopped with the available OS process permissions; shutdown endpoints also failed. They have no enabled notifications. Shared services were not restarted."
+}

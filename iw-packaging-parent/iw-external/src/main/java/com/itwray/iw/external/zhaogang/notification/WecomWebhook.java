@@ -37,14 +37,24 @@ class WecomWebhook {
     }
     String encrypt(String url) { return AESUtils.encryptAESGCM(key(), validate(url)); }
     String decrypt(String ciphertext) { return validate(AESUtils.decryptAESGCM(key(), ciphertext)); }
+    String hint(String ciphertext) {
+        if (ciphertext == null) return null;
+        String url = decrypt(ciphertext);
+        String secret = url.substring(url.indexOf("?key=") + 5);
+        return secret.substring(0, 3) + "xxx" + secret.substring(secret.length() - 4);
+    }
     private javax.crypto.SecretKey key() {
         return AESUtils.generateSecretKey(CodingCredentialService.fingerprint(properties.safeSessionKey() + ":worklog-webhook:v1").substring(0, 32));
     }
-    Result send(String ciphertext, String content) {
-        if (WorklogMessageFormatter.bytes(content) > 4096) return new Result(Outcome.FAILED, "消息超过企微字节上限");
+    Result send(String ciphertext, String content) { return send(ciphertext, NotificationMessage.markdown(content)); }
+    Result send(String ciphertext, NotificationMessage message) {
+        if (WorklogMessageFormatter.bytes(message.content()) > message.byteLimit()) return new Result(Outcome.FAILED, "消息超过企微字节上限");
         try {
             String url = decrypt(ciphertext);
-            String body = json.writeValueAsString(Map.of("msgtype", "markdown", "markdown", Map.of("content", content)));
+            Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("content", message.content());
+            if (!message.mentionedMobiles().isEmpty()) payload.put("mentioned_mobile_list", message.mentionedMobiles());
+            String body = json.writeValueAsString(Map.of("msgtype", message.type(), message.type(), payload));
             var request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15))
                     .header("Content-Type", "application/json;charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body)).build();
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());

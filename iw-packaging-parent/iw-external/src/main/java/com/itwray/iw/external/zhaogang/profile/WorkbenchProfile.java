@@ -20,6 +20,9 @@ public final class WorkbenchProfile {
     public record UpdateRole(@JsonProperty(required = true) CodingRole codingRole, boolean initializeOnly) {
     }
 
-    public record MemberProfile(long userId, CodingRole codingRole, LocalDateTime lastUsedAt) {
+    public record MemberProfile(long userId, CodingRole codingRole, LocalDateTime lastUsedAt, String mobile) {
+        public MemberProfile(long userId, CodingRole codingRole, LocalDateTime lastUsedAt) {
+            this(userId, codingRole, lastUsedAt, null);
+        }
     }
 }

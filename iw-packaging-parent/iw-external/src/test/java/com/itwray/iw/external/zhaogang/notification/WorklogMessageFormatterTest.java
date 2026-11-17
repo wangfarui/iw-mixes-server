@@ -74,7 +74,7 @@ class WorklogMessageFormatterTest {
                 new Member(2,"李四",false,true,"",List.of())));
         var messages=new WorklogMessageFormatter().format(snapshot);
         assertThat(messages.size()).isGreaterThan(3);
-        messages.forEach(m -> assertThat(WorklogMessageFormatter.bytes(m)).isLessThanOrEqualTo(4096));
+        messages.forEach(m -> assertThat(WorklogMessageFormatter.bytes(m)).isLessThanOrEqualTo(2048));
         assertThat(messages.get(1)).contains("张三", "张三（1/");
         assertThat(messages.get(messages.size()-1)).contains("李四");
         String recovered=messages.subList(1,messages.size()-1).stream().map(m->m.substring(m.indexOf('\n',m.indexOf('\n')+1)+1)).reduce("",String::concat);
@@ -85,7 +85,40 @@ class WorklogMessageFormatterTest {
         String name="长名🙂".repeat(500);
         var messages=new WorklogMessageFormatter().format(new Snapshot(name,LocalDate.now(),"17:00",List.of(
                 new Member(1,name,false,false,"记录缺少登记时间",List.of(entry(1,"a",1,"任务","2"))))));
-        messages.forEach(m->assertThat(WorklogMessageFormatter.bytes(m)).isLessThanOrEqualTo(4096));
+        messages.forEach(m->assertThat(WorklogMessageFormatter.bytes(m)).isLessThanOrEqualTo(2048));
         assertThat(String.join("",messages)).contains("数据不完整，暂不判断是否达到8h").doesNotContain("还差6h");
     }
+    @Test void phonesRemindOnlySelectedSummaryRecipientAndCompleteShortfallMembers() {
+        var snapshot = new Snapshot("团队", LocalDate.now(), "17:00", List.of(
+                new Member(1,"不足",false,true,"",List.of(entry(1,"项目",1,"任务","2"))),
+                new Member(2,"零工时",false,true,"",List.of()),
+                new Member(3,"达标",false,true,"",List.of(entry(2,"项目",1,"任务","8"))),
+                new Member(4,"请假",true,true,"",List.of()),
+                new Member(5,"异常",false,false,"失败",List.of()),
+                new Member(6,"未填手机",false,true,"",List.of())));
+        var phones = java.util.Map.of(1L,"13800000001",2L,"13800000002",3L,"13800000003",4L,"13800000004",5L,"13800000005");
+        var messages = new WorklogMessageFormatter().format(snapshot, 3L, phones);
+        assertThat(messages).allMatch(m -> m.type().equals("text"));
+        assertThat(messages.get(0).mentionedMobiles()).containsExactly("13800000003");
+        assertThat(messages.get(1).mentionedMobiles()).containsExactly("13800000001");
+        assertThat(messages.get(2).mentionedMobiles()).containsExactly("13800000002");
+        assertThat(messages.subList(3,7)).allMatch(m -> m.mentionedMobiles().isEmpty());
+        assertThat(new WorklogMessageFormatter().format(snapshot, null, phones).get(0).mentionedMobiles()).isEmpty();
+        assertThat(new WorklogMessageFormatter().format(snapshot, 999L, phones).get(0).mentionedMobiles()).isEmpty();
+    }
+    @Test void longPersonalReportMentionsOnlyOnceAndKeepsEveryTextPartWithin2048Bytes() {
+        var snapshot = new Snapshot("团队", LocalDate.now(), "17:00", List.of(new Member(1,"张三",false,true,"",
+                List.of(entry(1,"项目",1,"任务🙂".repeat(900),"1")))));
+        var messages = new WorklogMessageFormatter().format(snapshot, null, java.util.Map.of(1L,"13800000001"));
+        assertThat(messages.size()).isGreaterThan(3);
+        assertThat(messages).allMatch(m -> WorklogMessageFormatter.bytes(m.content()) <= 2048);
+        assertThat(messages.stream().filter(m -> !m.mentionedMobiles().isEmpty())).hasSize(1);
+        assertThat(messages.get(1).mentionedMobiles()).containsExactly("13800000001");
+    }
+    @Test void rejectsAllAndUserIdsAsPhoneRecipients() {
+        for (String invalid : List.of("@all", "zhangsan", "13800000001,13800000002", "123"))
+            assertThatThrownBy(() -> new NotificationMessage("text", "report", List.of(invalid)))
+                    .hasMessageContaining("11位手机号");
+    }
+
 }

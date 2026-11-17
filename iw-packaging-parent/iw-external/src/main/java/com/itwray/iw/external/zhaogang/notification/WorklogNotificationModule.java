@@ -23,13 +23,20 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class WorklogNotificationModule {
-    public record Command(boolean enabled, long revision, String webhook, boolean clearWebhook) {
+    public record Command(boolean enabled, long revision, String webhook, boolean clearWebhook, Long summaryMemberId) {
+        public Command(boolean enabled, long revision, String webhook, boolean clearWebhook) {
+            this(enabled, revision, webhook, clearWebhook, null);
+        }
         @Override public String toString() { return "Command[enabled=" + enabled + ", revision=" + revision + ", webhook=[redacted], clearWebhook=" + clearWebhook + "]"; }
     }
-    public record TestCommand(long revision) { }
+    public record TestCommand(long revision, String webhook) {
+        @Override public String toString() { return "TestCommand[revision=" + revision + ", webhook=[redacted]]"; }
+    }
+    public record TestResult(Status status, String state, String reason) { }
     public record SendNowCommand(long revision, String requestId) { }
-    public record Latest(String state, String reason, int accepted, int total, long createdAt, String kind) { }
-    public record Status(boolean enabled, boolean webhookConfigured, long revision, Latest latest) { }
+    public record Latest(String state, String reason, int accepted, int total, long createdAt, String kind, String id) { }
+    public record Status(boolean enabled, boolean webhookConfigured, long revision, Latest latest, Long summaryMemberId,
+                         String webhookHint, List<Latest> recent) { }
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
     private final NotificationStore store;
     private final WorkbenchTeamModule teams;
@@ -68,12 +75,37 @@ public class WorklogNotificationModule {
         store.save(teamId,actor.codingTeamId(),actor.userId(),command,webhook);
         return status(teamId);
     }
+    public TestResult test(Actor actor, long teamId, TestCommand command) {
+        requireAdmin(actor, teamId);
+        var config = store.config(teamId);
+        String url;
+        if (command.webhook() != null && !command.webhook().isBlank()) url = WecomWebhook.validate(command.webhook());
+        else {
+            if (config == null || config.cipher() == null) throw new WorkbenchTeamException("请输入群 Webhook 地址");
+            url = webhook.decrypt(config.cipher());
+        }
+        String cipher = webhook.encrypt(url);
+        String hash = com.itwray.iw.external.zhaogang.credential.CodingCredentialService.fingerprint(url);
+        var delivery = store.beginTest(teamId, actor.codingTeamId(), actor.userId(), command.revision(), hash,
+                NotificationMessage.text("工作台助手｜连接测试\n这是一条测试消息，不包含工时数据，也不会自动开启通知。"));
+        var result = webhook.send(cipher, delivery.message());
+        // An immediate test sends once; ambiguous delivery never triggers a blind retry.
+        if (result.outcome() == WecomWebhook.Outcome.RETRYABLE)
+            result = new WecomWebhook.Result(WecomWebhook.Outcome.FAILED, result.reason());
+        store.complete(delivery, result);
+        String state = switch (result.outcome()) {
+            case ACCEPTED -> "ACCEPTED";
+            case UNKNOWN -> "UNKNOWN";
+            default -> "FAILED";
+        };
+        return new TestResult(status(teamId), state, result.reason());
+    }
     public Status test(Actor actor, long teamId, long revision) {
         requireAdmin(actor,teamId);
         var config = store.config(teamId);
         if (config == null || config.cipher() == null) throw new WorkbenchTeamException("请先保存群 Webhook");
         String id = store.createTest(config, "", revision, actor.userId());
-        store.ready(id, "{}", List.of("工作台助手｜连接测试\n群 Webhook 已连接。\n这是一条测试消息，不包含工时数据，也不会自动开启通知。"));
+        store.readyMessages(id, "{}", List.of(NotificationMessage.text("工作台助手｜连接测试\n群 Webhook 已连接。\n这是一条测试消息，不包含工时数据，也不会自动开启通知。")));
         return status(teamId);
     }
     public Status sendNow(Actor actor, long teamId, SendNowCommand command) {
@@ -100,7 +132,9 @@ public class WorklogNotificationModule {
             var future = collection.submit(() -> reader.read(config.codingTeamId(), team, date));
             try {
                 var snapshot = future.get(120, TimeUnit.SECONDS);
-                store.ready(id, json.writeValueAsString(snapshot), formatter.format(snapshot));
+                Map<Long, String> mobiles = new HashMap<>();
+                team.members().forEach(member -> { if (member.mobile() != null) mobiles.put(member.userId(), member.mobile()); });
+                store.readyMessages(id, json.writeValueAsString(snapshot), formatter.format(snapshot, config.summaryMemberId(), mobiles));
             } finally { if (!future.isDone()) future.cancel(true); }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -111,9 +145,12 @@ public class WorklogNotificationModule {
         if (!teams.detail(actor,teamId).permissions().administrator()) throw new WorkbenchTeamException("只有团队管理员可以管理工时群通知");
     }
     private Status status(long teamId) {
-        var config=store.config(teamId); var latest=store.latest(teamId);
+        var config=store.config(teamId);
+        var recent=store.recent(teamId).stream().map(batch -> new Latest(batch.state(), batch.reason(),
+                store.accepted(batch.id()), batch.total(), batch.createdAt(), batch.kind(), batch.id())).toList();
         return new Status(config != null && config.enabled(), config != null && config.cipher() != null,
-                config == null ? 0 : config.revision(), latest == null ? null : new Latest(latest.state(), latest.reason(),store.accepted(latest.id()),latest.total(),latest.createdAt(),latest.kind()));
+                config == null ? 0 : config.revision(), recent.isEmpty() ? null : recent.get(0),
+                config == null ? null : config.summaryMemberId(), config == null ? null : webhook.hint(config.cipher()), recent);
     }
     void daily() {
         LocalDate date=LocalDate.now(ZONE);
@@ -147,14 +184,14 @@ public class WorklogNotificationModule {
                 }
                 var team=teams.findCodeSyncTeam(batch.codingTeamId(),batch.teamId()).orElse(null);
                 if (team==null || !"TEST".equals(batch.kind()) && !memberIds(team).equals(batch.members())) {
-                    store.stop(batch.id(),"CANCELLED","团队已解散或成员发生变化"); continue;
+                    store.stop(batch.id(),"CANCELLED","团队已解散、成员或手机号发生变化"); continue;
                 }
                 if ("DAILY".equals(batch.kind()) && calendar.resolve(batch.codingTeamId(),YearMonth.now(ZONE)).days().stream()
                         .noneMatch(day->day.date().equals(LocalDate.now(ZONE)) && day.dayType()==DayType.WORKDAY)) {
                     store.stop(batch.id(),"CANCELLED","日历已调整为非工作日"); continue;
                 }
                 var delivery=store.claim(batch,now);
-                if (delivery!=null) store.complete(delivery,webhook.send(config.cipher(),delivery.content()));
+                if (delivery!=null) store.complete(delivery,webhook.send(config.cipher(),delivery.message()));
             }
         } catch (RuntimeException e) {
             // Safe exception type only; SQL/URI/HTTP messages can include configuration secrets.
@@ -163,7 +200,10 @@ public class WorklogNotificationModule {
     }
     void cleanup() { store.cleanup(System.currentTimeMillis()); }
     static String memberIds(CodeSyncTeam team) {
-        return team.members().stream().map(m->m.userId()).sorted().map(String::valueOf).collect(Collectors.joining(","));
+        return team.members().stream().sorted(Comparator.comparingLong(m -> m.userId()))
+                .map(m -> m.userId() + (m.mobile() == null || m.mobile().isBlank() ? "" : ":" +
+                        com.itwray.iw.external.zhaogang.credential.CodingCredentialService.fingerprint(m.mobile())))
+                .collect(Collectors.joining(","));
     }
     @PreDestroy void shutdown() { scheduler.shutdown(); manualReports.shutdownNow(); collection.shutdownNow(); }
 }

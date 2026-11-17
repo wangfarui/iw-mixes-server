@@ -1,0 +1,11 @@
+{
+  "administrator_edit_member_phone": true,
+  "ordinary_member_phone_visible_edit_hidden": true,
+  "self_phone_below_coding_role_saved": true,
+  "summary_selection_persisted_after_reload": true,
+  "unsaved_summary_selection_blocks_send": true,
+  "browser_send_local_receiver_accepted": 3,
+  "measured_settings_viewport_width": 500,
+  "measured_settings_scroll_width": 500,
+  "real_wecom_group_used": false
+}

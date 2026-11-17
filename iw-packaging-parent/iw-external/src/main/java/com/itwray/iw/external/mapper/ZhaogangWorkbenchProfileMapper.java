@@ -20,7 +20,7 @@ public interface ZhaogangWorkbenchProfileMapper {
 
     @Select("""
             select m.coding_user_id as userId, p.coding_role as codingRole,
-                   case when #{includeActivity} then p.last_used_at else null end as lastUsedAt
+                   case when #{includeActivity} then p.last_used_at else null end as lastUsedAt, p.mobile
               from external_zhaogang_workbench_team_member m
               join external_zhaogang_workbench_team t on t.id = m.team_id
               left join external_zhaogang_workbench_profile p
@@ -41,6 +41,20 @@ public interface ZhaogangWorkbenchProfileMapper {
             """)
     void saveRole(@Param("codingTeamId") long codingTeamId, @Param("userId") long userId,
                   @Param("codingRole") CodingRole codingRole, @Param("initializeOnly") boolean initializeOnly);
+
+    @Select("""
+            select mobile from external_zhaogang_workbench_profile
+             where coding_team_id = #{codingTeamId} and coding_user_id = #{userId}
+            """)
+    String findMobile(@Param("codingTeamId") long codingTeamId, @Param("userId") long userId);
+
+    @Insert("""
+            insert into external_zhaogang_workbench_profile (coding_team_id, coding_user_id, mobile)
+            values (#{codingTeamId}, #{userId}, #{mobile,jdbcType=VARCHAR})
+            on duplicate key update mobile = #{mobile,jdbcType=VARCHAR}
+            """)
+    void saveMobile(@Param("codingTeamId") long codingTeamId, @Param("userId") long userId,
+                    @Param("mobile") String mobile);
 
     @Insert("""
             insert into external_zhaogang_workbench_profile (coding_team_id, coding_user_id, last_used_at)

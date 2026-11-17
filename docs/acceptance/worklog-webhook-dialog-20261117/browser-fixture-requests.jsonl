@@ -1,0 +1,9 @@
+{"method":"GET /teams/1/worklog-notification","body":{}}
+{"method":"GET /teams/1/worklog-notification","body":{}}
+{"method":"GET /teams/1/worklog-notification","body":{}}
+{"method":"POST /teams/1/worklog-notification/test","body":{"revision":1,"webhook":"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=new-fixture-1234"}}
+{"method":"PUT /teams/1/worklog-notification","body":{"enabled":false,"revision":1,"summaryMemberId":null,"webhook":"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=fail-fixture-0002"}}
+{"method":"PUT /teams/1/worklog-notification","body":{"enabled":false,"revision":1,"summaryMemberId":null,"webhook":"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=new-fixture-1234"}}
+{"method":"PUT /teams/1/worklog-notification","body":{"enabled":false,"revision":2,"summaryMemberId":101}}
+{"method":"PUT /teams/1/worklog-notification","body":{"enabled":true,"revision":3,"summaryMemberId":101}}
+{"method":"GET /teams/1/worklog-notification","body":{}}

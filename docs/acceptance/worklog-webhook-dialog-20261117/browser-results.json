@@ -1,0 +1,15 @@
+{
+  "source": "actual TeamWorklogNotification.vue mounted in isolated Vite page with synthetic API fixtures",
+  "masked_before": "oldxxx0001",
+  "masked_after_confirm": "newxxx1234",
+  "max_history_count": 3,
+  "candidate_test_did_not_replace_saved_address": true,
+  "cancel_preserved_saved_address": true,
+  "save_failure_kept_dialog_and_input": true,
+  "confirm_saved_and_closed_dialog": true,
+  "summary_member_change_saved_immediately": true,
+  "enabled_switch_saved_immediately": true,
+  "reload_preserved_fixture_state": true,
+  "requested_texts_and_page_buttons_removed": true,
+  "real_wecom_messages_sent": false
+}

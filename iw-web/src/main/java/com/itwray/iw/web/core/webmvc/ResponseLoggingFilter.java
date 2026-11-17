@@ -27,7 +27,11 @@ public class ResponseLoggingFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.equals("/application/account") || path.startsWith("/application/account/")
+        return path.equals("/external-service/api/zhaogang/profile/mobile")
+                || path.equals("/external-service/api/zhaogang/workbench-teams")
+                || path.startsWith("/external-service/api/zhaogang/workbench-teams/")
+                || path.matches("/external-service/api/zhaogang/workbench-team-invitations/[^/]+/join")
+                || path.equals("/application/account") || path.startsWith("/application/account/")
                 || path.equals("/auth-service/application/account") || path.startsWith("/auth-service/application/account/");
     }
 

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         ZhaogangCodeStatsController.class,
         ZhaogangCalendarController.class,
         ZhaogangTeamController.class,
+        ZhaogangProfileController.class,
         ZhaogangIterationController.class,
         ZhaogangReleaseReceiptController.class,
         com.itwray.iw.external.zhaogang.ai.ZhaogangAiController.class,

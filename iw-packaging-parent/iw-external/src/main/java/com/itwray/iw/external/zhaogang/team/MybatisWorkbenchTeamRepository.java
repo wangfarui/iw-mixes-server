@@ -7,6 +7,7 @@ import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamMemberMapper;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.TeamEntity;
 import org.springframework.stereotype.Repository;
@@ -113,6 +114,17 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
     @Override
     public List<MemberProfile> findMemberProfiles(long teamId, boolean includeActivity) {
         return profileMapper.findMemberProfiles(teamId, includeActivity);
+    }
+
+    @Override
+    @Transactional
+    public StoredTeam updateMemberMobile(long teamId, Actor actor, long targetUserId, UpdateMemberMobileCommand command) {
+        requireChanged(teamMapper.touchAsAdministrator(teamId, actor.userId(), command.versionNo()));
+        if (require(teamId).members().stream().noneMatch(m -> m.getCodingUserId() == targetUserId))
+            throw new WorkbenchTeamException("所选用户不是当前团队成员");
+        profileMapper.saveMobile(actor.codingTeamId(), targetUserId,
+                com.itwray.iw.external.zhaogang.profile.WorkbenchMobile.normalize(command.mobile()));
+        return require(teamId);
     }
 
     @Override

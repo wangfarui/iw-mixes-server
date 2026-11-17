@@ -11,6 +11,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamDetail;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TransferAdministratorCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.VersionCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import io.swagger.v3.oas.annotations.Operation;
@@ -77,6 +78,14 @@ public class ZhaogangTeamController {
     public GeneralResponse<TeamDetail> rename(@PathVariable long teamId, @RequestBody RenameCommand command,
                                               HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(module.rename(actor(request, response), teamId, command));
+    }
+
+    @PutMapping("/workbench-teams/{teamId}/members/{userId}/mobile")
+    @Operation(summary = "团队管理员更新成员手机号")
+    public GeneralResponse<TeamDetail> updateMemberMobile(
+            @PathVariable long teamId, @PathVariable long userId, @RequestBody UpdateMemberMobileCommand command,
+            HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.updateMemberMobile(actor(request, response), teamId, userId, command));
     }
 
     @PutMapping("/workbench-teams/{teamId}/members/{userId}/coding-role")

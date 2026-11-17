@@ -16,11 +16,19 @@ class NotificationStore {
     static final String M = "external_zhaogang_worklog_notify_message";
     private static final String BATCH_COLUMNS = "id,team_id,coding_team_id,kind,revision,webhook_hash,member_ids,state,reason,total_count,created_at,expires_at";
     static final String H = "external_zhaogang_worklog_notify_channel";
-    record Config(long teamId, long codingTeamId, boolean enabled, String cipher, String hash, long revision) { }
+    record Config(long teamId, long codingTeamId, boolean enabled, String cipher, String hash, long revision, Long summaryMemberId) {
+        Config(long teamId, long codingTeamId, boolean enabled, String cipher, String hash, long revision) {
+            this(teamId, codingTeamId, enabled, cipher, hash, revision, null);
+        }
+    }
     record Batch(String id, long teamId, long codingTeamId, String kind, long revision, String hash,
                  String members, String state, String reason, int total, long createdAt, long expiresAt) { }
     record ManualBatch(String id, boolean created) { }
-    record Delivery(Batch batch, int sequence, String content, int attempts) { }
+    record Delivery(Batch batch, int sequence, NotificationMessage message, int attempts) {
+        Delivery(Batch batch, int sequence, String content, int attempts) {
+            this(batch, sequence, NotificationMessage.markdown(content), attempts);
+        }
+    }
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     NotificationStore(JdbcTemplate jdbc, TransactionTemplate tx) { this.jdbc = jdbc; this.tx = tx; }
@@ -35,6 +43,11 @@ class NotificationStore {
             jdbc.update("INSERT INTO " + C + " (team_id,coding_team_id) VALUES (?,?) ON DUPLICATE KEY UPDATE team_id=team_id", id, codingTeamId);
             Config old = jdbc.queryForObject("SELECT * FROM " + C + " WHERE team_id=? FOR UPDATE", (r,n) -> configRow(r), id);
             if (old.revision() != command.revision()) throw new WorkbenchTeamException("通知配置已变化，请重新加载后保存");
+            Long summaryMemberId = command.clearWebhook() ? null : command.summaryMemberId();
+            if (summaryMemberId != null && jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM external_zhaogang_workbench_team_member WHERE team_id=? AND coding_user_id=?",
+                    Integer.class, id, summaryMemberId) != 1)
+                throw new WorkbenchTeamException("汇总提醒对象必须是当前团队成员");
             boolean clear = command.clearWebhook();
             if (clear && command.webhook() != null && !command.webhook().isBlank()) throw new WorkbenchTeamException("清除与更换 Webhook 不能同时操作");
             String cipher = clear ? null : old.cipher();
@@ -47,7 +60,7 @@ class NotificationStore {
             boolean enabled = !clear && command.enabled();
             if (enabled && cipher == null) throw new WorkbenchTeamException("请先保存群 Webhook");
             long now = System.currentTimeMillis();
-            jdbc.update("UPDATE " + C + " SET enabled=?,webhook_cipher=?,webhook_hash=?,revision=revision+1,updated_by=?,updated_at=? WHERE team_id=?", enabled, cipher, hash, actor, now, id);
+            jdbc.update("UPDATE " + C + " SET enabled=?,webhook_cipher=?,webhook_hash=?,summary_member_id=?,revision=revision+1,updated_by=?,updated_at=? WHERE team_id=?", enabled, cipher, hash, summaryMemberId, actor, now, id);
             // Stop only unsent messages. An already submitted HTTP request cannot be recalled.
             jdbc.update("UPDATE " + B + " SET state='CANCELLED',reason='通知配置已更新',updated_at=? WHERE team_id=? AND state IN ('COLLECTING','READY')", now, id);
             return config(id);
@@ -56,7 +69,36 @@ class NotificationStore {
     Batch latest(long teamId) {
         return jdbc.query("SELECT " + BATCH_COLUMNS + " FROM " + B + " WHERE team_id=? ORDER BY created_at DESC,id DESC LIMIT 1", (r,n)->batchRow(r), teamId).stream().findFirst().orElse(null);
     }
+    List<Batch> recent(long teamId) {
+        return jdbc.query("SELECT " + BATCH_COLUMNS + " FROM " + B + " WHERE team_id=? ORDER BY created_at DESC,id DESC LIMIT 3", (r,n)->batchRow(r), teamId);
+    }
     int accepted(String batchId) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + M + " WHERE batch_id=? AND state='ACCEPTED'", Integer.class, batchId); }
+
+    /** Reserve one immediate connection test without saving its candidate address. */
+    Delivery beginTest(long teamId, long codingTeamId, long actor, long revision, String hash, NotificationMessage message) {
+        return tx.execute(status -> {
+            authorize(teamId, codingTeamId, actor);
+            jdbc.update("INSERT INTO " + C + " (team_id,coding_team_id) VALUES (?,?) ON DUPLICATE KEY UPDATE team_id=team_id", teamId, codingTeamId);
+            Config config = jdbc.queryForObject("SELECT * FROM " + C + " WHERE team_id=? FOR UPDATE", (r,n)->configRow(r), teamId);
+            if (config.revision() != revision) throw new WorkbenchTeamException("通知配置已变化，请重新加载");
+            long now = System.currentTimeMillis();
+            if (jdbc.update("UPDATE " + C + " SET last_test_at=? WHERE team_id=? AND last_test_at<=?", now, teamId, now-10_000) != 1
+                    || jdbc.queryForObject("SELECT COUNT(*) FROM " + B + " WHERE team_id=? AND kind='TEST' AND state IN ('COLLECTING','READY','TESTING')", Integer.class, teamId) > 0)
+                throw new WorkbenchTeamException("测试发送处理中，请稍后再试");
+            jdbc.update("INSERT INTO " + H + " (webhook_hash) VALUES (?) ON DUPLICATE KEY UPDATE webhook_hash=webhook_hash", hash);
+            var channel = jdbc.queryForMap("SELECT active_batch,next_at FROM " + H + " WHERE webhook_hash=? FOR UPDATE", hash);
+            String active = (String) channel.get("active_batch");
+            if (((Number) channel.get("next_at")).longValue() > now || active != null &&
+                    jdbc.queryForObject("SELECT COUNT(*) FROM " + B + " WHERE id=? AND state IN ('COLLECTING','READY','TESTING')", Integer.class, active) > 0)
+                throw new WorkbenchTeamException("该群正在发送消息，请稍后测试");
+            String id = UUID.randomUUID().toString();
+            jdbc.update("INSERT INTO " + B + " (id,team_id,coding_team_id,batch_key,kind,revision,webhook_hash,member_ids,state,total_count,created_at,expires_at,updated_at) VALUES (?,?,?,?,'TEST',?,?,'','TESTING',1,?,?,?)",
+                    id, teamId, codingTeamId, "TEST:" + id, revision, hash, now, now + 60_000, now);
+            jdbc.update("INSERT INTO " + M + " (batch_id,sequence_no,content,message_type,state,attempts,updated_at) VALUES (?,0,?,?,'SENDING',1,?)", id, message.content(), message.type(), now);
+            jdbc.update("UPDATE " + H + " SET active_batch=?,next_at=? WHERE webhook_hash=?", id, now + 4000, hash);
+            return new Delivery(new Batch(id, teamId, codingTeamId, "TEST", revision, hash, "", "TESTING", "", 1, now, now+60_000), 0, message, 1);
+        });
+    }
 
     String create(Config config, String key, String kind, String members, long expiresAt) {
         String id = UUID.randomUUID().toString(); long now = System.currentTimeMillis();
@@ -98,17 +140,24 @@ class NotificationStore {
         });
     }
     void ready(String id, String snapshot, List<String> messages) {
+        readyMessages(id, snapshot, messages.stream().map(NotificationMessage::markdown).toList());
+    }
+    void readyMessages(String id, String snapshot, List<NotificationMessage> messages) {
         tx.executeWithoutResult(status -> {
             var state = jdbc.queryForObject("SELECT state FROM " + B + " WHERE id=? FOR UPDATE", String.class, id);
             if (!"COLLECTING".equals(state)) return;
             long now = System.currentTimeMillis();
-            for (int i=0;i<messages.size();i++) jdbc.update("INSERT INTO " + M + " (batch_id,sequence_no,content,updated_at) VALUES (?,?,?,?)", id, i, messages.get(i), now);
+            for (int i = 0; i < messages.size(); i++) {
+                var message = messages.get(i);
+                jdbc.update("INSERT INTO " + M + " (batch_id,sequence_no,content,message_type,mentioned_mobiles,updated_at) VALUES (?,?,?,?,?,?)",
+                        id, i, message.content(), message.type(), String.join(",", message.mentionedMobiles()), now);
+            }
             jdbc.update("UPDATE " + B + " SET snapshot_json=?,total_count=?,state='READY',updated_at=? WHERE id=?", snapshot, messages.size(), now, id);
         });
     }
     List<Batch> pending() { return jdbc.query("SELECT " + BATCH_COLUMNS + " FROM " + B + " WHERE state IN ('COLLECTING','READY') ORDER BY created_at,id", (r,n)->batchRow(r)); }
     void stop(String id, String state, String reason) {
-        jdbc.update("UPDATE " + B + " SET state=?,reason=?,updated_at=? WHERE id=? AND state IN ('COLLECTING','READY')", state, reason, System.currentTimeMillis(), id);
+        jdbc.update("UPDATE " + B + " SET state=?,reason=?,updated_at=? WHERE id=? AND state IN ('COLLECTING','READY','TESTING')", state, reason, System.currentTimeMillis(), id);
     }
     Delivery claim(Batch batch, long now) {
         return tx.execute(status -> {
@@ -117,7 +166,7 @@ class NotificationStore {
             String active = (String) channel.get("active_batch");
             if (active != null && !active.equals(batch.id())) {
                 String state = jdbc.queryForObject("SELECT state FROM " + B + " WHERE id=?", String.class, active);
-                if (Set.of("COLLECTING", "READY").contains(state)) return null;
+                if (Set.of("COLLECTING", "READY", "TESTING").contains(state)) return null;
             }
             jdbc.update("UPDATE " + H + " SET active_batch=? WHERE webhook_hash=?", batch.id(), batch.hash());
             if (((Number)channel.get("next_at")).longValue() > now) return null;
@@ -138,7 +187,9 @@ class NotificationStore {
             int attempts = ((Number)m.get("attempts")).intValue() + 1;
             jdbc.update("UPDATE " + M + " SET state='SENDING',attempts=?,updated_at=? WHERE batch_id=? AND sequence_no=?", attempts, now, batch.id(), sequence);
             jdbc.update("UPDATE " + H + " SET next_at=? WHERE webhook_hash=?", now+4000, batch.hash());
-            return new Delivery(batch, sequence, (String)m.get("content"), attempts);
+            String mobiles = (String)m.get("mentioned_mobiles");
+            return new Delivery(batch, sequence, new NotificationMessage((String)m.get("message_type"),
+                    (String)m.get("content"), mobiles == null || mobiles.isBlank() ? List.of() : List.of(mobiles.split(","))), attempts);
         });
     }
     void complete(Delivery d, WecomWebhook.Result result) {
@@ -159,16 +210,16 @@ class NotificationStore {
     }
     void recoverUnknown(long now) {
         tx.executeWithoutResult(status -> {
-            jdbc.update("UPDATE " + B + " b INNER JOIN " + M + " m ON b.id=m.batch_id SET b.state='UNKNOWN',b.reason='发送进程中断，投递结果未知，已停止自动续发',b.updated_at=? WHERE b.state='READY' AND m.state='SENDING' AND m.updated_at<?", now, now-60_000);
+            jdbc.update("UPDATE " + B + " b INNER JOIN " + M + " m ON b.id=m.batch_id SET b.state='UNKNOWN',b.reason='发送进程中断，投递结果未知，已停止自动续发',b.updated_at=? WHERE b.state IN ('READY','TESTING') AND m.state='SENDING' AND m.updated_at<?", now, now-60_000);
             jdbc.update("UPDATE " + M + " m INNER JOIN " + B + " b ON b.id=m.batch_id SET m.state='UNKNOWN',m.updated_at=? WHERE b.state='UNKNOWN' AND m.state='SENDING' AND m.updated_at<?", now, now-60_000);
         });
     }
     void cleanup(long now) {
         // Keep sending/unknown state for at least 30 days; remove children before their batch.
         tx.executeWithoutResult(status -> {
-            jdbc.update("DELETE m FROM " + M + " m INNER JOIN " + B + " b ON b.id=m.batch_id WHERE b.created_at<? AND b.state NOT IN ('COLLECTING','READY')", now-30L*86400_000);
-            jdbc.update("UPDATE " + H + " h LEFT JOIN " + B + " b ON b.id=h.active_batch SET h.active_batch=NULL WHERE b.id IS NULL OR b.state NOT IN ('COLLECTING','READY')");
-            jdbc.update("DELETE FROM " + B + " WHERE created_at<? AND state NOT IN ('COLLECTING','READY')", now-30L*86400_000);
+            jdbc.update("DELETE m FROM " + M + " m INNER JOIN " + B + " b ON b.id=m.batch_id WHERE b.created_at<? AND b.state NOT IN ('COLLECTING','READY','TESTING')", now-30L*86400_000);
+            jdbc.update("UPDATE " + H + " h LEFT JOIN " + B + " b ON b.id=h.active_batch SET h.active_batch=NULL WHERE b.id IS NULL OR b.state NOT IN ('COLLECTING','READY','TESTING')");
+            jdbc.update("DELETE FROM " + B + " WHERE created_at<? AND state NOT IN ('COLLECTING','READY','TESTING')", now-30L*86400_000);
         });
     }
     private void authorize(long teamId, long codingTeamId, long actor) {
@@ -177,6 +228,6 @@ class NotificationStore {
                 || ((Number)rows.get(0).get("administrator_user_id")).longValue()!=actor)
             throw new WorkbenchTeamException("团队不存在或当前用户已不是管理员");
     }
-    private Config configRow(ResultSet r) throws SQLException { return new Config(r.getLong("team_id"),r.getLong("coding_team_id"),r.getBoolean("enabled"),r.getString("webhook_cipher"),r.getString("webhook_hash"),r.getLong("revision")); }
+    private Config configRow(ResultSet r) throws SQLException { return new Config(r.getLong("team_id"),r.getLong("coding_team_id"),r.getBoolean("enabled"),r.getString("webhook_cipher"),r.getString("webhook_hash"),r.getLong("revision"),r.getObject("summary_member_id", Long.class)); }
     private Batch batchRow(ResultSet r) throws SQLException { return new Batch(r.getString("id"),r.getLong("team_id"),r.getLong("coding_team_id"),r.getString("kind"),r.getLong("revision"),r.getString("webhook_hash"),r.getString("member_ids"),r.getString("state"),r.getString("reason"),r.getInt("total_count"),r.getLong("created_at"),r.getLong("expires_at")); }
 }
