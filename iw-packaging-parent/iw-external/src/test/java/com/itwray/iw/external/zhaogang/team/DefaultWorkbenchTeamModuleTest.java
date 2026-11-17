@@ -1,6 +1,14 @@
 package com.itwray.iw.external.zhaogang.team;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itwray.iw.common.utils.AESUtils;
+import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamTokenMapper.StoredManagementToken;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.ProjectMember;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.ProjectReference;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.AddMembersCommand;
+import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
@@ -39,7 +47,7 @@ class DefaultWorkbenchTeamModuleTest {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         StoredTeam stored = storedTeam();
         when(repository.findById(1L)).thenReturn(Optional.of(stored));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         var detail = module.detail(administrator, 1L);
 
@@ -56,7 +64,7 @@ class DefaultWorkbenchTeamModuleTest {
         var profiles = List.of(new MemberProfile(200L, CodingRole.QA, lastUsedAt));
         when(repository.findMemberProfiles(1L, true)).thenReturn(profiles);
         when(repository.findMemberProfiles(1L, false)).thenReturn(profiles);
-        var module = new DefaultWorkbenchTeamModule(repository);
+        var module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         var adminView = module.detail(administrator, 1L).members().stream()
                 .filter(item -> item.userId() == 200L).findFirst().orElseThrow();
@@ -76,7 +84,7 @@ class DefaultWorkbenchTeamModuleTest {
         when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
         when(repository.findMemberProfiles(1L, false))
                 .thenReturn(List.of(new MemberProfile(200L, CodingRole.FRONTEND, null)));
-        var module = new DefaultWorkbenchTeamModule(repository);
+        var module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         var members = module.findCodeSyncTeam(10L, 1L).orElseThrow().members();
 
@@ -93,7 +101,7 @@ class DefaultWorkbenchTeamModuleTest {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         StoredTeam stored = storedTeam();
         when(repository.findById(1L)).thenReturn(Optional.of(stored));
-        var module = new DefaultWorkbenchTeamModule(repository);
+        var module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
         var command = new UpdateMemberRoleCommand(3, CodingRole.BACKEND);
 
         assertThatThrownBy(() -> module.updateMemberRole(member, 1L, 100L, command))
@@ -112,7 +120,7 @@ class DefaultWorkbenchTeamModuleTest {
     void ordinaryMemberCannotRenameOrDissolveTeam() {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         assertThatThrownBy(() -> module.rename(member, 1L, new RenameCommand(3, "新名称")))
                 .isInstanceOf(WorkbenchTeamException.class).hasMessage("只有团队管理员可以执行此操作");
@@ -125,7 +133,7 @@ class DefaultWorkbenchTeamModuleTest {
     void administratorMustChooseCurrentMemberBeforeLeaving() {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         assertThatThrownBy(() -> module.leave(administrator, 1L, new LeaveCommand(3, null)))
                 .isInstanceOf(WorkbenchTeamException.class).hasMessage("管理员退出前必须选择继任管理员");
@@ -141,7 +149,7 @@ class DefaultWorkbenchTeamModuleTest {
         StoredTeam stored = storedTeam();
         StoredTeam soleAdministrator = new StoredTeam(stored.team(), List.of(stored.members().get(0)));
         when(repository.findById(1L)).thenReturn(Optional.of(soleAdministrator));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         assertThatThrownBy(() -> module.leave(administrator, 1L, new LeaveCommand(3, 200L)))
                 .isInstanceOf(WorkbenchTeamException.class).hasMessage("团队仅有管理员一人，请使用解散团队");
@@ -151,7 +159,7 @@ class DefaultWorkbenchTeamModuleTest {
     void invitationCannotCrossCodingTeamBoundary() {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findByInviteCode("invite-code")).thenReturn(Optional.of(storedTeam()));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
         Actor outsider = new Actor(300L, "外部成员", "", 11L,
                 "another-team", "https://another-team.coding.net");
 
@@ -165,7 +173,7 @@ class DefaultWorkbenchTeamModuleTest {
         StoredTeam first = storedTeam(1L, 10L, "研发团队");
         StoredTeam second = storedTeam(2L, 10L, "产品团队");
         when(repository.findByMember(100L)).thenReturn(List.of(first, second), List.of(second, first));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         var reordered = module.reorder(administrator, new ReorderCommand(List.of(2L, 1L)));
 
@@ -178,7 +186,7 @@ class DefaultWorkbenchTeamModuleTest {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findByMember(100L)).thenReturn(List.of(
                 storedTeam(1L, 10L, "研发团队"), storedTeam(2L, 10L, "产品团队")));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         assertThatThrownBy(() -> module.reorder(administrator, new ReorderCommand(List.of(1L))))
                 .isInstanceOf(WorkbenchTeamException.class).hasMessage("团队列表已变化，请刷新后重试");
@@ -192,7 +200,7 @@ class DefaultWorkbenchTeamModuleTest {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findByMember(100L)).thenReturn(List.of(
                 storedTeam(2L, 10L, "产品团队"), storedTeam(), storedTeam(3L, 11L, "其他团队")));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         var options = module.worklogTeams(administrator);
 
@@ -206,7 +214,7 @@ class DefaultWorkbenchTeamModuleTest {
     void worklogScopeUsesStoredMemberProfiles() {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
 
         var scope = module.resolveWorklogScope(administrator, 1L);
 
@@ -223,13 +231,105 @@ class DefaultWorkbenchTeamModuleTest {
     void nonMemberCannotResolveWorklogScope() {
         WorkbenchTeamRepository repository = mock(WorkbenchTeamRepository.class);
         when(repository.findById(1L)).thenReturn(Optional.of(storedTeam()));
-        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository);
+        DefaultWorkbenchTeamModule module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
         Actor outsider = new Actor(300L, "同组织外部成员", "", 10L,
                 "g-iijw5014", "https://g-iijw5014.coding.net");
 
         assertThatThrownBy(() -> module.resolveWorklogScope(outsider, 1L))
                 .isInstanceOf(WorkbenchTeamException.class)
                 .hasMessage("团队不存在或当前用户不是团队成员");
+    }
+
+    @Test
+    void sameNameProjectProvidesCandidatesAndPersistsOnlySameTeamMembers() {
+        var repository = mock(WorkbenchTeamRepository.class);
+        var coding = mock(CodingOpenApiPort.class);
+        var module = projectMembersModule(repository, coding, storedTeam());
+        var candidate = new WorkbenchTeamModels.MemberCandidate(300L, "未绑定成员", "avatar");
+        when(coding.visibleProjects("fixture-management-pat", 777L)).thenReturn(List.of(
+                new ProjectReference(42, "release-project", "研发团队"),
+                new ProjectReference(51, "other-project", "研发团队二组")));
+        var eligible = new ProjectMember(300L, 10L, "未绑定成员", "avatar", true);
+        when(coding.projectMembers("fixture-management-pat", 42L)).thenReturn(List.of(
+                eligible, eligible, new ProjectMember(200L, 10L, "已加入成员", "", true),
+                new ProjectMember(301L, 11L, "跨团队成员", "", true),
+                new ProjectMember(302L, 10L, "已停用成员", "", false)));
+        when(repository.addMembers(1L, administrator, 3, 42L, List.of(candidate))).thenReturn(storedTeam());
+
+        var candidates = module.memberCandidates(administrator, 1L, false);
+        assertThat(candidates.projectId()).isEqualTo(42L);
+        assertThat(candidates.versionNo()).isEqualTo(3);
+        assertThat(candidates.members()).containsExactly(candidate);
+        module.addMembers(administrator, 1L, new AddMembersCommand(3, 42L, false, List.of(300L, 300L)));
+
+        verify(repository).addMembers(1L, administrator, 3, 42L, List.of(candidate));
+        verify(coding, never()).teamDirectory(anyString());
+    }
+
+    @Test
+    void keepsProjectIdAfterRenameAndRequiresExplicitRematchForNewProject() {
+        var repository = mock(WorkbenchTeamRepository.class);
+        var coding = mock(CodingOpenApiPort.class);
+        var stored = storedTeam(1L, 10L, "重命名团队");
+        stored.team().setMemberSourceProjectId(42L);
+        var module = projectMembersModule(repository, coding, stored);
+        when(coding.visibleProjects("fixture-management-pat", 777L)).thenReturn(List.of(
+                new ProjectReference(42, "source-project", "原项目"),
+                new ProjectReference(51, "replacement-project", "重命名团队")));
+        when(coding.projectMembers("fixture-management-pat", 51L))
+                .thenReturn(List.of(new ProjectMember(300L, 10L, "成员", "", true)));
+        var candidate = new WorkbenchTeamModels.MemberCandidate(300L, "成员", "");
+        when(repository.addMembers(1L, administrator, 3, 51L, List.of(candidate))).thenReturn(stored);
+
+        assertThat(module.memberCandidates(administrator, 1L, false).projectId()).isEqualTo(42L);
+        assertThat(module.memberCandidates(administrator, 1L, true).projectId()).isEqualTo(51L);
+        assertThatThrownBy(() -> module.addMembers(administrator, 1L, new AddMembersCommand(3, 51, false, List.of(300L))))
+                .hasMessageContaining("项目已变化");
+        module.addMembers(administrator, 1L, new AddMembersCommand(3, 51, true, List.of(300L)));
+        verify(repository).addMembers(1L, administrator, 3, 51L, List.of(candidate));
+    }
+
+    @Test
+    void rejectsMissingOrAmbiguousProjectBeforeReadingMembers() {
+        var repository = mock(WorkbenchTeamRepository.class);
+        var coding = mock(CodingOpenApiPort.class);
+        var module = projectMembersModule(repository, coding, storedTeam());
+        when(coding.visibleProjects("fixture-management-pat", 777L)).thenReturn(
+                List.of(new ProjectReference(42, "first", "研发团队二组")),
+                List.of(new ProjectReference(42, "first", "研发团队"),
+                        new ProjectReference(51, "second", "研发团队")));
+
+        assertThatThrownBy(() -> module.memberCandidates(administrator, 1L, false)).hasMessageContaining("未找到");
+        assertThatThrownBy(() -> module.memberCandidates(administrator, 1L, false)).hasMessageContaining("多个同名");
+        verify(coding, never()).projectMembers(anyString(), anyLong());
+    }
+
+    @Test
+    void rejectsMemberWhoLeavesProjectAfterCandidateLookup() {
+        var repository = mock(WorkbenchTeamRepository.class);
+        var coding = mock(CodingOpenApiPort.class);
+        var module = projectMembersModule(repository, coding, storedTeam());
+        when(coding.visibleProjects("fixture-management-pat", 777L))
+                .thenReturn(List.of(new ProjectReference(42, "release-project", "研发团队")));
+        when(coding.projectMembers("fixture-management-pat", 42L)).thenReturn(
+                List.of(new ProjectMember(300L, 10L, "候选成员", "", true)), List.of());
+
+        assertThat(module.memberCandidates(administrator, 1L, false).members()).hasSize(1);
+        assertThatThrownBy(() -> module.addMembers(administrator, 1L, new AddMembersCommand(3, 42, false, List.of(300L))))
+                .hasMessageContaining("已不在来源 CODING 项目");
+        verify(repository, never()).addMembers(anyLong(), any(), anyInt(), anyLong(), anyList());
+    }
+
+    private DefaultWorkbenchTeamModule projectMembersModule(
+            WorkbenchTeamRepository repository, CodingOpenApiPort coding, StoredTeam stored) {
+        var properties = new ZhaogangProperties();
+        properties.setWorkbenchManagerUserId(administrator.userId());
+        var key = AESUtils.generateSecretKey(CodingCredentialService
+                .fingerprint(properties.safeSessionKey() + ":team-statistics:v1").substring(0, 32));
+        when(repository.findById(1L)).thenReturn(Optional.of(stored));
+        when(repository.managementTokenCredential(1L))
+                .thenReturn(new StoredManagementToken(777L, AESUtils.encryptAESGCM(key, "fixture-management-pat")));
+        return new DefaultWorkbenchTeamModule(repository, properties, coding);
     }
 
     private StoredTeam storedTeam() {
@@ -275,7 +375,7 @@ class DefaultWorkbenchTeamModuleTest {
         var profile = new MemberProfile(200L, CodingRole.QA, null, "13800000002");
         when(repository.findMemberProfiles(1L, true)).thenReturn(List.of(profile));
         when(repository.findMemberProfiles(1L, false)).thenReturn(List.of(profile));
-        var module = new DefaultWorkbenchTeamModule(repository);
+        var module = new DefaultWorkbenchTeamModule(repository, new ZhaogangProperties(), mock(CodingOpenApiPort.class));
         assertThat(module.detail(member,1L).members()).filteredOn(m -> m.userId()==200L).singleElement()
                 .extracting(WorkbenchTeamModels.Member::mobile).isEqualTo("13800000002");
         assertThat(module.findCodeSyncTeam(10L,1L).orElseThrow().members()).filteredOn(m -> m.userId()==200L).singleElement()

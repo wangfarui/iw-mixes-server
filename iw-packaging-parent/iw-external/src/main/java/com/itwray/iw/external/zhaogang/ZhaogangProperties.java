@@ -132,6 +132,8 @@ public class ZhaogangProperties {
     /** 当前唯一允许维护工作日历的 CODING 用户。 */
     private long calendarManagerUserId = 9292850L;
 
+    private long workbenchManagerUserId = 9292850L;
+
     /** 复用现有部署环境标记，生产 Cookie 自动带 Secure。 */
     private String webEnv = "dev";
 

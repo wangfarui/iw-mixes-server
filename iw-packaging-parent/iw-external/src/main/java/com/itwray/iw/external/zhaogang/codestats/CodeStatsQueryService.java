@@ -244,11 +244,12 @@ class CodeStatsQueryService {
         if (!scannedRepos.isEmpty()) depots = scannedRepos;
         int scannedBranches = scannedBranchCount(scope, range);
         int branchCount = scannedBranches > 0 ? scannedBranches : branches.size();
-        int pats = (int) scope.members().stream().filter(member -> StringUtils.isNotBlank(member.token())).count();
+        int pats = (int) scope.members().stream().filter(scope::hasRepositoryToken).count();
         List<MemberIssue> memberIssues = scope.scope() == Scope.WORKBENCH_TEAM
-                ? scope.members().stream().filter(member -> StringUtils.isBlank(member.token()))
+                ? scope.members().stream().filter(member -> !scope.hasRepositoryToken(member))
                 .map(member -> new MemberIssue(new User(member.userId(), member.userName(), member.avatar()),
-                        "TOKEN_MISSING", "尚未绑定 CODING 令牌，其独有仓库可能未覆盖"))
+                        "TOKEN_MISSING", member.managedStatistics() ? "团队管理令牌不可用，仓库可能未覆盖"
+                                : "尚未绑定 CODING 令牌，其独有仓库可能未覆盖"))
                 .toList()
                 : List.of();
         int conflicts = (int) mappingIndex.values().stream().filter(item -> item.getCodingUserId() == null).count();

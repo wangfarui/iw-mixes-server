@@ -2,6 +2,10 @@ package com.itwray.iw.external.zhaogang;
 
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.AddMembersCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenStatus;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidates;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateManagementTokenCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CreateCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.InvitationPreview;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.LeaveCommand;
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PutMapping;
 
@@ -71,6 +76,34 @@ public class ZhaogangTeamController {
     public GeneralResponse<TeamDetail> detail(@PathVariable long teamId,
                                               HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(module.detail(actor(request, response), teamId));
+    }
+
+    @GetMapping("/workbench-teams/{teamId}/management-token")
+    public GeneralResponse<ManagementTokenStatus> managementTokenStatus(@PathVariable long teamId,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return GeneralResponse.success(module.managementTokenStatus(actor(request, response), teamId));
+    }
+
+    @PutMapping("/workbench-teams/{teamId}/management-token")
+    public GeneralResponse<TeamDetail> updateManagementToken(@PathVariable long teamId,
+            @RequestBody UpdateManagementTokenCommand command, HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return GeneralResponse.success(module.updateManagementToken(actor(request, response), teamId, command));
+    }
+
+    @GetMapping("/workbench-teams/{teamId}/member-candidates")
+    public GeneralResponse<MemberCandidates> memberCandidates(@PathVariable long teamId,
+            @RequestParam(defaultValue = "false") boolean matchTeamName,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return GeneralResponse.success(module.memberCandidates(actor(request, response), teamId, matchTeamName));
+    }
+
+    @PostMapping("/workbench-teams/{teamId}/members")
+    public GeneralResponse<TeamDetail> addMembers(@PathVariable long teamId, @RequestBody AddMembersCommand command,
+            HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.addMembers(actor(request, response), teamId, command));
     }
 
     @PatchMapping("/workbench-teams/{teamId}")
@@ -143,7 +176,10 @@ public class ZhaogangTeamController {
     }
 
     private Actor actor(HttpServletRequest request, HttpServletResponse response) {
-        ZhaogangSession session = sessionManager.resolve(request, response);
+        return actor(sessionManager.resolve(request, response));
+    }
+
+    private Actor actor(ZhaogangSession session) {
         return new Actor(session.userId(), session.userName(), session.avatar(),
                 session.teamId() == null ? 0 : session.teamId(), session.team(), properties.configuredTeamHost());
     }

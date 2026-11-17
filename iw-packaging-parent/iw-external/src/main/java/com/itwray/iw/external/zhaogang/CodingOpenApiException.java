@@ -10,6 +10,7 @@ public class CodingOpenApiException extends RuntimeException {
             Map.entry("DescribeTeam", List.of("团队信息（只读）")),
             Map.entry("DescribeTeamMembers", List.of("团队信息（只读）", "团队成员（只读）")),
             Map.entry("DescribeUserProjects", List.of("项目信息（只读）")),
+            Map.entry("DescribeProjectMembers", List.of("项目成员（只读）")),
             Map.entry("DescribeCodingCIJobs", List.of("持续集成任务（只读）")),
             Map.entry("DescribeCodingCIJob", List.of("持续集成任务（只读）")),
             Map.entry("DescribeCodingCIBuilds", List.of("持续集成构建（读写）")),

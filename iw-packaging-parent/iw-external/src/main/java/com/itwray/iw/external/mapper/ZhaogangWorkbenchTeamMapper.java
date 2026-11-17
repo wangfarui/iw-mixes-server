@@ -63,6 +63,29 @@ public interface ZhaogangWorkbenchTeamMapper extends BaseMapper<TeamEntity> {
     @Update("""
             update external_zhaogang_workbench_team
                set version_no = version_no + 1, update_time = current_timestamp
+             where id = #{teamId} and coding_team_id = #{codingTeamId} and creator_user_id = #{userId}
+               and version_no = #{versionNo}
+               and exists (select 1 from external_zhaogang_workbench_team_member
+                            where team_id = #{teamId} and coding_user_id = #{userId})
+            """)
+    int touchAsMaintainer(@Param("teamId") long teamId, @Param("codingTeamId") long codingTeamId,
+                          @Param("userId") long userId, @Param("versionNo") int versionNo);
+
+    @Update("""
+            update external_zhaogang_workbench_team
+               set member_source_project_id = #{projectId}, version_no = version_no + 1, update_time = current_timestamp
+             where id = #{teamId} and coding_team_id = #{codingTeamId} and creator_user_id = #{userId}
+               and version_no = #{versionNo}
+               and exists (select 1 from external_zhaogang_workbench_team_member
+                            where team_id = #{teamId} and coding_user_id = #{userId})
+            """)
+    int saveMemberSourceProject(@Param("teamId") long teamId, @Param("codingTeamId") long codingTeamId,
+                                @Param("userId") long userId, @Param("versionNo") int versionNo,
+                                @Param("projectId") long projectId);
+
+    @Update("""
+            update external_zhaogang_workbench_team
+               set version_no = version_no + 1, update_time = current_timestamp
              where id = #{teamId} and version_no = #{versionNo}
             """)
     int touchWithVersion(@Param("teamId") long teamId, @Param("versionNo") int versionNo);

@@ -9,6 +9,8 @@ import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamException;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamDetail;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamStatisticsCredential;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamListItem;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import org.apache.commons.lang3.StringUtils;
@@ -50,14 +52,19 @@ class CodeStatsScopeDirectory {
                 throw new CodeStatsForbiddenException("你不是该工作台团队成员");
             }
             TeamDetail team = teams.detail(actor, workbenchTeamId);
+            TeamStatisticsCredential managementCredential = team.members().stream().anyMatch(member -> member.managedStatistics())
+                    ? teams.findCodeSyncTeam(context.codingTeamId(), workbenchTeamId)
+                            .map(CodeSyncTeam::managementCredential).orElse(TeamStatisticsCredential.EMPTY)
+                    : TeamStatisticsCredential.EMPTY;
             List<CodeStatsModule.MemberCredential> members = team.members().stream()
                     .map(member -> new CodeStatsModule.MemberCredential(member.userId(), member.userName(),
                             member.avatar(), credentials.token(context.codingTeamId(), member.userId()).orElse(""),
-                            member.codingRole()))
+                            member.codingRole(), member.managedStatistics()))
                     .toList();
             return new CodeStatsModule.ScopeInfo(scope, workbenchTeamId, context.codingTeamId(),
                     context.codingTeamKey(), StringUtils.defaultIfBlank(team.codingTeamHost(),
-                    context.codingTeamHost()), team.name(), members, team.permissions().administrator());
+                    context.codingTeamHost()), team.name(), members, team.permissions().administrator(), true,
+                    managementCredential);
         } catch (WorkbenchTeamException error) {
             throw new CodingOpenApiException(error.getMessage());
         }
@@ -80,10 +87,11 @@ class CodeStatsScopeDirectory {
                             .map(member -> new CodeStatsModule.MemberCredential(member.userId(),
                                     member.userName(), member.avatar(),
                                     credentials.token(target.codingTeamId(), member.userId()).orElse(""),
-                                    member.codingRole()))
+                                    member.codingRole(), member.managedStatistics()))
                             .toList();
                     return new CodeStatsModule.ScopeInfo(Scope.WORKBENCH_TEAM, target.scopeId(), target.codingTeamId(),
-                            team.codingTeamKey(), team.codingTeamHost(), team.name(), members, false);
+                            team.codingTeamKey(), team.codingTeamHost(), team.name(), members, false, true,
+                            team.managementCredential());
                 });
     }
 

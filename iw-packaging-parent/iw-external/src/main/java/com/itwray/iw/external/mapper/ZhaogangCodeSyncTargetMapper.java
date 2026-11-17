@@ -18,8 +18,11 @@ public interface ZhaogangCodeSyncTargetMapper {
                    select 1 from external_zhaogang_workbench_team_member m
                      join external_zhaogang_coding_credential c on c.coding_user_id = m.coding_user_id
                     where m.team_id = t.id and c.coding_team_id = t.coding_team_id
-                      and c.token_plaintext <> ''
+                      and m.managed_statistics = 0 and c.token_plaintext <> ''
              )
+                or (exists (select 1 from external_zhaogang_workbench_team_token mt where mt.team_id = t.id)
+                    and exists (select 1 from external_zhaogang_workbench_team_member m
+                                 where m.team_id = t.id and m.managed_statistics = 1))
              order by codingTeamId, scopeId, scope
             """)
     List<AutomaticSyncTarget> selectAutomaticTargets();

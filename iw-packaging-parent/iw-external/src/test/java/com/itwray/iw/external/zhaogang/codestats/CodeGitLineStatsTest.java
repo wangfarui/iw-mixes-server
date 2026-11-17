@@ -3,6 +3,7 @@ package com.itwray.iw.external.zhaogang.codestats;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommitDiff;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
+import com.itwray.iw.external.zhaogang.CodingRequestLimiter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -20,7 +21,7 @@ import static org.mockito.Mockito.mock;
 class CodeGitLineStatsTest {
 
     @TempDir Path temp;
-    private final CodeGitLineStats stats = new CodeGitLineStats(mock(CodingOpenApiPort.class), new ZhaogangProperties());
+    private final CodeGitLineStats stats = new CodeGitLineStats(mock(CodingOpenApiPort.class), new ZhaogangProperties(), new CodingRequestLimiter(new ZhaogangProperties()));
 
     @Test
     void readsAnOldRootAndALargeChangeFromShallowFetchBySha() throws Exception {

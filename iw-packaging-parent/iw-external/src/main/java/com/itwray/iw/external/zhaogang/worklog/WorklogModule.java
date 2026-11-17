@@ -23,6 +23,14 @@ public interface WorklogModule {
     }
 
     /** Internal member credential; never serialized into a Web response. */
-    record MemberCredential(long userId, String userName, String avatar, String token) {
+    record MemberCredential(long userId, String userName, String avatar, String token, boolean managedStatistics) {
+        public MemberCredential(long userId, String userName, String avatar, String token) {
+            this(userId, userName, avatar, token, false);
+        }
+
+        @Override
+        public String toString() {
+            return "MemberCredential[userId=" + userId + ", managedStatistics=" + managedStatistics + "]";
+        }
     }
 }

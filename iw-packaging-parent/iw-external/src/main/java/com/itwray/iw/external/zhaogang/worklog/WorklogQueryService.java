@@ -270,7 +270,8 @@ class WorklogQueryService {
                 .toList();
         List<MemberLogs> results = futures.stream().map(CompletableFuture::join).toList();
         int failedMembers = (int) results.stream().filter(MemberLogs::failed).count();
-        if (failedMembers == results.size() && failedMembers > 0) {
+        if (failedMembers == results.size() && failedMembers > 0
+                && members.stream().noneMatch(WorklogModule.MemberCredential::managedStatistics)) {
             CodingOpenApiException permissionError = results.stream().map(MemberLogs::error)
                     .filter(CodingOpenApiException.class::isInstance).map(CodingOpenApiException.class::cast)
                     .filter(CodingOpenApiException::isPermissionDenied).findFirst().orElse(null);
@@ -323,7 +324,9 @@ class WorklogQueryService {
     private MemberIssue memberIssue(WorklogModule.MemberCredential member, MemberLogs result) {
         User user = new User(member.userId(), member.userName(), member.avatar());
         if (StringUtils.isBlank(member.token())) {
-            return new MemberIssue(user, "TOKEN_MISSING", "尚未绑定 CODING 令牌，请该成员在工作台登录并绑定令牌");
+            return new MemberIssue(user, "TOKEN_MISSING", member.managedStatistics()
+                    ? "团队管理令牌不可用，请工作台维护人在团队页检查配置"
+                    : "尚未绑定 CODING 令牌，请该成员在工作台登录并绑定令牌");
         }
         if (!result.failed()) {
             if (!result.pageLimitReached()) {
@@ -340,6 +343,9 @@ class WorklogQueryService {
                 return new MemberIssue(user, "REQUEST_FAILED", "与 CODING 服务通信失败，请稍后重试");
             }
             String code = codingError.code();
+            if ("WORKLOG_USER_MISMATCH".equals(code)) {
+                return new MemberIssue(user, code, "CODING 返回的工时不属于所查成员，请检查团队管理令牌权限");
+            }
             if (StringUtils.isNotBlank(code) && code.matches("[A-Za-z0-9_-]{1,64}")) {
                 return new MemberIssue(user, "CODING_ERROR", "CODING 工时接口返回错误（" + code + "），请稍后重试");
             }
@@ -482,13 +488,17 @@ class WorklogQueryService {
     private MemberLogs fetchMember(WorklogModule.MemberCredential member, long from, long to) {
         if (StringUtils.isBlank(member.token())) {
             return new MemberLogs(member.userId(), member.token(), List.of(), false, true,
-                    new CodingOpenApiException("成员 " + member.userName() + " 尚未绑定 CODING 令牌"));
+                    new CodingOpenApiException(member.managedStatistics() ? "团队管理令牌不可用"
+                            : "成员 " + member.userName() + " 尚未绑定 CODING 令牌"));
         }
         List<Worklog> result = new ArrayList<>();
         int offset = 0;
         try {
             for (int page = 0; page < MAX_PAGES; page++) {
                 List<Worklog> items = coding.worklogPage(member.token(), from, to, member.userId(), offset, PAGE_LIMIT).items();
+                if (member.managedStatistics() && items.stream().anyMatch(item -> item.userId() != member.userId())) {
+                    throw new CodingOpenApiException("WORKLOG_USER_MISMATCH", "CODING 返回了其他成员的工时");
+                }
                 result.addAll(items);
                 if (items.size() < PAGE_LIMIT) {
                     return new MemberLogs(member.userId(), member.token(), result, false, false, null);

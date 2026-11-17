@@ -13,6 +13,8 @@ import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanTrigger;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.UpdateIdentityRequest;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamStatisticsCredential;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.List;
 
@@ -54,15 +56,31 @@ public interface CodeStatsModule {
                    String codingTeamKey, String codingTeamHost) {
     }
 
-    record MemberCredential(long userId, String userName, String avatar, String token, CodingRole codingRole) {
+    record MemberCredential(long userId, String userName, String avatar, String token, CodingRole codingRole,
+                            boolean managedStatistics) {
         public MemberCredential(long userId, String userName, String avatar, String token) {
             this(userId, userName, avatar, token, null);
+        }
+
+        public MemberCredential(long userId, String userName, String avatar, String token, CodingRole codingRole) {
+            this(userId, userName, avatar, token, codingRole, false);
+        }
+
+        @Override
+        public String toString() {
+            return "MemberCredential[userId=" + userId + ", managedStatistics=" + managedStatistics + "]";
         }
     }
 
     record ScopeInfo(Scope scope, long scopeId, long codingTeamId, String teamKey, String teamHost,
                      String teamName, List<MemberCredential> members, boolean administrator,
-                     boolean automaticSyncEligible) {
+                     boolean automaticSyncEligible, TeamStatisticsCredential managementCredential) {
+        public ScopeInfo(Scope scope, long scopeId, long codingTeamId, String teamKey, String teamHost,
+                         String teamName, List<MemberCredential> members, boolean administrator, boolean automaticSyncEligible) {
+            this(scope, scopeId, codingTeamId, teamKey, teamHost, teamName, members, administrator,
+                    automaticSyncEligible, TeamStatisticsCredential.EMPTY);
+        }
+
         public ScopeInfo(Scope scope, long scopeId, long codingTeamId, String teamKey, String teamHost,
                          String teamName, List<MemberCredential> members, boolean administrator) {
             this(scope, scopeId, codingTeamId, teamKey, teamHost, teamName, members, administrator, true);
@@ -70,6 +88,14 @@ public interface CodeStatsModule {
 
         public ScopeInfo {
             members = members == null ? List.of() : List.copyOf(members);
+        }
+
+        String repositoryToken(MemberCredential member) {
+            return member.managedStatistics() ? managementCredential.token() : member.token();
+        }
+
+        boolean hasRepositoryToken(MemberCredential member) {
+            return StringUtils.isNotBlank(repositoryToken(member));
         }
 
         List<MemberCredential> developmentMembers() {

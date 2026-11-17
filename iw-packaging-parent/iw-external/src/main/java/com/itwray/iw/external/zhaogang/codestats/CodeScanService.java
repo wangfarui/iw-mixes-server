@@ -175,7 +175,7 @@ class CodeScanService implements CodeBackfillTrigger {
 
     /** 活动任务结束或扫描线程空闲后，调度器继续处理暂缓的范围。 */
     boolean scheduledSync(CodeStatsModule.ScopeInfo scope, LocalDateTime scheduledAt) {
-        var actor = scope.members().stream().filter(member -> StringUtils.isNotBlank(member.token())).findFirst();
+        var actor = scope.members().stream().filter(scope::hasRepositoryToken).findFirst();
         if (actor.isEmpty()) return true;
         if (jobMapper.selectByActiveKey(activeKey(scope, "")) != null || !hasScheduledSyncCapacity()) return false;
         ScanJobEntity latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
@@ -191,7 +191,7 @@ class CodeScanService implements CodeBackfillTrigger {
         if (!hasToken(scope)) {
             throw new CodingOpenApiException(scope.scope() == Scope.SELF
                     ? "当前会话没有可用的 CODING 令牌，请重新绑定"
-                    : "团队成员都还没有绑定 CODING 令牌，无法扫描代码仓库");
+                    : "团队没有可用的 CODING 令牌，无法扫描代码仓库");
         }
         List<SkippedMonth> skipped = new ArrayList<>();
         int started = 0;
@@ -485,7 +485,7 @@ class CodeScanService implements CodeBackfillTrigger {
         // A year-wide job may be partial solely due to a different month's diff.
         // Preserve metadata failures, missing PATs, truncation and unfinished jobs conservatively.
         boolean completeMetadata = value(latest.getFailedRepos()) == 0 && !Boolean.TRUE.equals(latest.getTruncated())
-                && scope.members().stream().noneMatch(member -> org.apache.commons.lang3.StringUtils.isBlank(member.token()));
+                && scope.members().stream().allMatch(scope::hasRepositoryToken);
         if (continuous(latest) && completeMetadata && (STATUS_COMPLETED.equals(status)
                 || (STATUS_PARTIAL.equals(status) && "PARTIAL_SCAN".equals(latest.getErrorCode())
                     && value(latest.getFailedDiffs()) > 0))) {
@@ -554,7 +554,7 @@ class CodeScanService implements CodeBackfillTrigger {
     }
 
     private boolean hasToken(CodeStatsModule.ScopeInfo scope) {
-        return scope.members().stream().anyMatch(member -> StringUtils.isNotBlank(member.token()));
+        return scope.members().stream().anyMatch(scope::hasRepositoryToken);
     }
 
     private String activeKey(CodeStatsModule.ScopeInfo scope, String month) {

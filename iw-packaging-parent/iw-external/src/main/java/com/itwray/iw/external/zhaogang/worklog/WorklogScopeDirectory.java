@@ -4,6 +4,8 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamException;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.StatisticsMember;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamStatisticsCredential;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.WorklogTeamScope;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
@@ -43,13 +45,18 @@ class WorklogScopeDirectory {
 
     TeamSelection workbenchTeam(WorklogModule.Context context, long workbenchTeamId) {
         WorklogTeamScope scope = requireWorkbenchTeam(context, workbenchTeamId);
-        Map<Long, String> tokens = credentials.tokens(context.codingTeamId(),
-                scope.members().stream().map(member -> member.userId()).toList());
-        List<WorklogModule.MemberCredential> members = scope.members().stream()
-                .map(member -> new WorklogModule.MemberCredential(member.userId(), member.userName(), member.avatar(),
-                        tokens.getOrDefault(member.userId(), "")))
-                .toList();
-        return new TeamSelection(new Team(scope.id(), scope.name(), scope.codingTeamHost()), members);
+        return new TeamSelection(new Team(scope.id(), scope.name(), scope.codingTeamHost()),
+                memberCredentials(credentials, context.codingTeamId(), scope.members(), scope.managementCredential()));
+    }
+
+    static List<WorklogModule.MemberCredential> memberCredentials(CodingCredentialService credentials, long codingTeamId,
+            List<? extends StatisticsMember> members, TeamStatisticsCredential managementCredential) {
+        Map<Long, String> tokens = credentials.tokens(codingTeamId, members.stream()
+                .filter(member -> !member.managedStatistics()).map(StatisticsMember::userId).toList());
+        return members.stream().map(member -> new WorklogModule.MemberCredential(
+                member.userId(), member.userName(), member.avatar(), member.managedStatistics()
+                ? managementCredential.token() : tokens.getOrDefault(member.userId(), ""),
+                member.managedStatistics())).toList();
     }
 
     WorklogTeamScope requireWorkbenchTeam(WorklogModule.Context context, long workbenchTeamId) {

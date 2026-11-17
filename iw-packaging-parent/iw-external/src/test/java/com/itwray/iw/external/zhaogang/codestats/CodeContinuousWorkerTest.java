@@ -55,7 +55,7 @@ class CodeContinuousWorkerTest {
         when(repos.saveSyncCheckpoint(anyLong(),anyLong(),anyString())).thenAnswer(v->{checkpoint=v.getArgument(2);return 1;});
     }
     ScanJobEntity run(long id,String today) {
-        return run(id, today, scope, new CodeGitLineStats(coding, new ZhaogangProperties()));
+        return run(id, today, scope, new CodeGitLineStats(coding, new ZhaogangProperties(), new CodingRequestLimiter(new ZhaogangProperties())));
     }
 
     private ScanJobEntity run(long id, String today, CodeStatsModule.ScopeInfo target, CodeGitLineStats git) {

@@ -1,7 +1,20 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.itwray.iw.common.utils.AESUtils;
+import com.itwray.iw.external.zhaogang.CodingOpenApiException;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.ProjectMember;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.ProjectReference;
+import com.itwray.iw.external.zhaogang.ZhaogangProperties;
+import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.TeamStatisticsCredential;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.AddMembersCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenStatus;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidate;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidates;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateManagementTokenCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncMember;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CreateCommand;
@@ -27,9 +40,14 @@ import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberE
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
@@ -40,11 +58,19 @@ import java.util.stream.Collectors;
 class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
+    private static final int MAX_ADD_MEMBERS = 100;
 
     private final WorkbenchTeamRepository repository;
 
-    DefaultWorkbenchTeamModule(WorkbenchTeamRepository repository) {
+    private final ZhaogangProperties properties;
+    private final CodingOpenApiPort coding;
+
+    DefaultWorkbenchTeamModule(WorkbenchTeamRepository repository, ZhaogangProperties properties,
+                               CodingOpenApiPort coding) {
         this.repository = repository;
+        this.properties = properties;
+        this.coding = coding;
     }
 
     @Override
@@ -104,6 +130,144 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         validateActor(actor);
         repository.refreshProfile(actor);
         return toDetail(actor, requireMember(actor, require(teamId)));
+    }
+
+    @Override
+    public ManagementTokenStatus managementTokenStatus(Actor actor, long teamId) {
+        requireMaintainer(actor, teamId);
+        ManagementTokenStatus status = repository.managementTokenStatus(teamId);
+        return status == null ? new ManagementTokenStatus(false, null, null, null) : status;
+    }
+
+    @Override
+    public TeamDetail updateManagementToken(Actor actor, long teamId, UpdateManagementTokenCommand command) {
+        StoredTeam stored = requireMaintainer(actor, teamId);
+        requireCurrentVersion(stored, command == null ? 0 : command.versionNo());
+        String token = StringUtils.trimToEmpty(command.token());
+        if (token.isEmpty() || token.length() > 512 || token.chars().anyMatch(Character::isWhitespace)) {
+            throw new WorkbenchTeamException("请输入有效的 CODING PAT");
+        }
+        CodingOpenApiPort.CodingUserProfile owner;
+        try {
+            owner = coding.currentUserProfile(token);
+        } catch (CodingOpenApiException error) {
+            throw new WorkbenchTeamException("无法验证管理令牌，请检查令牌和用户信息读取权限");
+        }
+        if (owner.id() <= 0 || owner.teamId() != actor.codingTeamId()) {
+            throw new WorkbenchTeamException("管理令牌必须属于当前 CODING 团队");
+        }
+        verifyStatisticsAccess(token, stored, owner.id());
+        var status = new ManagementTokenStatus(true, owner.id(),
+                StringUtils.left(StringUtils.defaultIfBlank(owner.name(), Long.toString(owner.id())), 128),
+                LocalDateTime.now(ZONE));
+        return toDetail(actor, repository.saveManagementToken(teamId, actor, command.versionNo(),
+                AESUtils.encryptAESGCM(managementTokenKey(), token), status));
+    }
+
+    private void verifyStatisticsAccess(String token, StoredTeam stored, long ownerId) {
+        long targetId = stored.members().stream().filter(member -> Boolean.TRUE.equals(member.getManagedStatistics()))
+                .mapToLong(MemberEntity::getCodingUserId).filter(id -> id != ownerId).findFirst()
+                .orElse(stored.team().getCreatorUserId());
+        ZonedDateTime now = ZonedDateTime.now(ZONE);
+        try {
+            var page = coding.worklogPage(token, now.minusDays(7).toInstant().toEpochMilli(),
+                    now.toInstant().toEpochMilli(), targetId, 0, 1);
+            if (page.items().stream().anyMatch(row -> row.userId() != targetId)) {
+                throw new WorkbenchTeamException("CODING 返回的工时不属于所查成员，请检查令牌的工时读取权限");
+            }
+        } catch (CodingOpenApiException error) {
+            throw new WorkbenchTeamException("管理令牌无法读取 CODING 工时，请检查项目协同权限");
+        }
+        try {
+            coding.myDepots(token, 1, 1);
+        } catch (CodingOpenApiException error) {
+            throw new WorkbenchTeamException("管理令牌无法读取 CODING 代码仓库，请检查仓库读取权限");
+        }
+    }
+
+    @Override
+    public MemberCandidates memberCandidates(Actor actor, long teamId, boolean matchTeamName) {
+        StoredTeam stored = requireMaintainer(actor, teamId);
+        ManagementCredential credential = requireManagementToken(teamId);
+        ProjectReference project = memberSourceProject(stored, credential, matchTeamName);
+        return new MemberCandidates(project.id(), project.displayName(), stored.team().getVersionNo(),
+                projectCandidates(stored, credential, project.id()));
+    }
+
+    @Override
+    public TeamDetail addMembers(Actor actor, long teamId, AddMembersCommand command) {
+        StoredTeam stored = requireMaintainer(actor, teamId);
+        requireCurrentVersion(stored, command == null ? 0 : command.versionNo());
+        List<Long> userIds = command.userIds();
+        if (userIds == null || userIds.isEmpty() || userIds.size() > MAX_ADD_MEMBERS
+                || userIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new WorkbenchTeamException("每次请选择 1 至 100 名 CODING 成员");
+        }
+        var requested = new HashSet<>(userIds);
+        stored.members().forEach(member -> requested.remove(member.getCodingUserId()));
+        if (requested.isEmpty()) return toDetail(actor, stored);
+
+        ManagementCredential credential = requireManagementToken(teamId);
+        ProjectReference project = memberSourceProject(stored, credential, command.matchTeamName());
+        if (command.projectId() != project.id()) {
+            throw new WorkbenchTeamException("来源 CODING 项目已变化，请刷新成员列表后重试");
+        }
+        var candidates = projectCandidates(stored, credential, project.id()).stream()
+                .filter(member -> requested.contains(member.userId())).toList();
+        if (candidates.size() != requested.size()) {
+            throw new WorkbenchTeamException("部分成员已不在来源 CODING 项目或不可用，请重新选择");
+        }
+        return toDetail(actor, repository.addMembers(teamId, actor, command.versionNo(), project.id(), candidates));
+    }
+
+    private ProjectReference memberSourceProject(StoredTeam stored, ManagementCredential credential, boolean matchTeamName) {
+        List<ProjectReference> projects;
+        try {
+            projects = coding.visibleProjects(credential.value().token(), credential.ownerUserId());
+        } catch (CodingOpenApiException error) {
+            if (!error.isPermissionDenied()) throw error;
+            throw new WorkbenchTeamException("团队管理令牌无法读取项目列表，请检查项目信息读取权限");
+        }
+        Long projectId = stored.team().getMemberSourceProjectId();
+        if (!matchTeamName && projectId != null) {
+            return projects.stream().filter(project -> project.id() == projectId).findFirst()
+                    .orElseThrow(() -> new WorkbenchTeamException("团队管理令牌无法访问已关联的 CODING 项目，可按当前团队名称重新匹配"));
+        }
+
+        String teamName = stored.team().getName();
+        Map<Long, ProjectReference> matches = new LinkedHashMap<>();
+        projects.stream().filter(project -> project.id() > 0
+                        && (teamName.equals(project.displayName()) || teamName.equals(project.name())))
+                .forEach(project -> matches.putIfAbsent(project.id(), project));
+        if (matches.isEmpty()) {
+            throw new WorkbenchTeamException("管理令牌的可见项目中未找到与工作台团队同名的 CODING 项目");
+        }
+        if (matches.size() > 1) {
+            throw new WorkbenchTeamException("存在多个同名 CODING 项目，请将工作台团队改为目标项目的唯一标识后再试");
+        }
+        return matches.values().iterator().next();
+    }
+
+    private List<MemberCandidate> projectCandidates(StoredTeam stored, ManagementCredential credential, long projectId) {
+        List<ProjectMember> members;
+        try {
+            members = coding.projectMembers(credential.value().token(), projectId);
+        } catch (CodingOpenApiException error) {
+            if (!error.isPermissionDenied()) throw error;
+            throw new WorkbenchTeamException("团队管理令牌无法读取此 CODING 项目的成员，请检查项目成员读取权限");
+        }
+        var joined = stored.members().stream().map(MemberEntity::getCodingUserId).collect(Collectors.toSet());
+        long codingTeamId = stored.team().getCodingTeamId();
+        Map<Long, MemberCandidate> candidates = new LinkedHashMap<>();
+        for (ProjectMember member : members) {
+            if (member.userId() > 0 && member.teamId() == codingTeamId && member.active()
+                    && !joined.contains(member.userId())) {
+                candidates.putIfAbsent(member.userId(), new MemberCandidate(member.userId(),
+                        StringUtils.left(StringUtils.defaultIfBlank(member.name(), Long.toString(member.userId())), 128),
+                        StringUtils.left(member.avatar(), 512)));
+            }
+        }
+        return List.copyOf(candidates.values());
     }
 
     @Override
@@ -214,7 +378,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         repository.refreshProfile(actor);
         StoredTeam stored = requireMember(actor, require(teamId));
         return new WorklogTeamScope(stored.team().getId(), stored.team().getName(),
-                stored.team().getCodingTeamHost(), scopeMembers(stored));
+                stored.team().getCodingTeamHost(), scopeMembers(stored), statisticsCredential(stored));
     }
 
     @Override
@@ -226,16 +390,18 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                     List<CodeSyncMember> members = stored.members().stream().map(member -> {
                         MemberProfile profile = profiles.get(member.getCodingUserId());
                         return new CodeSyncMember(member.getCodingUserId(), member.getUserName(), member.getAvatar(),
-                                profile == null ? null : profile.codingRole(), profile == null ? null : profile.mobile());
+                                profile == null ? null : profile.codingRole(), profile == null ? null : profile.mobile(),
+                                Boolean.TRUE.equals(member.getManagedStatistics()));
                     }).toList();
                     return new CodeSyncTeam(stored.team().getName(), stored.team().getCodingTeamKey(),
-                            stored.team().getCodingTeamHost(), members);
+                            stored.team().getCodingTeamHost(), members, statisticsCredential(stored));
                 });
     }
 
     private List<WorklogMember> scopeMembers(StoredTeam stored) {
         return stored.members().stream()
-                .map(member -> new WorklogMember(member.getCodingUserId(), member.getUserName(), member.getAvatar()))
+                .map(member -> new WorklogMember(member.getCodingUserId(), member.getUserName(), member.getAvatar(),
+                        Boolean.TRUE.equals(member.getManagedStatistics())))
                 .toList();
     }
 
@@ -271,6 +437,56 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
             throw new WorkbenchTeamException("团队不存在或当前用户不是团队成员");
         }
         return stored;
+    }
+
+    private boolean canMaintain(Actor actor, StoredTeam team) {
+        return actor.userId() == properties.getWorkbenchManagerUserId()
+                && actor.userId() == team.team().getCreatorUserId();
+    }
+
+    private StoredTeam requireMaintainer(Actor actor, long teamId) {
+        validateActor(actor);
+        StoredTeam team = requireMember(actor, require(teamId));
+        if (!canMaintain(actor, team)) {
+            throw new WorkbenchTeamException("只有创建该团队的工作台维护人可以执行此操作");
+        }
+        return team;
+    }
+
+    private void requireCurrentVersion(StoredTeam stored, int versionNo) {
+        requireVersion(versionNo);
+        if (stored.team().getVersionNo() != versionNo) {
+            throw new WorkbenchTeamException("团队数据已变化，请刷新后重试");
+        }
+    }
+
+    private ManagementCredential requireManagementToken(long teamId) {
+        return managementCredential(teamId).orElseThrow(() -> new WorkbenchTeamException("请先配置该团队的管理令牌"));
+    }
+
+    private TeamStatisticsCredential statisticsCredential(StoredTeam stored) {
+        return stored.members().stream().anyMatch(member -> Boolean.TRUE.equals(member.getManagedStatistics()))
+                ? managementCredential(stored.team().getId()).map(ManagementCredential::value).orElse(TeamStatisticsCredential.EMPTY)
+                : TeamStatisticsCredential.EMPTY;
+    }
+
+    private Optional<ManagementCredential> managementCredential(long teamId) {
+        var stored = repository.managementTokenCredential(teamId);
+        if (stored == null || StringUtils.isBlank(stored.ciphertext())) return Optional.empty();
+        try {
+            String token = AESUtils.decryptAESGCM(managementTokenKey(), stored.ciphertext());
+            return Optional.of(new ManagementCredential(stored.ownerUserId(), new TeamStatisticsCredential(token)));
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    private record ManagementCredential(long ownerUserId, TeamStatisticsCredential value) {
+    }
+
+    private SecretKey managementTokenKey() {
+        return AESUtils.generateSecretKey(CodingCredentialService
+                .fingerprint(properties.safeSessionKey() + ":team-statistics:v1").substring(0, 32));
     }
 
     private StoredTeam requireAdministrator(Actor actor, StoredTeam stored) {
@@ -320,11 +536,11 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                 .map(member -> toMember(member, administratorUserId, administrator, profiles.get(member.getCodingUserId())))
                 .toList();
         Permissions permissions = new Permissions(administrator, administrator, administrator, administrator,
-                !administrator || members.size() > 1, administrator);
+                !administrator || members.size() > 1, administrator, canMaintain(actor, stored));
         return new TeamDetail(stored.team().getId(), stored.team().getName(), stored.team().getInviteCode(),
                 stored.team().getCodingTeamId(), stored.team().getCodingTeamKey(), stored.team().getCodingTeamHost(),
                 stored.team().getCreatorUserId(), administratorUserId, stored.team().getVersionNo(), members,
-                permissions, stored.team().getCreateTime(), stored.team().getUpdateTime());
+                permissions, stored.team().getCreateTime(), stored.team().getUpdateTime(), canMaintain(actor, stored) ? stored.team().getMemberSourceProjectId() : null);
     }
 
     private Map<Long, MemberProfile> memberProfiles(long teamId, boolean includeActivity) {
@@ -336,7 +552,8 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                             MemberProfile profile) {
         return new Member(member.getCodingUserId(), member.getUserName(), member.getAvatar(), member.getCreateTime(),
                 member.getCodingUserId() == administratorUserId, profile == null ? null : profile.codingRole(),
-                includeActivity && profile != null ? profile.lastUsedAt() : null, profile == null ? null : profile.mobile());
+                includeActivity && profile != null ? profile.lastUsedAt() : null, profile == null ? null : profile.mobile(),
+                Boolean.TRUE.equals(member.getManagedStatistics()));
     }
 
     private String normalizedName(String name) {

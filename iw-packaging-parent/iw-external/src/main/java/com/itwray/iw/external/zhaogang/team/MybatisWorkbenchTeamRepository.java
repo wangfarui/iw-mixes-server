@@ -4,8 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkbenchProfileMapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamMapper;
 import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamMemberMapper;
+import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamTokenMapper;
+import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamTokenMapper.StoredManagementToken;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenStatus;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidate;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
@@ -25,13 +29,16 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
     private final ZhaogangWorkbenchTeamMemberMapper memberMapper;
 
     private final ZhaogangWorkbenchProfileMapper profileMapper;
+    private final ZhaogangWorkbenchTeamTokenMapper tokenMapper;
 
     MybatisWorkbenchTeamRepository(ZhaogangWorkbenchTeamMapper teamMapper,
                                    ZhaogangWorkbenchTeamMemberMapper memberMapper,
-                                   ZhaogangWorkbenchProfileMapper profileMapper) {
+                                   ZhaogangWorkbenchProfileMapper profileMapper,
+                                   ZhaogangWorkbenchTeamTokenMapper tokenMapper) {
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
         this.profileMapper = profileMapper;
+        this.tokenMapper = tokenMapper;
     }
 
     @Override
@@ -112,6 +119,35 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
     }
 
     @Override
+    public ManagementTokenStatus managementTokenStatus(long teamId) {
+        return tokenMapper.status(teamId);
+    }
+
+    @Override
+    public StoredManagementToken managementTokenCredential(long teamId) {
+        return tokenMapper.credential(teamId);
+    }
+
+    @Override
+    @Transactional
+    public StoredTeam saveManagementToken(long teamId, Actor actor, int versionNo, String ciphertext,
+                                          ManagementTokenStatus status) {
+        requireChanged(teamMapper.touchAsMaintainer(teamId, actor.codingTeamId(), actor.userId(), versionNo));
+        tokenMapper.save(teamId, ciphertext, status.ownerUserId(), status.ownerName(), status.verifiedAt());
+        return require(teamId);
+    }
+
+    @Override
+    @Transactional
+    public StoredTeam addMembers(long teamId, Actor actor, int versionNo, long projectId, List<MemberCandidate> candidates) {
+        requireChanged(teamMapper.saveMemberSourceProject(teamId, actor.codingTeamId(), actor.userId(), versionNo, projectId));
+        for (MemberCandidate candidate : candidates) {
+            memberMapper.insertMemberIgnore(teamId, candidate.userId(), candidate.userName(), candidate.avatar(), projectId);
+        }
+        return require(teamId);
+    }
+
+    @Override
     public List<MemberProfile> findMemberProfiles(long teamId, boolean includeActivity) {
         return profileMapper.findMemberProfiles(teamId, includeActivity);
     }
@@ -171,6 +207,7 @@ class MybatisWorkbenchTeamRepository implements WorkbenchTeamRepository {
     public void dissolve(long teamId, int versionNo, Actor actor) {
         requireChanged(teamMapper.dissolve(teamId, actor.userId(), versionNo));
         memberMapper.deleteByTeamId(teamId);
+        tokenMapper.deleteByTeamId(teamId);
     }
 
     @Override

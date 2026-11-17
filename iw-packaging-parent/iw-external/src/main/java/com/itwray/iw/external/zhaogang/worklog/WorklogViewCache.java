@@ -143,7 +143,7 @@ class WorklogViewCache {
     private String memberFingerprint(List<WorklogModule.MemberCredential> members) {
         String material = members.stream()
                 .sorted(java.util.Comparator.comparingLong(WorklogModule.MemberCredential::userId))
-                .map(member -> member.userId() + ":" + (member.token() == null || member.token().isBlank()
+                .map(member -> member.userId() + ":" + member.managedStatistics() + ":" + (member.token() == null || member.token().isBlank()
                         ? "missing" : CodingCredentialService.fingerprint(member.token())))
                 .collect(Collectors.joining("|"));
         return digest(material);

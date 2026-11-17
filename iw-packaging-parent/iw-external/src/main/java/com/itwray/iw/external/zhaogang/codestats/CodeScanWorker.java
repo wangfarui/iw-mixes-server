@@ -5,6 +5,7 @@ import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanRepoMapper;
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingRequestLimiter;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingUserProfile;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommitDiff;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommit;
@@ -77,7 +78,7 @@ class CodeScanWorker {
                    CodeIdentityResolver identities, CodeStatsViewCache cache, ZhaogangProperties properties,
                    Clock clock) {
         this(coding, jobMapper, repoMapper, commitMapper, identities, cache, properties, clock,
-                new CodeGitLineStats(coding, properties));
+                new CodeGitLineStats(coding, properties, new CodingRequestLimiter(properties)));
     }
 
     CodeScanWorker(CodingOpenApiPort coding, ZhaogangCodeScanJobMapper jobMapper,
@@ -148,17 +149,20 @@ class CodeScanWorker {
     }
 
     private Map<Long, DepotPlan> discover(ScanInput input, ScanJobEntity job) {
-        List<MemberToken> tokens = input.scope().members().stream()
-                .filter(member -> StringUtils.isNotBlank(member.token()))
-                .map(member -> new MemberToken(member.userId(), member.token()))
-                .toList();
+        Map<String, MemberToken> uniqueTokens = new LinkedHashMap<>();
+        for (CodeStatsModule.MemberCredential member : input.scope().members()) {
+            if (!input.scope().hasRepositoryToken(member)) continue;
+            String token = input.scope().repositoryToken(member);
+            uniqueTokens.putIfAbsent(token, new MemberToken(member.userId(), token));
+        }
+        List<MemberToken> tokens = List.copyOf(uniqueTokens.values());
         if (tokens.isEmpty()) {
             throw new CodingOpenApiException("没有可用的 CODING 令牌，无法发现代码仓库");
         }
         Map<Long, DepotPlan> depots = new LinkedHashMap<>();
         int successfulTokens = 0;
         RuntimeException lastError = null;
-        if (input.scope().members().stream().anyMatch(member -> StringUtils.isBlank(member.token()))) {
+        if (input.scope().members().stream().anyMatch(member -> !input.scope().hasRepositoryToken(member))) {
             job.setCoverageIncomplete(true);
         }
         try (CodeScanReadAhead<MemberDiscovery> reads = new CodeScanReadAhead<>(4)) {
@@ -233,12 +237,15 @@ class CodeScanWorker {
 
     private void applyIdentities(ScanInput input, ScanJobEntity job) {
         for (CodeStatsModule.MemberCredential member : input.scope().members()) {
+            if (member.managedStatistics()) {
+                identities.initializeDirectoryName(input.scope().codingTeamId(), member.userId(), member.userName());
+            }
             if (StringUtils.isBlank(member.token())) continue;
             try {
                 identities.initializeDefaults(input.scope().codingTeamId(), member.userId(), profile(member));
             } catch (CodingOpenApiException failure) {
                 if (input.scope().scope() == Scope.SELF) throw failure;
-                job.setCoverageIncomplete(true);
+                if (!member.managedStatistics()) job.setCoverageIncomplete(true);
             }
         }
         job.setStage("DISCOVERING");
@@ -775,13 +782,15 @@ class CodeScanWorker {
         depots.forEach((depotId, plan) -> depotTokens.put(depotId,
                 plan.tokens().stream().map(MemberToken::token).toList()));
         Map<Long, MemberToken> memberTokens = new HashMap<>();
-        List<String> fallbackTokens = new ArrayList<>();
+        Set<String> fallback = new java.util.LinkedHashSet<>();
         input.scope().members().forEach(member -> {
-            if (StringUtils.isNotBlank(member.token())) {
-                memberTokens.put(member.userId(), new MemberToken(member.userId(), member.token()));
-                fallbackTokens.add(member.token());
+            if (input.scope().hasRepositoryToken(member)) {
+                String token = input.scope().repositoryToken(member);
+                memberTokens.put(member.userId(), new MemberToken(member.userId(), token));
+                fallback.add(token);
             }
         });
+        List<String> fallbackTokens = List.copyOf(fallback);
         List<IdentityEntity> mappings = identities.mappings(input.scope());
         Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(mappings);
         Set<Long> memberIds = new HashSet<>();
@@ -844,7 +853,8 @@ class CodeScanWorker {
     private List<String> diffTokens(MemberToken ownerToken, List<String> repositoryTokens) {
         List<String> candidates = new ArrayList<>();
         if (ownerToken != null) candidates.add(ownerToken.token());
-        candidates.addAll(repositoryTokens);
+        repositoryTokens.stream().filter(token -> ownerToken == null || !token.equals(ownerToken.token()))
+                .forEach(candidates::add);
         return candidates;
     }
 

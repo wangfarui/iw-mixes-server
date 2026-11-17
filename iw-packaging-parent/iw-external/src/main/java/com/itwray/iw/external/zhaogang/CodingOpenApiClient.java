@@ -356,6 +356,33 @@ class CodingOpenApiClient implements CodingOpenApiPort {
     }
 
     @Override
+    public List<ProjectMember> projectMembers(String token, long projectId) {
+        int pageSize = 100;
+        List<ProjectMember> members = new ArrayList<>();
+        int seen = 0;
+        for (int page = 1; page <= 100; page++) {
+            JsonNode response = invoke(token, "DescribeProjectMembers", Map.of(
+                    "ProjectId", projectId, "PageNumber", page, "PageSize", pageSize));
+            JsonNode data = response.path("Data");
+            JsonNode rows = data.path("ProjectMembers");
+            if (!rows.isArray()) {
+                throw new CodingOpenApiException("CODING 未返回有效的项目成员列表");
+            }
+            for (JsonNode row : rows) {
+                JsonNode user = row.path("User").isObject() ? row.path("User") : row;
+                Member member = toMember(row);
+                long teamId = longValue(user, "TeamId");
+                if (teamId <= 0) teamId = longValue(row, "TeamId");
+                members.add(new ProjectMember(member.id(), teamId, member.name(), member.avatar(), member.active()));
+            }
+            seen += rows.size();
+            long total = longValue(data, "TotalCount");
+            if (rows.isEmpty() || (total > 0 ? seen >= total : rows.size() < pageSize)) return members;
+        }
+        throw new CodingOpenApiException("CODING 项目成员列表达到分页上限");
+    }
+
+    @Override
     public WorklogPage worklogPage(String token, long startAt, long endAt, long userId, int offset, int limit) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("StartAt", startAt);
@@ -706,22 +733,25 @@ class CodingOpenApiClient implements CodingOpenApiPort {
     }
 
     private JsonNode invoke(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
-        boolean readOnly = java.util.Set.of("DescribeMyDepots", "DescribeProjectDepotBranches",
+        boolean repositoryRead = java.util.Set.of("DescribeMyDepots", "DescribeProjectDepotBranches",
                 "DescribeGitCommitsInPage", "DescribeGitCommitDiff").contains(action);
+        boolean worklogRead = "DescribeAllProjectsIssueWorkLogList".equals(action);
         for (int attempt = 0; ; attempt++) {
             try {
                 return invokeOnce(token, action, parameters, maxResponseBytes);
             } catch (CodingOpenApiException error) {
                 String code = error.code();
-                boolean transientFailure = code.startsWith("InternalError")
-                        || code.startsWith("RequestLimitExceeded") || code.startsWith("HTTP_5")
-                        || "HTTP_429".equals(code) || Integer.valueOf(429).equals(error.httpStatus())
+                boolean rateLimited = code.startsWith("RequestLimitExceeded") || "HTTP_429".equals(code)
+                        || Integer.valueOf(429).equals(error.httpStatus());
+                boolean transientFailure = rateLimited || code.startsWith("InternalError") || code.startsWith("HTTP_5")
                         || (error.httpStatus() != null && error.httpStatus() >= 500)
                         || error.getCause() instanceof java.io.IOException;
-                if (!readOnly || !transientFailure || Thread.currentThread().isInterrupted()) throw error;
+                if (!(repositoryRead && transientFailure || worklogRead && rateLimited)
+                        || Thread.currentThread().isInterrupted()) throw error;
                 if (attempt >= 2) {
                     throw new CodingOpenApiException(action, code,
-                            "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描",
+                            repositoryRead ? "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描"
+                                    : "CODING 工时请求达到频率限制，请稍后重试",
                             error.httpStatus(), error.getCause());
                 }
                 try {
@@ -778,8 +808,12 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             if (httpResponse.statusCode() < 200 || httpResponse.statusCode() >= 300 || !error.isMissingNode()) {
                 String code = error.isMissingNode() ? "HTTP_" + httpResponse.statusCode() : text(error, "Code");
                 String message = error.isMissingNode() ? "CODING 请求失败" : text(error, "Message", "Code");
-                throw new CodingOpenApiException(action, code,
-                        StringUtils.defaultIfBlank(message, "CODING 请求失败"), httpResponse.statusCode(), null);
+                String safeMessage = StringUtils.defaultIfBlank(message, "CODING 请求失败");
+                if (StringUtils.isNotBlank(token)) {
+                    safeMessage = safeMessage.replace(token, "[redacted]");
+                    code = code.replace(token, "[redacted]");
+                }
+                throw new CodingOpenApiException(action, code, safeMessage, httpResponse.statusCode(), null);
             }
             return response;
         } catch (CodingOpenApiException e) {

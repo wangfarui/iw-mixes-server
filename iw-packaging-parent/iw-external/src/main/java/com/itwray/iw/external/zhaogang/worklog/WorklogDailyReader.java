@@ -41,15 +41,16 @@ public class WorklogDailyReader {
 
     public Snapshot read(long codingTeamId, CodeSyncTeam team, LocalDate date) {
         var ids = team.members().stream().map(m -> m.userId()).toList();
-        var tokens = credentials.tokens(codingTeamId, ids);
+        var membersWithCredentials = WorklogScopeDirectory.memberCredentials(credentials, codingTeamId,
+                team.members(), team.managementCredential());
         var leaveDates = leaves.resolve(codingTeamId, ids, YearMonth.from(date));
         List<Member> members = new ArrayList<>();
         Map<Long, WorklogQueryService.DailyRows> rowsByMember = new LinkedHashMap<>();
         Map<String, Map<IssueKey, Set<Long>>> candidates = new LinkedHashMap<>();
         Set<Long> allIds = new HashSet<>();
-        for (var member : team.members()) {
-            String token = tokens.getOrDefault(member.userId(), "");
-            var rows = query.dailyRows(new WorklogModule.MemberCredential(member.userId(), member.userName(), member.avatar(), token), date);
+        for (var member : membersWithCredentials) {
+            String token = member.token();
+            var rows = query.dailyRows(member, date);
             rowsByMember.put(member.userId(), rows);
             for (var row : rows.rows()) {
                 if (row.issueId() > 0) allIds.add(row.issueId());
@@ -78,8 +79,8 @@ public class WorklogDailyReader {
         confirmed.keySet().removeAll(existing);
         deleted.record(codingTeamId, confirmed);
         Set<Long> excluded = new HashSet<>(knownDeleted); excluded.addAll(confirmed.keySet());
-        for (var member : team.members()) {
-            String token = tokens.getOrDefault(member.userId(), "");
+        for (var member : membersWithCredentials) {
+            String token = member.token();
             var rows = rowsByMember.get(member.userId());
             boolean complete = rows.complete();
             String warning = rows.warning();

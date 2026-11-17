@@ -12,15 +12,20 @@ import java.util.List;
 
 public interface ZhaogangWorkbenchTeamMemberMapper extends BaseMapper<MemberEntity> {
 
+    default int insertIgnore(long teamId, long codingUserId, String userName, String avatar) {
+        return insertMemberIgnore(teamId, codingUserId, userName, avatar, null);
+    }
+
     @Insert("""
             insert ignore into external_zhaogang_workbench_team_member
-                (team_id, coding_user_id, user_name, avatar, sort_no)
-            select #{teamId}, #{codingUserId}, #{userName}, #{avatar}, coalesce(max(sort_no), 0) + 1
+                (team_id, coding_user_id, user_name, avatar, sort_no, managed_statistics, source_project_id)
+            select #{teamId}, #{codingUserId}, #{userName}, #{avatar}, coalesce(max(sort_no), 0) + 1, if(#{sourceProjectId,jdbcType=BIGINT} is null, 0, 1), #{sourceProjectId,jdbcType=BIGINT}
               from external_zhaogang_workbench_team_member
              where coding_user_id = #{codingUserId}
             """)
-    int insertIgnore(@Param("teamId") long teamId, @Param("codingUserId") long codingUserId,
-                     @Param("userName") String userName, @Param("avatar") String avatar);
+    int insertMemberIgnore(@Param("teamId") long teamId, @Param("codingUserId") long codingUserId,
+                           @Param("userName") String userName, @Param("avatar") String avatar,
+                           @Param("sourceProjectId") Long sourceProjectId);
 
     @Update("""
             update external_zhaogang_workbench_team_member

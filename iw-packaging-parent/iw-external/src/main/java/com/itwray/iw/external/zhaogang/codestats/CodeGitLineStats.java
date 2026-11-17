@@ -2,6 +2,7 @@ package com.itwray.iw.external.zhaogang.codestats;
 
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.CodingRequestLimiter;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.CodingCommitDiff;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.CommitEntity;
@@ -43,9 +44,12 @@ class CodeGitLineStats {
     private final CodingOpenApiPort coding;
     private final ZhaogangProperties properties;
 
-    CodeGitLineStats(CodingOpenApiPort coding, ZhaogangProperties properties) {
+    private final CodingRequestLimiter requestLimiter;
+
+    CodeGitLineStats(CodingOpenApiPort coding, ZhaogangProperties properties, CodingRequestLimiter requestLimiter) {
         this.coding = coding;
         this.properties = properties;
+        this.requestLimiter = requestLimiter;
     }
 
     Batch batch(CodeStatsModule.ScopeInfo scope) {
@@ -111,9 +115,14 @@ class CodeGitLineStats {
             // 只对这一条固定 HTTPS 仓库请求附带凭证，不写远程配置，不传给其他 Git 命令。
             String authorization = "Authorization: Basic " + Base64.getEncoder()
                     .encodeToString((username + ":" + token).getBytes(StandardCharsets.UTF_8));
-            command(workspace, deadline, Map.of("http." + remote + ".extraHeader", authorization),
-                    "fetch", "--depth=2", "--no-tags", "--no-recurse-submodules", "--no-auto-gc",
-                    "--quiet", "--", remote, sha);
+            requestLimiter.acquire(token, "GitFetch");
+            try {
+                command(workspace, deadline, Map.of("http." + remote + ".extraHeader", authorization),
+                        "fetch", "--depth=2", "--no-tags", "--no-recurse-submodules", "--no-auto-gc",
+                        "--quiet", "--", remote, sha);
+            } finally {
+                requestLimiter.release(token);
+            }
             String fetched = command(workspace, deadline, Map.of(), "rev-parse", "--verify", "FETCH_HEAD^{commit}").trim();
             if (!sha.equals(fetched)) return Result.failed(Failure.OBJECT_UNAVAILABLE);
             checkExpandedObjects(workspace, deadline);

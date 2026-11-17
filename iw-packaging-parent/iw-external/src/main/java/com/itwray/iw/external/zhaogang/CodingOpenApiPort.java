@@ -18,6 +18,22 @@ public interface CodingOpenApiPort {
 
     List<CodingProject> projects(String token, long userId);
 
+    default List<ProjectReference> visibleProjects(String token, long userId) {
+        return projects(token, userId).stream()
+                .map(project -> new ProjectReference(project.id(), project.name(), project.displayName()))
+                .toList();
+    }
+
+    record ProjectReference(long id, String name, String displayName) {
+    }
+
+    default List<ProjectMember> projectMembers(String token, long projectId) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现项目成员查询");
+    }
+
+    record ProjectMember(long userId, long teamId, String name, String avatar, boolean active) {
+    }
+
     default List<String> accessibleProjectNames(String token, long userId) {
         return projects(token, userId).stream().map(CodingProject::name).toList();
     }

@@ -83,6 +83,7 @@ create table external_zhaogang_workbench_team
     coding_team_host      varchar(255)                       not null comment 'CODING团队地址',
     creator_user_id       bigint unsigned                    not null comment '创建人CODING用户ID，仅审计',
     administrator_user_id bigint unsigned                    not null comment '当前唯一管理员CODING用户ID',
+    member_source_project_id bigint unsigned null comment '添加成员时使用的CODING项目ID',
     version_no            int unsigned default 1             not null comment '乐观锁版本',
     create_time           datetime default current_timestamp not null comment '创建时间',
     update_time           datetime default current_timestamp not null on update current_timestamp comment '更新时间',
@@ -101,12 +102,24 @@ create table external_zhaogang_workbench_team_member
     user_name      varchar(128)                       not null comment '成员名称快照',
     avatar         varchar(512)                       null comment '成员头像快照',
     sort_no        int unsigned default 0             not null comment '当前用户的团队显示顺序',
+    managed_statistics tinyint(1) not null default 0 comment '是否使用工作台团队管理令牌统计',
+    source_project_id bigint unsigned null comment '添加该成员时验证的CODING项目ID',
     create_time    datetime default current_timestamp not null comment '加入时间',
     update_time    datetime default current_timestamp not null on update current_timestamp comment '资料更新时间',
     primary key (id),
     unique key uk_team_user (team_id, coding_user_id),
     key idx_user_sort (coding_user_id, sort_no, team_id)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台团队成员';
+
+create table external_zhaogang_workbench_team_token
+(
+    team_id          bigint unsigned not null comment '工作台团队ID',
+    token_ciphertext varchar(2048)    not null comment '管理令牌密文',
+    owner_user_id    bigint unsigned not null comment '令牌所属CODING用户ID',
+    owner_name       varchar(128)    not null comment '令牌所属CODING用户名称',
+    verified_at      datetime        not null comment '最近验证时间（北京时间）',
+    primary key (team_id)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台团队统计管理令牌';
 
 create table external_zhaogang_coding_credential
 (

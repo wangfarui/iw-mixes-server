@@ -96,6 +96,30 @@ class CodingOpenApiClientTest {
     }
 
     @Test
+    void projectMembersUsesOfficialContractAndContinuesUsingTotalCount() throws Exception {
+        CodingOpenApiClient client = client(exchange -> {
+            JsonNode request = objectMapper.readTree(exchange.getRequestBody());
+            int page = request.path("PageNumber").asInt();
+            if (!"DescribeProjectMembers".equals(request.path("Action").asText())
+                    || request.path("ProjectId").asLong() != 42L || request.path("PageSize").asInt() != 100
+                    || page < 1 || page > 2) {
+                respondContractError(exchange);
+                return;
+            }
+            respond(exchange, """
+                    {"Response":{"Data":{"TotalCount":2,"ProjectMembers":[
+                      {"Id":%d,"TeamId":7,"Name":"项目成员%d","Avatar":"avatar"}
+                    ]}}}
+                    """.formatted(page, page));
+        });
+
+        var members = client.projectMembers("test-token", 42);
+        assertEquals(List.of(
+                new CodingOpenApiPort.ProjectMember(1, 7, "项目成员1", "avatar", true),
+                new CodingOpenApiPort.ProjectMember(2, 7, "项目成员2", "avatar", true)), members);
+    }
+
+    @Test
     void worklogPageSendsTimestampUserAndOffsetAndParsesOfficialFields() throws Exception {
         CodingOpenApiClient client = client(exchange -> {
             JsonNode request = objectMapper.readTree(exchange.getRequestBody());

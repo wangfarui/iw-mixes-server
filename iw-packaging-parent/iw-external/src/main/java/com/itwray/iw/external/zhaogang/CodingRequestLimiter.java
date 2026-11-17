@@ -13,7 +13,7 @@ import java.util.concurrent.Semaphore;
 
 /** 按 CODING PAT 隔离并发和请求速率，避免不同用户互相阻塞。 */
 @Component
-class CodingRequestLimiter {
+public class CodingRequestLimiter {
 
     private static final long QPS_WINDOW_NANOS = Duration.ofSeconds(1).toNanos();
     private static final long ENTRY_RETENTION_NANOS = Duration.ofMinutes(30).toNanos();
@@ -27,7 +27,7 @@ class CodingRequestLimiter {
     private final RateWindow commitWindow;
     private final RateWindow diffWindow;
 
-    CodingRequestLimiter(ZhaogangProperties properties) {
+    public CodingRequestLimiter(ZhaogangProperties properties) {
         concurrencyPerToken = Math.max(1, properties.getCodingConcurrencyPerToken());
         issueQpsPerToken = Math.max(0, properties.getCodingIssueQpsPerToken());
         issueWindow = new RateWindow(TEAM_ISSUE_QPS);
@@ -35,7 +35,7 @@ class CodingRequestLimiter {
         diffWindow = new RateWindow(Math.max(0, properties.getCodeDiffQps()));
     }
 
-    void acquire(String token, String action) throws InterruptedException {
+    public void acquire(String token, String action) throws InterruptedException {
         TokenGate gate = gate(token);
         gate.semaphore.acquire();
         try {
@@ -54,7 +54,7 @@ class CodingRequestLimiter {
         return RateWindow.NONE;
     }
 
-    void release(String token) {
+    public void release(String token) {
         TokenGate gate = gates.get(fingerprint(token));
         if (gate != null) gate.semaphore.release();
     }

@@ -56,8 +56,14 @@ class CodeIdentityResolver {
         }
         // 唯一键 + INSERT IGNORE 保证并发初始化不覆盖用户绑定或已删除身份的墓碑。
         mapper.insertDefault(codingTeamId, userId, EMAIL, profile.emailHash(), "已绑定邮箱");
-        mapper.insertDefault(codingTeamId, userId, NAME, CodeStatsSupport.nameKey(profile.name()),
-                CodeStatsSupport.maskName(profile.name()));
+        initializeDirectoryName(codingTeamId, userId, profile.name());
+    }
+
+    void initializeDirectoryName(long codingTeamId, long userId, String name) {
+        String nameKey = CodeStatsSupport.nameKey(name);
+        if (!nameKey.isBlank()) {
+            mapper.insertDefault(codingTeamId, userId, NAME, nameKey, CodeStatsSupport.maskName(name));
+        }
     }
 
     Map<String, IdentityEntity> mappingIndex(List<IdentityEntity> mappings) {

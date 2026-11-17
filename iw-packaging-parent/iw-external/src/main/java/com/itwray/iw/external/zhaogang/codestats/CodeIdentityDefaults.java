@@ -17,6 +17,9 @@ class CodeIdentityDefaults {
 
     void ensure(CodeStatsModule.ScopeInfo scope) {
         for (CodeStatsModule.MemberCredential member : scope.members()) {
+            if (member.managedStatistics()) {
+                identities.initializeDirectoryName(scope.codingTeamId(), member.userId(), member.userName());
+            }
             if (member.token() == null || member.token().isBlank()) continue;
             try {
             String key = CodingCredentialService.fingerprint(member.token());

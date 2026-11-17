@@ -1,6 +1,10 @@
 package com.itwray.iw.external.zhaogang.team;
 
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.AddMembersCommand;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenStatus;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidates;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateManagementTokenCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CreateCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.InvitationPreview;
@@ -29,6 +33,14 @@ public interface WorkbenchTeamModule {
     TeamDetail create(Actor actor, CreateCommand command);
 
     TeamDetail detail(Actor actor, long teamId);
+
+    ManagementTokenStatus managementTokenStatus(Actor actor, long teamId);
+
+    TeamDetail updateManagementToken(Actor actor, long teamId, UpdateManagementTokenCommand command);
+
+    MemberCandidates memberCandidates(Actor actor, long teamId, boolean matchTeamName);
+
+    TeamDetail addMembers(Actor actor, long teamId, AddMembersCommand command);
 
     TeamDetail rename(Actor actor, long teamId, RenameCommand command);
 

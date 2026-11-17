@@ -31,6 +31,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         return path.matches("/external-service/api/zhaogang/teams/[0-9]+/worklog-notification(?:/(?:test|send-now))?")
+                || path.matches("/external-service/api/zhaogang/workbench-teams/[0-9]+/(?:management-token|member-candidates)")
                 || path.equals("/external-service/api/zhaogang/profile/mobile")
                 || path.matches("/external-service/api/zhaogang/workbench-teams/[0-9]+/members/[0-9]+/mobile")
                 || path.equals("/application/account") || path.startsWith("/application/account/")

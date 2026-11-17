@@ -1,7 +1,10 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.itwray.iw.external.mapper.ZhaogangWorkbenchTeamTokenMapper.StoredManagementToken;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.MemberProfile;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.Actor;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.ManagementTokenStatus;
+import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.MemberCandidate;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberRoleCommand;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.UpdateMemberMobileCommand;
 import com.itwray.iw.external.zhaogang.team.entity.WorkbenchTeamEntities.MemberEntity;
@@ -27,6 +30,15 @@ interface WorkbenchTeamRepository {
     StoredTeam rename(long teamId, int versionNo, Actor actor, String name);
 
     StoredTeam join(long teamId, Actor actor);
+
+    ManagementTokenStatus managementTokenStatus(long teamId);
+
+    StoredManagementToken managementTokenCredential(long teamId);
+
+    StoredTeam saveManagementToken(long teamId, Actor actor, int versionNo, String ciphertext,
+                                   ManagementTokenStatus status);
+
+    StoredTeam addMembers(long teamId, Actor actor, int versionNo, long projectId, List<MemberCandidate> candidates);
 
     List<MemberProfile> findMemberProfiles(long teamId, boolean includeActivity);
 

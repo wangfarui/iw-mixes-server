@@ -24,6 +24,7 @@ public final class WorkbenchTeamEntities {
         private String codingTeamKey;
         private String codingTeamHost;
         private Long creatorUserId;
+        private Long memberSourceProjectId;
         private Long administratorUserId;
         private Integer versionNo;
         private LocalDateTime createTime;
@@ -40,6 +41,8 @@ public final class WorkbenchTeamEntities {
         private String userName;
         private String avatar;
         private Integer sortNo;
+        private Boolean managedStatistics;
+        private Long sourceProjectId;
         private LocalDateTime createTime;
         private LocalDateTime updateTime;
     }

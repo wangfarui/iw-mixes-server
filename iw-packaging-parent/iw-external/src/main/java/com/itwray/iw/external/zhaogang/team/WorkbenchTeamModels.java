@@ -1,5 +1,6 @@
 package com.itwray.iw.external.zhaogang.team;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
@@ -29,6 +30,25 @@ public final class WorkbenchTeamModels {
         @Override public String toString() { return "UpdateMemberMobileCommand[versionNo=" + versionNo + ", mobile=[redacted]]"; }
     }
 
+    public record UpdateManagementTokenCommand(int versionNo, @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String token) {
+        @Override
+        public String toString() {
+            return "UpdateManagementTokenCommand[versionNo=" + versionNo + "]";
+        }
+    }
+
+    public record ManagementTokenStatus(boolean configured, Long ownerUserId, String ownerName, LocalDateTime verifiedAt) {
+    }
+
+    public record AddMembersCommand(int versionNo, long projectId, boolean matchTeamName, List<Long> userIds) {
+    }
+
+    public record MemberCandidate(long userId, String userName, String avatar) {
+    }
+
+    public record MemberCandidates(long projectId, String projectName, int versionNo, List<MemberCandidate> members) {
+    }
+
     public record TransferAdministratorCommand(int versionNo, long successorUserId) {
     }
 
@@ -46,11 +66,16 @@ public final class WorkbenchTeamModels {
 
     public record Member(long userId, String userName, String avatar, LocalDateTime joinedAt,
                          boolean administrator, CodingRole codingRole,
-                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt, String mobile) {
+                         @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime lastUsedAt, String mobile, boolean managedStatistics) {
     }
 
     public record Permissions(boolean administrator, boolean canRename, boolean canRemoveMembers,
-                              boolean canTransferAdministrator, boolean canLeave, boolean canDissolve) {
+                              boolean canTransferAdministrator, boolean canLeave, boolean canDissolve,
+                              boolean canManageStatistics) {
+        public Permissions(boolean administrator, boolean canRename, boolean canRemoveMembers,
+                           boolean canTransferAdministrator, boolean canLeave, boolean canDissolve) {
+            this(administrator, canRename, canRemoveMembers, canTransferAdministrator, canLeave, canDissolve, false);
+        }
     }
 
     public record TeamListItem(long id, String name, String codingTeamKey, int memberCount,
@@ -61,7 +86,8 @@ public final class WorkbenchTeamModels {
     public record TeamDetail(long id, String name, String inviteCode, long codingTeamId, String codingTeamKey,
                              String codingTeamHost, long creatorUserId, long administratorUserId, int versionNo,
                              List<Member> members, Permissions permissions, LocalDateTime createTime,
-                             LocalDateTime updateTime) {
+                             LocalDateTime updateTime,
+                             @JsonInclude(JsonInclude.Include.NON_NULL) Long memberSourceProjectId) {
     }
 
     public record InvitationPreview(long teamId, String teamName, String codingTeamKey, int memberCount,
@@ -71,19 +97,52 @@ public final class WorkbenchTeamModels {
     public record WorklogTeamOption(long id, String name, int memberCount) {
     }
 
-    public record WorklogMember(long userId, String userName, String avatar) {
+    public interface StatisticsMember {
+        long userId();
+        String userName();
+        String avatar();
+        boolean managedStatistics();
     }
 
-    public record WorklogTeamScope(long id, String name, String codingTeamHost, List<WorklogMember> members) {
-    }
+    public record TeamStatisticsCredential(@JsonIgnore String token) {
+        public static final TeamStatisticsCredential EMPTY = new TeamStatisticsCredential("");
 
-    public record CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole, String mobile) {
-        public CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole) {
-            this(userId, userName, avatar, codingRole, null);
+        @Override
+        public String toString() {
+            return "TeamStatisticsCredential[redacted]";
         }
     }
 
-    public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members) {
+    public record WorklogMember(long userId, String userName, String avatar,
+                                boolean managedStatistics) implements StatisticsMember {
+        public WorklogMember(long userId, String userName, String avatar) {
+            this(userId, userName, avatar, false);
+        }
+    }
+
+    public record WorklogTeamScope(long id, String name, String codingTeamHost, List<WorklogMember> members,
+                                   @JsonIgnore TeamStatisticsCredential managementCredential) {
+        public WorklogTeamScope(long id, String name, String codingTeamHost, List<WorklogMember> members) {
+            this(id, name, codingTeamHost, members, TeamStatisticsCredential.EMPTY);
+        }
+    }
+
+    public record CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole, String mobile,
+                                 boolean managedStatistics) implements StatisticsMember {
+        public CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole) {
+            this(userId, userName, avatar, codingRole, null, false);
+        }
+
+        public CodeSyncMember(long userId, String userName, String avatar, CodingRole codingRole, String mobile) {
+            this(userId, userName, avatar, codingRole, mobile, false);
+        }
+    }
+
+    public record CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members,
+                               @JsonIgnore TeamStatisticsCredential managementCredential) {
+        public CodeSyncTeam(String name, String codingTeamKey, String codingTeamHost, List<CodeSyncMember> members) {
+            this(name, codingTeamKey, codingTeamHost, members, TeamStatisticsCredential.EMPTY);
+        }
     }
 
     public record IterationMemberOption(long userId, String userName, String avatar) {
