@@ -43,6 +43,12 @@
             <version>1.17.2</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.28.0</version>
+        </dependency>
+
         <!-- 阿里云sms短信服务依赖 -->
         <dependency>
             <groupId>com.aliyun</groupId>
@@ -62,6 +68,11 @@
             <version>3.7.1</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

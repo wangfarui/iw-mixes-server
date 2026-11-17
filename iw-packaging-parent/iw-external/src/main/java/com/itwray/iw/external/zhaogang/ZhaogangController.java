@@ -16,7 +16,6 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModule;
-import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.UpdateRole;
 import com.itwray.iw.external.zhaogang.k8s.K8sTokenService;
@@ -64,8 +63,6 @@ public class ZhaogangController {
 
     private final WorklogModule worklogModule;
 
-    private final CodingCredentialService credentials;
-
     private final K8sTokenService k8sTokens;
 
     public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
@@ -74,23 +71,15 @@ public class ZhaogangController {
         this(sessionManager, workbenchService, catalogService, properties, worklogModule, null);
     }
 
-    public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
-                              ZhaogangCatalogService catalogService, ZhaogangProperties properties,
-                              WorklogModule worklogModule, CodingCredentialService credentials) {
-        this(sessionManager, workbenchService, catalogService, properties, worklogModule, credentials, null);
-    }
-
     @Autowired
     public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
                               ZhaogangCatalogService catalogService, ZhaogangProperties properties,
-                              WorklogModule worklogModule, CodingCredentialService credentials,
-                              K8sTokenService k8sTokens) {
+                              WorklogModule worklogModule, K8sTokenService k8sTokens) {
         this.sessionManager = sessionManager;
         this.workbenchService = workbenchService;
         this.catalogService = catalogService;
         this.properties = properties;
         this.worklogModule = worklogModule;
-        this.credentials = credentials;
         this.k8sTokens = k8sTokens;
     }
 
@@ -107,6 +96,7 @@ public class ZhaogangController {
     @GetMapping("/session")
     @Operation(summary = "获取找钢工作台会话状态")
     public GeneralResponse<SessionStatus> session(HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         ZhaogangSession session = sessionManager.resolve(request, response);
         ZhaogangSession repaired = workbenchService.repairSession(session);
         if (!repaired.equals(session)) {
@@ -131,17 +121,8 @@ public class ZhaogangController {
     }
 
     @DeleteMapping("/session")
-    @Operation(summary = "解除 CODING 个人令牌绑定")
-    public GeneralResponse<Void> unbind(HttpServletRequest request, HttpServletResponse response) {
-        try {
-            ZhaogangSession session = sessionManager.resolve(request, response);
-            catalogService.invalidate(session);
-            if (credentials != null) {
-                credentials.remove(session.teamId() == null ? 0 : session.teamId(), session.userId());
-            }
-        } catch (ZhaogangSessionException ignored) {
-            // Cookie 已失效时仍允许执行解除绑定。
-        }
+    @Operation(summary = "解除当前浏览器的 CODING 绑定")
+    public GeneralResponse<Void> unbind(HttpServletResponse response) {
         sessionManager.clear(response);
         return GeneralResponse.success();
     }

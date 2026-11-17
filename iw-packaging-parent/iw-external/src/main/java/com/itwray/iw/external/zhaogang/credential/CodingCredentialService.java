@@ -15,8 +15,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Stores the plaintext PAT backup and exposes it only to server-side team worklog and
- * team code statistics paths. Other CODING calls continue to use the session cookie token.
+ * Stores the server-side PAT backup used by worklog, code synchronization and agent authorization.
  */
 @Service
 public class CodingCredentialService {

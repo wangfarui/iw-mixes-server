@@ -37,6 +37,13 @@ iw:
       base-url: ${IW_CORE_BASE_URL:http://127.0.0.1:18080}
     external:
       base-url: http://127.0.0.1:${server.port}
+  zhaogang:
+    skills:
+      oss-endpoint: ${IW_ZHAOGANG_SKILLS_OSS_ENDPOINT:}
+      oss-bucket: ${IW_ZHAOGANG_SKILLS_OSS_BUCKET:}
+      oss-access-key: ${IW_ZHAOGANG_SKILLS_OSS_ACCESS_KEY:}
+      oss-secret-key: ${IW_ZHAOGANG_SKILLS_OSS_SECRET_KEY:}
+      local-directory: ${IW_ZHAOGANG_SKILLS_LOCAL_DIRECTORY:}
   dao:
     dataPermission:
       enabled: false
@@ -98,6 +105,10 @@ server:
 
 # spring 配置
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
   application:
     name: iw-external-service
   profiles:
@@ -158,6 +169,9 @@ spring:
       on-profile: dev
 
 iw:
+  zhaogang:
+    skills:
+      local-directory: ${IW_ZHAOGANG_SKILLS_LOCAL_DIRECTORY:logs/local/skills-packages}
   remote:
     auth:
       base-url: ${IW_CORE_BASE_URL:http://127.0.0.1:18000}
