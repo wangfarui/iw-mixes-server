@@ -9,6 +9,8 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.file.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
@@ -29,16 +31,21 @@ class NotificationStoreMysqlTest {
         jdbc.execute("CREATE TABLE IF NOT EXISTS external_zhaogang_workbench_team (id BIGINT PRIMARY KEY,coding_team_id BIGINT,administrator_user_id BIGINT)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS external_zhaogang_workbench_team_member (team_id BIGINT,coding_user_id BIGINT,PRIMARY KEY(team_id,coding_user_id))");
         jdbc.execute("CREATE TABLE IF NOT EXISTS external_zhaogang_workbench_profile (coding_team_id BIGINT,coding_user_id BIGINT,PRIMARY KEY(coding_team_id,coding_user_id))");
-        String mobileSql = Files.readString(Path.of("scripts/iw-external-migrate-20261116-worklog-mobile.sql"));
+        jdbc.update("INSERT IGNORE INTO " + NotificationStore.C + " (team_id,coding_team_id,revision) VALUES (0,10,5)");
+        migrate("iw-external-migrate-20261116-worklog-mobile.sql");
+        migrate("iw-external-migrate-20261118-worklog-notification-time.sql");
+        id=System.nanoTime(); jdbc.update("INSERT INTO external_zhaogang_workbench_team VALUES (?,10,100)",id);
+        store=new NotificationStore(jdbc,tx); webhook=new WecomWebhook(new ObjectMapper(),new ZhaogangProperties());
+    }
+    private void migrate(String filename) throws Exception {
+        String sql = Files.readString(Path.of("scripts", filename));
         jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
             try (var sqlStatement = connection.createStatement()) {
-                for (int repeat=0;repeat<2;repeat++) for (String statement:mobileSql.split(";"))
+                for (int repeat=0;repeat<2;repeat++) for (String statement:sql.split(";"))
                     if (!statement.isBlank()) sqlStatement.execute(statement);
             }
             return null;
         });
-        id=System.nanoTime(); jdbc.update("INSERT INTO external_zhaogang_workbench_team VALUES (?,10,100)",id);
-        store=new NotificationStore(jdbc,tx); webhook=new WecomWebhook(new ObjectMapper(),new ZhaogangProperties());
     }
     private NotificationStore.Config config() { return store.save(id,10,100,new WorklogNotificationModule.Command(true,0,"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=fixture-key-"+id,false),webhook); }
     private NotificationStore.Batch batch(String id) { return store.pending().stream().filter(b->b.id().equals(id)).findFirst().orElseThrow(); }
@@ -57,7 +64,8 @@ class NotificationStoreMysqlTest {
         ExecutorService pool=Executors.newFixedThreadPool(4);
         try {
             var tasks=new ArrayList<Callable<String>>();
-            for(int i=0;i<8;i++) tasks.add(()->store.create(c,"WORKLOG_DAILY_REPORT:2026-11-13","DAILY","1,2",System.currentTimeMillis()+600_000));
+            for(int i=0;i<8;i++) tasks.add(() -> store.createDaily(c, LocalDate.of(2026, 11, 13), "1,2",
+                    System.currentTimeMillis() + 600_000));
             var ids=pool.invokeAll(tasks).stream().map(f->{try{return f.get();}catch(Exception e){throw new RuntimeException(e);}}).filter(Objects::nonNull).toList();
             assertThat(ids).hasSize(1);
             store.ready(ids.get(0),"{}",List.of("team-summary","member-one","member-two"));
@@ -72,6 +80,35 @@ class NotificationStoreMysqlTest {
             store.complete(second,new WecomWebhook.Result(WecomWebhook.Outcome.FAILED,"rejected"));
             assertThat(store.latest(id).state()).isEqualTo("FAILED"); assertThat(store.accepted(b.id())).isEqualTo(1);
         } finally {pool.shutdownNow();}
+    }
+    @Test void savesTeamTimeWithoutReplacingTheAlreadyScheduledBatch() throws Exception {
+        assertThat(store.config(0).sendTime()).isEqualTo(LocalTime.of(17, 0));
+        assertThat(store.config(0).deliveryRevision()).isEqualTo(5);
+        var initial = config();
+        var date = LocalDate.of(2026, 11, 18);
+        long expiry = System.currentTimeMillis() + 600_000;
+        String batchId = store.createDaily(initial, date, "100", expiry);
+        store.ready(batchId, "{}", List.of("summary"));
+
+        assertThatThrownBy(() -> store.save(id, 10, 100,
+                new WorklogNotificationModule.Command(true, 1, null, false, null, "24:00"), webhook))
+                .hasMessageContaining("HH:mm");
+        var updated = store.save(id, 10, 100,
+                new WorklogNotificationModule.Command(true, 1, null, false, null, "18:45"), webhook);
+        assertThat(updated.revision()).isEqualTo(2);
+        assertThat(updated.deliveryRevision()).isEqualTo(initial.revision());
+        assertThat(store.due(LocalTime.of(17, 0))).doesNotContain(updated);
+        assertThat(store.due(LocalTime.of(18, 45))).contains(updated);
+        assertThat(batch(batchId).expiresAt()).isEqualTo(expiry);
+        assertThat(store.createDaily(updated, date, "100", expiry)).isNull();
+        assertThat(store.createDaily(initial, date.plusDays(1), "100", expiry)).isNull();
+        migrate("iw-external-migrate-20261118-worklog-notification-time.sql");
+        assertThat(store.config(id)).isEqualTo(updated);
+
+        var disabled = store.save(id, 10, 100, new WorklogNotificationModule.Command(false, 2, null, false), webhook);
+        assertThat(disabled.sendTime()).isEqualTo(LocalTime.of(18, 45));
+        assertThat(store.due(LocalTime.of(18, 45))).doesNotContain(disabled);
+        assertThat(store.latest(id).state()).isEqualTo("CANCELLED");
     }
     @Test void pausesUnknownSubmissionAndStopsAfterTwoExplicitRetries() {
         var c=config(); String key=store.create(c,"a","TEST","",System.currentTimeMillis()+600_000);

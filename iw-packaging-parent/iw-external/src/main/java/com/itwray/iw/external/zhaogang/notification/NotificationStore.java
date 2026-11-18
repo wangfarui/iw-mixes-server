@@ -7,6 +7,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 
 @Repository
@@ -16,9 +18,11 @@ class NotificationStore {
     static final String M = "external_zhaogang_worklog_notify_message";
     private static final String BATCH_COLUMNS = "id,team_id,coding_team_id,kind,revision,webhook_hash,member_ids,state,reason,total_count,created_at,expires_at";
     static final String H = "external_zhaogang_worklog_notify_channel";
-    record Config(long teamId, long codingTeamId, boolean enabled, String cipher, String hash, long revision, Long summaryMemberId) {
+    record Config(long teamId, long codingTeamId, boolean enabled, String cipher, String hash, long revision,
+                  Long summaryMemberId, LocalTime sendTime, long deliveryRevision) {
         Config(long teamId, long codingTeamId, boolean enabled, String cipher, String hash, long revision) {
-            this(teamId, codingTeamId, enabled, cipher, hash, revision, null);
+            this(teamId, codingTeamId, enabled, cipher, hash, revision, null,
+                    WorklogNotificationModule.DEFAULT_SEND_TIME, revision);
         }
     }
     record Batch(String id, long teamId, long codingTeamId, String kind, long revision, String hash,
@@ -36,7 +40,9 @@ class NotificationStore {
     Config config(long id) {
         return jdbc.query("SELECT * FROM " + C + " WHERE team_id=?", (r,n) -> configRow(r), id).stream().findFirst().orElse(null);
     }
-    List<Config> enabled() { return jdbc.query("SELECT * FROM " + C + " WHERE enabled=1", (r,n) -> configRow(r)); }
+    List<Config> due(LocalTime time) {
+        return jdbc.query("SELECT * FROM " + C + " WHERE enabled=1 AND send_time=?", (r,n) -> configRow(r), time);
+    }
     Config save(long id, long codingTeamId, long actor, WorklogNotificationModule.Command command, WecomWebhook webhook) {
         return tx.execute(status -> {
             authorize(id, codingTeamId, actor);
@@ -59,10 +65,23 @@ class NotificationStore {
             }
             boolean enabled = !clear && command.enabled();
             if (enabled && cipher == null) throw new WorkbenchTeamException("请先保存群 Webhook");
+            LocalTime sendTime = old.sendTime();
+            if (command.sendTime() != null) {
+                if (!command.sendTime().matches("(?:[01][0-9]|2[0-3]):[0-5][0-9]"))
+                    throw new WorkbenchTeamException("通知时间必须为有效的北京时间（HH:mm）");
+                sendTime = LocalTime.parse(command.sendTime());
+            }
+            boolean scheduleOnly = !sendTime.equals(old.sendTime()) && !clear && enabled == old.enabled()
+                    && Objects.equals(hash, old.hash()) && Objects.equals(summaryMemberId, old.summaryMemberId());
+            long deliveryRevision = scheduleOnly ? old.deliveryRevision() : old.revision() + 1;
             long now = System.currentTimeMillis();
-            jdbc.update("UPDATE " + C + " SET enabled=?,webhook_cipher=?,webhook_hash=?,summary_member_id=?,revision=revision+1,updated_by=?,updated_at=? WHERE team_id=?", enabled, cipher, hash, summaryMemberId, actor, now, id);
-            // Stop only unsent messages. An already submitted HTTP request cannot be recalled.
-            jdbc.update("UPDATE " + B + " SET state='CANCELLED',reason='通知配置已更新',updated_at=? WHERE team_id=? AND state IN ('COLLECTING','READY')", now, id);
+            jdbc.update("UPDATE " + C + " SET enabled=?,webhook_cipher=?,webhook_hash=?,summary_member_id=?,"
+                            + "send_time=?,delivery_revision=?,revision=revision+1,updated_by=?,updated_at=? WHERE team_id=?",
+                    enabled, cipher, hash, summaryMemberId, sendTime, deliveryRevision, actor, now, id);
+            // Moving the schedule only affects future batches. Other edits can invalidate queued messages.
+            if (!scheduleOnly) {
+                jdbc.update("UPDATE " + B + " SET state='CANCELLED',reason='通知配置已更新',updated_at=? WHERE team_id=? AND state IN ('COLLECTING','READY')", now, id);
+            }
             return config(id);
         });
     }
@@ -107,6 +126,17 @@ class NotificationStore {
                     id, config.teamId(), config.codingTeamId(), key, kind, config.revision(), config.hash(), members, now, expiresAt, now);
             return count == 1 ? id : null;
         } catch (org.springframework.dao.DuplicateKeyException ignored) { return null; }
+    }
+    String createDaily(Config expected, LocalDate date, String members, long expiresAt) {
+        return tx.execute(status -> {
+            var rows = jdbc.query("SELECT * FROM " + C + " WHERE team_id=? FOR UPDATE",
+                    (r,n) -> configRow(r), expected.teamId());
+            if (rows.isEmpty()) return null;
+            var current = rows.get(0);
+            if (!current.enabled() || current.revision() != expected.revision()
+                    || System.currentTimeMillis() >= expiresAt) return null;
+            return create(current, "WORKLOG_DAILY_REPORT:" + date, "DAILY", members, expiresAt);
+        });
     }
     String createTest(Config expected, String members, long revision, long actor) {
         return tx.execute(status -> {
@@ -228,6 +258,13 @@ class NotificationStore {
                 || ((Number)rows.get(0).get("administrator_user_id")).longValue()!=actor)
             throw new WorkbenchTeamException("团队不存在或当前用户已不是管理员");
     }
-    private Config configRow(ResultSet r) throws SQLException { return new Config(r.getLong("team_id"),r.getLong("coding_team_id"),r.getBoolean("enabled"),r.getString("webhook_cipher"),r.getString("webhook_hash"),r.getLong("revision"),r.getObject("summary_member_id", Long.class)); }
+    private Config configRow(ResultSet r) throws SQLException {
+        long revision = r.getLong("revision");
+        Long deliveryRevision = r.getObject("delivery_revision", Long.class);
+        return new Config(r.getLong("team_id"), r.getLong("coding_team_id"), r.getBoolean("enabled"),
+                r.getString("webhook_cipher"), r.getString("webhook_hash"), revision,
+                r.getObject("summary_member_id", Long.class), r.getObject("send_time", LocalTime.class),
+                deliveryRevision == null ? revision : deliveryRevision);
+    }
     private Batch batchRow(ResultSet r) throws SQLException { return new Batch(r.getString("id"),r.getLong("team_id"),r.getLong("coding_team_id"),r.getString("kind"),r.getLong("revision"),r.getString("webhook_hash"),r.getString("member_ids"),r.getString("state"),r.getString("reason"),r.getInt("total_count"),r.getLong("created_at"),r.getLong("expires_at")); }
 }

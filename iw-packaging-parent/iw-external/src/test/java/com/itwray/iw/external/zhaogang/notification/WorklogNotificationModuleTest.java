@@ -27,13 +27,36 @@ class WorklogNotificationModuleTest {
     private NotificationStore.Batch batch(long expires) { return new NotificationStore.Batch("batch",1,10,"DAILY",1,"hash","100","READY","",2,System.currentTimeMillis(),expires); }
     private void workday() { when(calendar.resolve(eq(10L),any())).thenReturn(new Schedule(today.toString().substring(0,7),1,List.of(new Day(today,DayType.WORKDAY,true)))); }
     @Test void usesWorkbenchCalendarIncludingOverrideInsteadOfWeekdayHeuristics() throws Exception {
-        when(store.enabled()).thenReturn(List.of(config));
-        when(calendar.resolve(eq(10L),any())).thenReturn(new Schedule("month",1,List.of(new Day(today,DayType.REST_DAY,true))));
-        module.daily(); verify(store,never()).create(any(),anyString(),anyString(),anyString(),anyLong());
-        workday(); when(teams.findCodeSyncTeam(10,1)).thenReturn(Optional.of(team()));
-        when(store.create(eq(config),anyString(),eq("DAILY"),eq("100"),anyLong())).thenReturn("batch");
-        when(reader.read(10,team(),today)).thenReturn(new WorklogDailyReader.Snapshot("团队",today,"17:00",List.of(new WorklogDailyReader.Member(100,"张三",false,true,"",List.of()))));
-        module.daily(); verify(store).readyMessages(eq("batch"),anyString(),argThat(list->list.size()==2 && list.get(0).content().contains("今日工时报告") && list.get(1).content().contains("张三")));
+        var friday = LocalDate.of(2026, 11, 20);
+        var saturday = friday.plusDays(1);
+        var sendTime = LocalTime.of(18, 45);
+        var zone = ZoneId.of("Asia/Shanghai");
+        var custom = new NotificationStore.Config(2, 10, true, "cipher", "hash", 1, null, sendTime, 1);
+        when(store.due(sendTime)).thenReturn(List.of(custom));
+        when(calendar.resolve(10, YearMonth.from(friday))).thenReturn(new Schedule("2026-11", 1, List.of(
+                new Day(friday, DayType.REST_DAY, true), new Day(saturday, DayType.WORKDAY, true))));
+        module.daily(friday.atTime(sendTime).atZone(zone));
+        module.daily(saturday.atTime(sendTime.minusMinutes(1)).atZone(zone));
+        verify(store, never()).createDaily(any(), any(), anyString(), anyLong());
+        when(teams.findCodeSyncTeam(10, 2)).thenReturn(Optional.of(team()));
+        var scheduled = saturday.atTime(sendTime).atZone(zone);
+        long expiry = scheduled.plusMinutes(30).toInstant().toEpochMilli();
+        when(store.createDaily(custom, saturday, "100", expiry)).thenReturn("batch");
+        when(reader.read(10, team(), saturday)).thenReturn(new WorklogDailyReader.Snapshot("团队", saturday, "18:45",
+                List.of(new WorklogDailyReader.Member(100, "张三", false, true, "", List.of()))));
+        module.daily(scheduled.plusSeconds(5).withZoneSameInstant(ZoneOffset.UTC));
+        verify(store, timeout(2000)).readyMessages(eq("batch"), anyString(), argThat(list -> list.size() == 2
+                && list.get(0).content().contains("今日工时报告") && list.get(1).content().contains("张三")));
+    }
+    @Test void lateDailyBatchExpiresBeforeTheNextDate() {
+        var zone = ZoneId.of("Asia/Shanghai");
+        var sendTime = LocalTime.of(23, 59);
+        var late = new NotificationStore.Config(1, 10, true, "cipher", "hash", 1, null, sendTime, 1);
+        when(store.due(sendTime)).thenReturn(List.of(late));
+        when(teams.findCodeSyncTeam(10, 1)).thenReturn(Optional.of(team()));
+        workday();
+        module.daily(today.atTime(sendTime).atZone(zone));
+        verify(store).createDaily(late, today, "100", today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli());
     }
     @Test void cancelsChangedConfigAndRemovedMembersBeforeClaiming() {
         var b=batch(System.currentTimeMillis()+600_000); when(store.pending()).thenReturn(List.of(b));
@@ -59,7 +82,9 @@ class WorklogNotificationModuleTest {
     }
     @Test void expiresOldBatchesAndSubmitsOnlyClaimedMessage() {
         when(store.pending()).thenReturn(List.of(batch(0))); module.deliver(); verify(store).stop("batch","EXPIRED","已超过当日发送窗口");
-        var b=batch(System.currentTimeMillis()+600_000); when(store.pending()).thenReturn(List.of(b)); when(store.config(1)).thenReturn(config);
+        var b=batch(System.currentTimeMillis()+600_000); when(store.pending()).thenReturn(List.of(b));
+        when(store.config(1)).thenReturn(new NotificationStore.Config(1, 10, true, "cipher", "hash", 2,
+                null, LocalTime.of(18, 45), 1));
         when(teams.findCodeSyncTeam(10,1)).thenReturn(Optional.of(team())); workday();
         var delivery=new NotificationStore.Delivery(b,0,"summary",1); when(store.claim(eq(b),anyLong())).thenReturn(delivery);
         var result=new WecomWebhook.Result(WecomWebhook.Outcome.ACCEPTED,"accepted"); when(webhook.send("cipher",NotificationMessage.markdown("summary"))).thenReturn(result);

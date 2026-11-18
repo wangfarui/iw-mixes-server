@@ -16,6 +16,7 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -23,9 +24,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class WorklogNotificationModule {
-    public record Command(boolean enabled, long revision, String webhook, boolean clearWebhook, Long summaryMemberId) {
+    public record Command(boolean enabled, long revision, String webhook, boolean clearWebhook, Long summaryMemberId,
+                          String sendTime) {
         public Command(boolean enabled, long revision, String webhook, boolean clearWebhook) {
             this(enabled, revision, webhook, clearWebhook, null);
+        }
+        public Command(boolean enabled, long revision, String webhook, boolean clearWebhook, Long summaryMemberId) {
+            this(enabled, revision, webhook, clearWebhook, summaryMemberId, null);
         }
         @Override public String toString() { return "Command[enabled=" + enabled + ", revision=" + revision + ", webhook=[redacted], clearWebhook=" + clearWebhook + "]"; }
     }
@@ -36,7 +41,8 @@ public class WorklogNotificationModule {
     public record SendNowCommand(long revision, String requestId) { }
     public record Latest(String state, String reason, int accepted, int total, long createdAt, String kind, String id) { }
     public record Status(boolean enabled, boolean webhookConfigured, long revision, Latest latest, Long summaryMemberId,
-                         String webhookHint, List<Latest> recent) { }
+                         String webhookHint, List<Latest> recent, String sendTime) { }
+    static final LocalTime DEFAULT_SEND_TIME = LocalTime.of(17, 0);
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
     private final NotificationStore store;
     private final WorkbenchTeamModule teams;
@@ -53,6 +59,9 @@ public class WorklogNotificationModule {
             new SynchronousQueue<>(), r -> {
                 Thread thread = new Thread(r, "worklog-notification-manual"); thread.setDaemon(true); return thread;
             });
+    private final ExecutorService scheduledReports = Executors.newFixedThreadPool(2, r -> {
+        Thread thread = new Thread(r, "worklog-notification-daily"); thread.setDaemon(true); return thread;
+    });
 
     public WorklogNotificationModule(NotificationStore store, WorkbenchTeamModule teams, WorkCalendarResolver calendar,
                                     WorklogDailyReader reader, ObjectMapper json, WecomWebhook webhook) {
@@ -65,7 +74,7 @@ public class WorklogNotificationModule {
         scheduler.setPoolSize(2);
         scheduler.setThreadNamePrefix("worklog-notification-");
         scheduler.initialize();
-        scheduler.schedule(this::daily, new CronTrigger("0 0 17 * * *", ZONE));
+        scheduler.schedule(() -> daily(ZonedDateTime.now(ZONE)), new CronTrigger("0 * * * * *", ZONE));
         scheduler.scheduleWithFixedDelay(this::deliver, Duration.ofSeconds(1));
         scheduler.schedule(this::cleanup, new CronTrigger("0 15 3 * * *", ZONE));
     }
@@ -150,20 +159,24 @@ public class WorklogNotificationModule {
                 store.accepted(batch.id()), batch.total(), batch.createdAt(), batch.kind(), batch.id())).toList();
         return new Status(config != null && config.enabled(), config != null && config.cipher() != null,
                 config == null ? 0 : config.revision(), recent.isEmpty() ? null : recent.get(0),
-                config == null ? null : config.summaryMemberId(), config == null ? null : webhook.hint(config.cipher()), recent);
+                config == null ? null : config.summaryMemberId(), config == null ? null : webhook.hint(config.cipher()),
+                recent, (config == null ? DEFAULT_SEND_TIME : config.sendTime()).toString());
     }
-    void daily() {
-        LocalDate date=LocalDate.now(ZONE);
-        for (var config:store.enabled()) {
+    void daily(ZonedDateTime now) {
+        var scheduled = now.withZoneSameInstant(ZONE).truncatedTo(ChronoUnit.MINUTES);
+        LocalDate date = scheduled.toLocalDate();
+        var cutoff = scheduled.plusMinutes(30);
+        var midnight = date.plusDays(1).atStartOfDay(ZONE);
+        long expiry = (cutoff.isBefore(midnight) ? cutoff : midnight).toInstant().toEpochMilli();
+        for (var config : store.due(scheduled.toLocalTime())) {
             try {
                 if (calendar.resolve(config.codingTeamId(),YearMonth.from(date)).days().stream()
                         .noneMatch(day->day.date().equals(date) && day.dayType()==DayType.WORKDAY)) continue;
                 var team=teams.findCodeSyncTeam(config.codingTeamId(),config.teamId()).orElse(null);
                 if (team==null) continue;
-                long expiry=date.atTime(17,30).atZone(ZONE).toInstant().toEpochMilli();
-                String id=store.create(config,"WORKLOG_DAILY_REPORT:"+date,"DAILY",memberIds(team),expiry);
+                String id = store.createDaily(config, date, memberIds(team), expiry);
                 if (id==null) continue;
-                collect(id, config, team, date);
+                scheduledReports.execute(() -> collect(id, config, team, date));
             } catch (RuntimeException e) { log.warn("工时通知批次创建失败，teamId={}，类型={}",config.teamId(),e.getClass().getSimpleName()); }
         }
     }
@@ -178,7 +191,7 @@ public class WorklogNotificationModule {
                     continue;
                 }
                 var config=store.config(batch.teamId());
-                if (config==null || config.revision()!=batch.revision() || !Objects.equals(config.hash(),batch.hash())
+                if (config==null || batch.revision()<config.deliveryRevision() || !Objects.equals(config.hash(),batch.hash())
                         || "DAILY".equals(batch.kind()) && !config.enabled()) {
                     store.stop(batch.id(),"CANCELLED","通知配置已停用或更新"); continue;
                 }
@@ -206,5 +219,10 @@ public class WorklogNotificationModule {
                         + (m.ignoreTeamStatistics() ? ":ignored" : ""))
                 .collect(Collectors.joining(","));
     }
-    @PreDestroy void shutdown() { scheduler.shutdown(); manualReports.shutdownNow(); collection.shutdownNow(); }
+    @PreDestroy void shutdown() {
+        scheduler.shutdown();
+        scheduledReports.shutdownNow();
+        manualReports.shutdownNow();
+        collection.shutdownNow();
+    }
 }

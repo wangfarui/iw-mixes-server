@@ -635,6 +635,8 @@ CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_notify_config (
   webhook_cipher TEXT NULL,
   webhook_hash CHAR(64) NULL,
   summary_member_id BIGINT NULL,
+  send_time TIME NOT NULL DEFAULT '17:00:00',
+  delivery_revision BIGINT NULL,
   revision BIGINT NOT NULL DEFAULT 0,
   updated_by BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0,
