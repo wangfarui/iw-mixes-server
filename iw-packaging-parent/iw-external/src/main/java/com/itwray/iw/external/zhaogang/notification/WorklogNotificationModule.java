@@ -96,7 +96,7 @@ public class WorklogNotificationModule {
         String cipher = webhook.encrypt(url);
         String hash = com.itwray.iw.external.zhaogang.credential.CodingCredentialService.fingerprint(url);
         var delivery = store.beginTest(teamId, actor.codingTeamId(), actor.userId(), command.revision(), hash,
-                NotificationMessage.text("工作台助手｜连接测试\n这是一条测试消息，不包含工时数据，也不会自动开启通知。"));
+                NotificationMessage.text("Dev Hub｜连接测试\n这是一条测试消息，不包含工时数据，也不会自动开启通知。"));
         var result = webhook.send(cipher, delivery.message());
         // An immediate test sends once; ambiguous delivery never triggers a blind retry.
         if (result.outcome() == WecomWebhook.Outcome.RETRYABLE)
@@ -114,7 +114,7 @@ public class WorklogNotificationModule {
         var config = store.config(teamId);
         if (config == null || config.cipher() == null) throw new WorkbenchTeamException("请先保存群 Webhook");
         String id = store.createTest(config, "", revision, actor.userId());
-        store.readyMessages(id, "{}", List.of(NotificationMessage.text("工作台助手｜连接测试\n群 Webhook 已连接。\n这是一条测试消息，不包含工时数据，也不会自动开启通知。")));
+        store.readyMessages(id, "{}", List.of(NotificationMessage.text("Dev Hub｜连接测试\n群 Webhook 已连接。\n这是一条测试消息，不包含工时数据，也不会自动开启通知。")));
         return status(teamId);
     }
     public Status sendNow(Actor actor, long teamId, SendNowCommand command) {

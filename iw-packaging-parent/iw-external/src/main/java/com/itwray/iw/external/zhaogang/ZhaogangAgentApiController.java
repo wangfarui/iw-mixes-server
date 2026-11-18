@@ -30,7 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/external-service/api/zhaogang/agent-api")
 @Validated
-@Tag(name = "找钢工作台 Agent API")
+@Tag(name = "Dev Hub Agent API")
 public class ZhaogangAgentApiController {
 
     private final ZhaogangAgentTokenService tokenService;
@@ -48,7 +48,7 @@ public class ZhaogangAgentApiController {
     }
 
     @GetMapping("/me")
-    @Operation(summary = "查询 Agent 绑定的工作台用户")
+    @Operation(summary = "查询 Agent 绑定的 Dev Hub 用户")
     public GeneralResponse<Me> me(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
                                   String authorization) {
         ZhaogangSession session = session(authorization);

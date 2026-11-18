@@ -325,8 +325,8 @@ class WorklogQueryService {
         User user = new User(member.userId(), member.userName(), member.avatar());
         if (StringUtils.isBlank(member.token())) {
             return new MemberIssue(user, "TOKEN_MISSING", member.managedStatistics()
-                    ? "团队管理令牌不可用，请工作台维护人在团队页检查配置"
-                    : "尚未绑定 CODING 令牌，请该成员在工作台登录并绑定令牌");
+                    ? "团队管理令牌不可用，请 Dev Hub 维护人在团队页检查配置"
+                    : "尚未绑定 CODING 令牌，请该成员在 Dev Hub 绑定令牌");
         }
         if (!result.failed()) {
             if (!result.pageLimitReached()) {

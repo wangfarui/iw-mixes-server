@@ -32,7 +32,7 @@ public class K8sTokenService {
     public String token(long teamId, long userId, String environment) {
         K8sTokenEnvironment parsed = K8sTokenEnvironment.parse(environment);
         if (teamId <= 0 || userId <= 0) {
-            throw new IllegalArgumentException("找钢工作台会话信息不完整");
+            throw new IllegalArgumentException("Dev Hub 会话信息不完整");
         }
         K8sTokenEntity entity = mapper.find(teamId, userId, parsed.code());
         if (entity == null || entity.getTokenPlaintext() == null || entity.getTokenPlaintext().isBlank()) {

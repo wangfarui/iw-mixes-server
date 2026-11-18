@@ -5,7 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * 找钢工作台的固定 CODING 连接配置。
+ * Dev Hub 的固定 CODING 连接配置。
  */
 @Data
 @ConfigurationProperties(prefix = "iw.external.zhaogang")

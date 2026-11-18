@@ -36,7 +36,7 @@ class DefaultReleaseReceiptModule implements ReleaseReceiptModule {
 
     private void validate(Context context, String releaseId) {
         if (context == null || context.codingTeamId() <= 0 || context.codingUserId() <= 0) {
-            throw new IllegalArgumentException("找钢工作台会话信息不完整");
+            throw new IllegalArgumentException("Dev Hub 会话信息不完整");
         }
         if (releaseId == null || !RELEASE_ID.matcher(releaseId).matches()) {
             throw new IllegalArgumentException("版本标识格式无效");

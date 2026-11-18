@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/external-service/api/zhaogang/release-notes")
 @Validated
-@Tag(name = "找钢工作台版本通知")
+@Tag(name = "Dev Hub 版本通知")
 public class ZhaogangReleaseReceiptController {
 
     private final ZhaogangSessionManager sessionManager;
@@ -31,7 +31,7 @@ public class ZhaogangReleaseReceiptController {
     }
 
     @GetMapping("/{releaseId}/receipt")
-    @Operation(summary = "查询找钢工作台版本已读状态")
+    @Operation(summary = "查询 Dev Hub 版本已读状态")
     public GeneralResponse<Receipt> receipt(@PathVariable String releaseId,
                                              HttpServletRequest request, HttpServletResponse response) {
         noStore(response);
@@ -39,7 +39,7 @@ public class ZhaogangReleaseReceiptController {
     }
 
     @PutMapping("/{releaseId}/receipt")
-    @Operation(summary = "确认找钢工作台版本已读")
+    @Operation(summary = "确认 Dev Hub 版本已读")
     public GeneralResponse<Receipt> acknowledge(@PathVariable String releaseId,
                                                  HttpServletRequest request, HttpServletResponse response) {
         noStore(response);

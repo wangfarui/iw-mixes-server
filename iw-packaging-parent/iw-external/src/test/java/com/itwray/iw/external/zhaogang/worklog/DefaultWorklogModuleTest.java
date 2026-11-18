@@ -54,9 +54,9 @@ class DefaultWorklogModuleTest {
         DefaultWorklogModule module = module(directory, queryService, cache);
 
         assertThatThrownBy(() -> module.statistics(context, "2026-08", "WORKBENCH_TEAM", null, false))
-                .isInstanceOf(CodingOpenApiException.class).hasMessage("团队工时必须选择工作台团队");
+                .isInstanceOf(CodingOpenApiException.class).hasMessage("团队工时必须选择 Dev Hub 团队");
         assertThatThrownBy(() -> module.entries(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", null, false))
-                .isInstanceOf(CodingOpenApiException.class).hasMessage("团队工时必须选择工作台团队");
+                .isInstanceOf(CodingOpenApiException.class).hasMessage("团队工时必须选择 Dev Hub 团队");
         verifyNoInteractions(directory, queryService, cache);
     }
 

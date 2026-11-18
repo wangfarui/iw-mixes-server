@@ -12,7 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/** 找钢工作台统一异常契约，避免不同页面丢失 CODING 权限上下文。 */
+/** Dev Hub 统一异常契约，避免不同页面丢失 CODING 权限上下文。 */
 @RestControllerAdvice(assignableTypes = {
         ZhaogangController.class,
         ZhaogangAgentTokenController.class,

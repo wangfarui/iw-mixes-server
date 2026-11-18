@@ -241,10 +241,10 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
                         && (teamName.equals(project.displayName()) || teamName.equals(project.name())))
                 .forEach(project -> matches.putIfAbsent(project.id(), project));
         if (matches.isEmpty()) {
-            throw new WorkbenchTeamException("管理令牌的可见项目中未找到与工作台团队同名的 CODING 项目");
+            throw new WorkbenchTeamException("管理令牌的可见项目中未找到与 Dev Hub 团队同名的 CODING 项目");
         }
         if (matches.size() > 1) {
-            throw new WorkbenchTeamException("存在多个同名 CODING 项目，请将工作台团队改为目标项目的唯一标识后再试");
+            throw new WorkbenchTeamException("存在多个同名 CODING 项目，请将 Dev Hub 团队改为目标项目的唯一标识后再试");
         }
         return matches.values().iterator().next();
     }
@@ -464,7 +464,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         validateActor(actor);
         StoredTeam team = requireMember(actor, require(teamId));
         if (!canMaintain(actor, team)) {
-            throw new WorkbenchTeamException("只有创建该团队的工作台维护人可以执行此操作");
+            throw new WorkbenchTeamException("只有创建该团队的 Dev Hub 维护人可以执行此操作");
         }
         return team;
     }

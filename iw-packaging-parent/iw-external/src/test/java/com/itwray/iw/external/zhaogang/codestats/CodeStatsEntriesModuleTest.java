@@ -63,7 +63,7 @@ class CodeStatsEntriesModuleTest {
     @Test
     void rejectsNonMemberBeforeReadingCache() {
         when(directory.resolve(actor, Scope.WORKBENCH_TEAM, 9L))
-                .thenThrow(new CodeStatsForbiddenException("你不是该工作台团队成员"));
+                .thenThrow(new CodeStatsForbiddenException("你不是该 Dev Hub 团队成员"));
         assertThrows(CodeStatsForbiddenException.class,
                 () -> entries(1L, null, null, EntrySort.COMMIT_AT, SortDirection.DESC));
         verifyNoInteractions(cache, queries);

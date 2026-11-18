@@ -188,7 +188,7 @@ class CodeIdentityService {
             throw new CodingOpenApiException("请选择需要绑定的团队成员");
         }
         if (info.members().stream().noneMatch(member -> member.userId() == codingUserId)) {
-            throw new CodingOpenApiException("绑定的成员不在当前工作台团队中");
+            throw new CodingOpenApiException("绑定的成员不在当前 Dev Hub 团队中");
         }
     }
 

@@ -85,7 +85,7 @@ final class WorklogMessageFormatter {
     static List<String> split(String title, String body) {
         // Keep unusually long names as content too; repeated headers remain compact.
         String header = title;
-        if (bytes(header) > 480) { header = "工作台助手｜工时明细"; body = title + "\n" + body; }
+        if (bytes(header) > 480) { header = "Dev Hub｜工时明细"; body = title + "\n" + body; }
         String prefix = header + "\n\n";
         if (bytes(prefix + body) <= LIMIT) return List.of(prefix + body);
         int budget = LIMIT - bytes(prefix) - 48;

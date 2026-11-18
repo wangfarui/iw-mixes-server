@@ -51,7 +51,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/external-service/api/zhaogang")
-@Tag(name = "找钢工作台团队迭代")
+@Tag(name = "Dev Hub 团队迭代")
 public class ZhaogangIterationController {
 
     private final ZhaogangSessionManager sessionManager;
@@ -274,7 +274,7 @@ public class ZhaogangIterationController {
     }
 
     @PostMapping("/iterations/{iterationId}/issues/batch-delete")
-    @Operation(summary = "批量删除工作台迭代事项，不删除 CODING 数据")
+    @Operation(summary = "批量删除 Dev Hub 中的迭代事项，不删除 CODING 数据")
     public GeneralResponse<Void> removeIssues(@PathVariable long iterationId,
                                               @RequestBody RemoveIssuesCommand command,
                                               HttpServletRequest request,

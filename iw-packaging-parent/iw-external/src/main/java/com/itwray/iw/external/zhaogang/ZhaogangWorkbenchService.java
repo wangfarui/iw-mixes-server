@@ -95,7 +95,7 @@ class ZhaogangWorkbenchService {
 
     RolePreference updateRole(ZhaogangSession session, UpdateRole command) {
         if (session.teamId() == null || session.teamId() <= 0 || session.userId() <= 0) {
-            throw new ZhaogangSessionException("当前 CODING 身份不完整，请重新进入工作台");
+            throw new ZhaogangSessionException("当前 CODING 身份不完整，请重新进入 Dev Hub");
         }
         profiles.saveRole(session.teamId(), session.userId(), command.codingRole(), command.initializeOnly());
         return rolePreference(session);

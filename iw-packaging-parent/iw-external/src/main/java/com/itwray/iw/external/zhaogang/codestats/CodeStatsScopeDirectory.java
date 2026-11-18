@@ -42,16 +42,16 @@ class CodeStatsScopeDirectory {
                     credentials.exists(context.codingTeamId(), context.userId()));
         }
         if (workbenchTeamId == null || workbenchTeamId <= 0) {
-            throw new CodingOpenApiException("团队代码统计必须选择工作台团队");
+            throw new CodingOpenApiException("团队代码统计必须选择 Dev Hub 团队");
         }
         Actor actor = actor(context);
         try {
             if (teams.list(actor).stream().noneMatch(item -> item.id() == workbenchTeamId)) {
-                throw new CodeStatsForbiddenException("你不是该工作台团队成员");
+                throw new CodeStatsForbiddenException("你不是该 Dev Hub 团队成员");
             }
             CodeSyncTeam team = teams.findCodeSyncTeam(context.codingTeamId(), workbenchTeamId)
                     .filter(found -> found.members().stream().anyMatch(member -> member.userId() == context.userId()))
-                    .orElseThrow(() -> new CodeStatsForbiddenException("你不是该工作台团队成员"));
+                    .orElseThrow(() -> new CodeStatsForbiddenException("你不是该 Dev Hub 团队成员"));
             return teamScope(context.codingTeamId(), workbenchTeamId, context.codingTeamKey(),
                     StringUtils.defaultIfBlank(team.codingTeamHost(), context.codingTeamHost()), team,
                     team.administratorUserId() == context.userId());

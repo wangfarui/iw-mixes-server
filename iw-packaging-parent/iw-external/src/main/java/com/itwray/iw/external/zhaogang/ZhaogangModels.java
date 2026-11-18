@@ -4,7 +4,7 @@ import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
 
 import java.util.List;
 
-/** 对 Web 保持稳定的找钢工作台返回模型。 */
+/** 对 Web 保持稳定的 Dev Hub 返回模型。 */
 public final class ZhaogangModels {
 
     private ZhaogangModels() {

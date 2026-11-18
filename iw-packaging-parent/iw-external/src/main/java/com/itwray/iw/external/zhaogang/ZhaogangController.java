@@ -46,11 +46,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 找钢工作台公开接口，只依赖浏览器中已绑定的 CODING 会话。 */
+/** Dev Hub 公开接口，只依赖浏览器中已绑定的 CODING 会话。 */
 @RestController
 @RequestMapping("/external-service/api/zhaogang")
 @Validated
-@Tag(name = "找钢工作台")
+@Tag(name = "Dev Hub")
 public class ZhaogangController {
 
     private final ZhaogangSessionManager sessionManager;
@@ -94,7 +94,7 @@ public class ZhaogangController {
     }
 
     @GetMapping("/session")
-    @Operation(summary = "获取找钢工作台会话状态")
+    @Operation(summary = "获取 Dev Hub 会话状态")
     public GeneralResponse<SessionStatus> session(HttpServletRequest request, HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         ZhaogangSession session = sessionManager.resolve(request, response);
@@ -106,7 +106,7 @@ public class ZhaogangController {
     }
 
     @PutMapping("/profile/coding-role")
-    @Operation(summary = "更新当前用户的工作台 CODING 角色")
+    @Operation(summary = "更新当前用户在 Dev Hub 中的 CODING 角色")
     public GeneralResponse<RolePreference> updateRole(@RequestBody UpdateRole command,
                                                        HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(workbenchService.updateRole(sessionManager.resolve(request, response), command));
@@ -234,7 +234,7 @@ public class ZhaogangController {
     }
 
     @GetMapping("/worklog-options")
-    @Operation(summary = "查询工时可选的工作台团队")
+    @Operation(summary = "查询工时可选的 Dev Hub 团队")
     public GeneralResponse<Options> worklogOptions(HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(worklogModule.options(worklogContext(sessionManager.resolve(request, response))));
     }

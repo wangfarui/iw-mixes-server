@@ -77,14 +77,14 @@ class ZhaogangAgentApiControllerTest {
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new ZhaogangExceptionHandler(mock(ZhaogangSessionManager.class)))
                 .build();
-        when(tokenService.authenticate(null)).thenThrow(new ZhaogangAgentTokenException("缺少工作台 Agent 令牌，请重新绑定"));
+        when(tokenService.authenticate(null)).thenThrow(new ZhaogangAgentTokenException("缺少 Dev Hub Agent 令牌，请重新绑定"));
         when(tokenService.authenticate("Bearer zg_ag_stale"))
-                .thenThrow(new ZhaogangAgentTokenException("工作台 Agent 令牌无效或已失效，请重新绑定"));
+                .thenThrow(new ZhaogangAgentTokenException("Dev Hub Agent 令牌无效或已失效，请重新绑定"));
 
         mvc.perform(get("/external-service/api/zhaogang/agent-api/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(401))
-                .andExpect(jsonPath("$.message").value("缺少工作台 Agent 令牌，请重新绑定"));
+                .andExpect(jsonPath("$.message").value("缺少 Dev Hub Agent 令牌，请重新绑定"));
         mvc.perform(get("/external-service/api/zhaogang/agent-api/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer zg_ag_stale"))
                 .andExpect(status().isOk())
@@ -101,7 +101,7 @@ class ZhaogangAgentApiControllerTest {
                 .build();
         when(tokenService.authenticate("Bearer " + AGENT_TOKEN))
                 .thenThrow(new ZhaogangAgentCodingCredentialException(
-                        "当前工作台账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌"));
+                        "当前 Dev Hub 账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌"));
 
         mvc.perform(get("/external-service/api/zhaogang/agent-api/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + AGENT_TOKEN))
@@ -109,7 +109,7 @@ class ZhaogangAgentApiControllerTest {
                 .andExpect(jsonPath("$.code").value(409))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("重新绑定 CODING 令牌")))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("重新绑定工作台 Agent 令牌"))));
+                        org.hamcrest.Matchers.containsString("重新绑定 Dev Hub Agent 令牌"))));
     }
 
     @Test

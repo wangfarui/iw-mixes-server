@@ -110,7 +110,7 @@ class ZhaogangAgentTokenServiceTest {
 
         assertThatThrownBy(() -> service.authenticate(null))
                 .isInstanceOf(ZhaogangAgentTokenException.class)
-                .hasMessageContaining("缺少工作台 Agent 令牌");
+                .hasMessageContaining("缺少 Dev Hub Agent 令牌");
     }
 
     @Test

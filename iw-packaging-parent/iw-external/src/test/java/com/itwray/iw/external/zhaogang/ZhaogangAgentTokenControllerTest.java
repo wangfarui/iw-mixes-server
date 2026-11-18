@@ -51,7 +51,7 @@ class ZhaogangAgentTokenControllerTest {
                 .build();
         when(sessionManager.resolve(any(), any())).thenReturn(session);
         when(tokenService.create(session)).thenThrow(new ZhaogangAgentCodingCredentialException(
-                "当前工作台账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌"));
+                "当前 Dev Hub 账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌"));
 
         mvc.perform(post("/external-service/api/zhaogang/agent-token"))
                 .andExpect(status().isOk())

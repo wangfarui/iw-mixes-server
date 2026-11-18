@@ -143,5 +143,5 @@ public class SkillsDevices {
 
     private String hash(String value) { return SkillPackage.sha256(value.getBytes(StandardCharsets.UTF_8)); }
 
-    static SkillProblem unauthorized() { return new SkillProblem(401, "请登录工作台或绑定 Skills 设备"); }
+    static SkillProblem unauthorized() { return new SkillProblem(401, "请连接 Dev Hub 或绑定 Skills 设备"); }
 }

@@ -110,7 +110,7 @@ public class ZhaogangSessionManager {
                     .build();
             response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         } catch (Exception e) {
-            throw new IllegalStateException("找钢工作台会话保存失败", e);
+            throw new IllegalStateException("Dev Hub 会话保存失败", e);
         }
     }
 

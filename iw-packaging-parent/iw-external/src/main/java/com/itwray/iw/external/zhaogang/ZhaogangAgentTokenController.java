@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/external-service/api/zhaogang/agent-token")
 @Validated
-@Tag(name = "找钢工作台 Agent 授权")
+@Tag(name = "Dev Hub Agent 授权")
 public class ZhaogangAgentTokenController {
 
     private final ZhaogangSessionManager sessionManager;

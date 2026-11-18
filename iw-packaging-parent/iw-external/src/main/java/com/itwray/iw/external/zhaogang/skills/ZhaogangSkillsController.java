@@ -157,7 +157,7 @@ public class ZhaogangSkillsController {
     private SkillLibrary.Actor browser(HttpServletRequest request, HttpServletResponse response) {
         noStore(response);
         if (!request.getMethod().equals("GET") && !"1".equals(request.getHeader("X-ZG-Skills-Request"))) {
-            throw new SkillProblem(403, "请从找钢工作台发起操作");
+            throw new SkillProblem(403, "请从 Dev Hub 发起操作");
         }
         ZhaogangSession session;
         try {

@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HexFormat;
 
-/** 工作台 Agent 令牌的生成、展示状态与 Bearer 鉴权。 */
+/** Dev Hub Agent 令牌的生成、展示状态与 Bearer 鉴权。 */
 @Service
 public class ZhaogangAgentTokenService {
 
@@ -50,7 +50,7 @@ public class ZhaogangAgentTokenService {
         requireIdentity(session);
         if (!credentials.exists(session.teamId(), session.userId())) {
             throw new ZhaogangAgentCodingCredentialException(
-                    "当前工作台账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌");
+                    "当前 Dev Hub 账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌");
         }
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
@@ -70,11 +70,11 @@ public class ZhaogangAgentTokenService {
         ZhaogangAgentTokenEntity entity = mapper.findByHash(digest(token));
         if (entity == null || entity.getCodingTeamId() == null || entity.getCodingTeamId() <= 0
                 || entity.getCodingUserId() == null || entity.getCodingUserId() <= 0) {
-            throw new ZhaogangAgentTokenException("工作台 Agent 令牌无效或已失效，请重新绑定");
+            throw new ZhaogangAgentTokenException("Dev Hub Agent 令牌无效或已失效，请重新绑定");
         }
         String codingToken = credentials.token(entity.getCodingTeamId(), entity.getCodingUserId())
                 .orElseThrow(() -> new ZhaogangAgentCodingCredentialException(
-                        "当前工作台账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌"));
+                        "当前 Dev Hub 账号尚未保存 CODING 令牌，请先在设置页重新绑定 CODING 令牌"));
         mapper.touch(entity.getCodingTeamId(), entity.getCodingUserId(), LocalDateTime.now());
         return new ZhaogangSession(codingToken, entity.getCodingUserId(), entity.getUserName(), entity.getAvatar(),
                 "", entity.getCodingTeamId());
@@ -103,15 +103,15 @@ public class ZhaogangAgentTokenService {
 
     private String bearerToken(String authorization) {
         if (StringUtils.isBlank(authorization)) {
-            throw new ZhaogangAgentTokenException("缺少工作台 Agent 令牌，请重新绑定");
+            throw new ZhaogangAgentTokenException("缺少 Dev Hub Agent 令牌，请重新绑定");
         }
         String token = authorization.trim();
         if (!token.regionMatches(true, 0, "Bearer ", 0, 7)) {
-            throw new ZhaogangAgentTokenException("工作台 Agent 令牌格式无效，请重新绑定");
+            throw new ZhaogangAgentTokenException("Dev Hub Agent 令牌格式无效，请重新绑定");
         }
         token = token.substring(7).trim();
         if (!token.startsWith(TOKEN_PREFIX) || token.length() > 128) {
-            throw new ZhaogangAgentTokenException("工作台 Agent 令牌无效或已失效，请重新绑定");
+            throw new ZhaogangAgentTokenException("Dev Hub Agent 令牌无效或已失效，请重新绑定");
         }
         return token;
     }
@@ -131,7 +131,7 @@ public class ZhaogangAgentTokenService {
     private void requireIdentity(ZhaogangSession session) {
         if (session == null || session.teamId() == null || session.teamId() <= 0
                 || session.userId() == null || session.userId() <= 0) {
-            throw new IllegalArgumentException("当前工作台账号信息不完整，请重新绑定 CODING 令牌");
+            throw new IllegalArgumentException("当前 Dev Hub 账号信息不完整，请重新绑定 CODING 令牌");
         }
     }
 }

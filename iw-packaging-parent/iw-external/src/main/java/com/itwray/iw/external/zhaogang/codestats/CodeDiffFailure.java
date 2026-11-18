@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 /** 细分 diff 失败原因，不将上游消息、响应内容或凭证写入日志和 API。 */
 enum CodeDiffFailure {
     UPSTREAM_LIMIT("CODING 拒绝返回过大的 diff", true),
-    RESPONSE_LIMIT("diff 响应超过工作台的大小上限", true),
+    RESPONSE_LIMIT("diff 响应超过 Dev Hub 的大小上限", true),
     INVALID_ARGUMENT("CODING 拒绝了 diff 请求参数", false),
     PERMISSION_DENIED("CODING 拒绝访问该提交的 diff", false),
     RATE_LIMITED("CODING 请求频率受限", false),

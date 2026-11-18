@@ -38,7 +38,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/external-service/api/zhaogang")
-@Tag(name = "找钢工作台团队")
+@Tag(name = "Dev Hub 团队")
 public class ZhaogangTeamController {
 
     private final ZhaogangSessionManager sessionManager;
@@ -123,7 +123,7 @@ public class ZhaogangTeamController {
     }
 
     @PutMapping("/workbench-teams/{teamId}/members/{userId}/coding-role")
-    @Operation(summary = "团队管理员更新成员的工作台 CODING 角色")
+    @Operation(summary = "团队管理员更新成员在 Dev Hub 中的 CODING 角色")
     public GeneralResponse<TeamDetail> updateMemberRole(
             @PathVariable long teamId, @PathVariable long userId, @RequestBody UpdateMemberRoleCommand command,
             HttpServletRequest request, HttpServletResponse response) {

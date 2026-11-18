@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/external-service/api/zhaogang/code-stats")
 @Validated
-@Tag(name = "找钢工作台代码统计")
+@Tag(name = "Dev Hub 代码统计")
 public class ZhaogangCodeStatsController {
 
     private final ZhaogangSessionManager sessionManager;

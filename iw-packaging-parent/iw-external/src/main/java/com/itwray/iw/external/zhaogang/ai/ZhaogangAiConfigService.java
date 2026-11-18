@@ -270,7 +270,7 @@ public class ZhaogangAiConfigService {
 
     private void requireIdentity(long teamId, long userId) {
         if (teamId <= 0 || userId <= 0) {
-            throw new IllegalArgumentException("找钢工作台会话信息不完整");
+            throw new IllegalArgumentException("Dev Hub 会话信息不完整");
         }
     }
 

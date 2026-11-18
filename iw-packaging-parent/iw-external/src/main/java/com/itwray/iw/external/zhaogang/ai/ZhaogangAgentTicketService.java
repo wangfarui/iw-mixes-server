@@ -36,7 +36,7 @@ public class ZhaogangAgentTicketService {
     public AgentTicket issue(long teamId, long userId, long iterationId,
                              String projectColumnName, String planColumnName) {
         if (teamId <= 0 || userId <= 0 || iterationId <= 0) {
-            throw new IllegalArgumentException("找钢工作台票据参数不完整");
+            throw new IllegalArgumentException("Dev Hub 票据参数不完整");
         }
         ZhaogangAiModels.ConfigCommand config = aiConfig.stored(teamId, userId);
         if (config == null || config.apiUrl() == null || config.apiUrl().isBlank()

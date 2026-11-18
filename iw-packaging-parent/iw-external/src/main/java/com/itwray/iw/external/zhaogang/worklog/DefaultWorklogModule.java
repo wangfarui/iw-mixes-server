@@ -142,7 +142,7 @@ class DefaultWorklogModule implements WorklogModule {
 
     private long requireTeamId(Long workbenchTeamId) {
         if (workbenchTeamId == null || workbenchTeamId <= 0) {
-            throw new CodingOpenApiException("团队工时必须选择工作台团队");
+            throw new CodingOpenApiException("团队工时必须选择 Dev Hub 团队");
         }
         return workbenchTeamId;
     }

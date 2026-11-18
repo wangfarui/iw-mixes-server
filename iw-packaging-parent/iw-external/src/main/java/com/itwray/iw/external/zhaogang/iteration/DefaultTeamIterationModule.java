@@ -905,10 +905,10 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             List<ResolvedMember> result = new ArrayList<>();
             for (MemberInput input : inputs) {
                 IterationTeamOption team = teams.get(input.teamId());
-                if (team == null) throw new TeamIterationException("所选工作台团队不存在或当前用户未加入");
+                if (team == null) throw new TeamIterationException("所选 Dev Hub 团队不存在或当前用户未加入");
                 IterationMemberOption member = team.members().stream()
                         .filter(item -> item.userId() == input.userId()).findFirst().orElse(null);
-                if (member == null) throw new TeamIterationException("所选成员不属于对应工作台团队");
+                if (member == null) throw new TeamIterationException("所选成员不属于对应 Dev Hub 团队");
                 result.add(new ResolvedMember(team.teamId(), team.teamName(),
                         new UserSnapshot(member.userId(), member.userName(), member.avatar()), input.roles()));
             }
@@ -1400,7 +1400,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             throw new TeamIterationException("迭代成员不正确");
         }
         if (workbenchTeams != null && members.stream().anyMatch(member -> member.teamId() <= 0)) {
-            throw new TeamIterationException("请选择每位成员所属的工作台团队");
+            throw new TeamIterationException("请选择每位成员所属的 Dev Hub 团队");
         }
     }
 
