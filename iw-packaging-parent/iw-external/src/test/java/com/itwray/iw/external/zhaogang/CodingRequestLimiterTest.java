@@ -8,8 +8,32 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CodingRequestLimiterTest {
+
+    @Test
+    void teamRateIsSharedAcrossTokensAndActionsKeepSeparateBudgets() throws Exception {
+        var properties = new ZhaogangProperties();
+        properties.setCodingConcurrencyPerToken(1);
+        properties.setCodingIssueQpsPerTeam(1);
+        properties.setCodingWorklogQpsPerTeam(1);
+        var limiter = new CodingRequestLimiter(properties);
+        limiter.acquire("admin", CodingRequestLimiter.ISSUE_ACTION);
+        limiter.release("admin");
+
+        assertThatThrownBy(() -> limiter.acquire("personal", CodingRequestLimiter.ISSUE_ACTION,
+                System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100)))
+                .isInstanceOfSatisfying(CodingOpenApiException.class,
+                        error -> assertThat(error.code()).isEqualTo("CODING_ADMISSION_TIMEOUT"));
+
+        limiter.acquire("personal", CodingRequestLimiter.WORKLOG_ACTION,
+                System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100));
+        limiter.release("personal");
+        assertThatThrownBy(() -> limiter.acquire("admin", CodingRequestLimiter.WORKLOG_ACTION,
+                System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100)))
+                .isInstanceOf(CodingOpenApiException.class);
+    }
 
     @Test
     void differentTokensDoNotShareConcurrencyPermit() throws Exception {

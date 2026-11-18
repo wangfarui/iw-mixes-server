@@ -35,6 +35,7 @@ public class CodingOpenApiException extends RuntimeException {
 
     private final String code;
     private final Integer httpStatus;
+    private final Long retryAfterMillis;
 
     public CodingOpenApiException(String message) {
         this("", "", message);
@@ -49,10 +50,16 @@ public class CodingOpenApiException extends RuntimeException {
     }
 
     public CodingOpenApiException(String action, String code, String message, Integer httpStatus, Throwable cause) {
+        this(action, code, message, httpStatus, cause, null);
+    }
+
+    CodingOpenApiException(String action, String code, String message, Integer httpStatus, Throwable cause,
+                           Long retryAfterMillis) {
         super(message, cause);
         this.action = action == null ? "" : action;
         this.code = code == null ? "" : code;
         this.httpStatus = httpStatus;
+        this.retryAfterMillis = retryAfterMillis;
     }
 
     public CodingOpenApiException(String message, Throwable cause) {
@@ -69,6 +76,10 @@ public class CodingOpenApiException extends RuntimeException {
 
     public Integer httpStatus() {
         return httpStatus;
+    }
+
+    Long retryAfterMillis() {
+        return retryAfterMillis;
     }
 
     public boolean isPermissionDenied() {

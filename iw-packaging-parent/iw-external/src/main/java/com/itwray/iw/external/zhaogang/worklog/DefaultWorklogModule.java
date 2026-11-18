@@ -124,8 +124,9 @@ class DefaultWorklogModule implements WorklogModule {
         if (scope == Scope.WORKBENCH_TEAM) {
             scopeDirectory.requireWorkbenchTeam(context, requireTeamId(workbenchTeamId));
         }
-        boolean pending = issueChecks.isPending(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null, checkId);
-        return new IssueCheckStatus(deletedIssues.revision(context.codingTeamId()), pending);
+        var progress = issueChecks.progress(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null, checkId);
+        return new IssueCheckStatus(deletedIssues.revision(context.codingTeamId()),
+                progress.pending(), progress.updates(), progress.incomplete());
     }
 
     private TeamSelection selection(Context context, Scope scope, Long workbenchTeamId) {

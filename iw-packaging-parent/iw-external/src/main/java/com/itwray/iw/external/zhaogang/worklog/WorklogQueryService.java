@@ -135,7 +135,7 @@ class WorklogQueryService {
                 : excludeDeleted(absenceItems, deleted);
         var check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
                 absenceItems == monthItems ? monthWorklogs.stream()
-                : Stream.concat(monthWorklogs.stream(), absenceWorklogs.stream()), deletionRevision, refresh);
+                : Stream.concat(monthWorklogs.stream(), absenceWorklogs.stream()), null, deletionRevision, refresh);
         long aggregationStarted = System.nanoTime();
         String syncedAt = syncedAt();
         Statistics statistics = statistics(scope, workbenchTeamId, members, month, schedule, leaveDatesByMember,
@@ -206,15 +206,16 @@ class WorklogQueryService {
         List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive, today());
         List<PendingWorklog> items = worklogsInRange(memberResults, from, toExclusive);
         List<PendingWorklog> worklogs = distinctWorklogs(excludeDeleted(items, findDeleted(context, items.stream())));
-        var check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
-                worklogs.stream(), deletionRevision, refresh);
         Comparator<Worklog> byRegistrationTime = Comparator.comparingLong(this::sortStart).reversed()
                 .thenComparing(Comparator.comparingLong(this::sortSecondary).reversed())
                 .thenComparing(Comparator.comparingLong(Worklog::id).reversed());
         Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
                 (map, member) -> map.put(member.userId(), member), LinkedHashMap::putAll);
-        List<Item> entries = worklogs.stream()
-                .sorted(Comparator.comparing(PendingWorklog::worklog, byRegistrationTime))
+        List<PendingWorklog> sorted = worklogs.stream()
+                .sorted(Comparator.comparing(PendingWorklog::worklog, byRegistrationTime)).toList();
+        var check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
+                sorted.stream(), team.host(), deletionRevision, refresh);
+        List<Item> entries = sorted.stream()
                 .map(item -> toItem(context, team, memberMap, item.issueKey() == null ? null
                         : issueChecks.cachedIssue(item.token(), item.issueKey()), item.worklog()))
                 .toList();
@@ -535,15 +536,20 @@ class WorklogQueryService {
     }
 
     private IssueCheck enqueueCheck(WorklogModule.Context context, Long workbenchTeamId, Stream<PendingWorklog> items,
-                                    long deletionRevision, boolean refresh) {
-        Map<String, Map<IssueKey, Set<Long>>> requested = new LinkedHashMap<>();
-        items.filter(item -> item.issueKey() != null && StringUtils.isNotBlank(item.token()))
-                .forEach(item -> {
-                    Set<Long> ids = requested.computeIfAbsent(item.token(), ignored -> new LinkedHashMap<>())
-                            .computeIfAbsent(item.issueKey(), ignored -> new LinkedHashSet<>());
-                    if (item.worklog().issueId() > 0) ids.add(item.worklog().issueId());
-                });
-        return new IssueCheck(deletionRevision, issueChecks.enqueue(context, workbenchTeamId, requested, refresh));
+                                    String teamHost, long deletionRevision, boolean refresh) {
+        Map<String, Map<IssueKey, WorklogIssueChecks.Candidate>> requested = new LinkedHashMap<>();
+        var iterator = items.iterator();
+        for (int index = 0; iterator.hasNext(); index++) {
+            PendingWorklog item = iterator.next();
+            if (item.issueKey() == null || StringUtils.isBlank(item.token())) continue;
+            var candidate = requested.computeIfAbsent(item.token(), ignored -> new LinkedHashMap<>())
+                    .computeIfAbsent(item.issueKey(), ignored -> new WorklogIssueChecks.Candidate());
+            if (item.worklog().issueId() > 0) candidate.issueIds().add(item.worklog().issueId());
+            if (teamHost != null) candidate.rows().add(index);
+        }
+        var submitted = issueChecks.enqueue(context, workbenchTeamId, requested, teamHost, refresh);
+        return new IssueCheck(deletionRevision, submitted == null ? null : submitted.id(),
+                submitted != null && submitted.incomplete());
     }
 
     private Item toItem(WorklogModule.Context context, Team team,

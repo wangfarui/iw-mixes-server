@@ -42,6 +42,11 @@ public class ZhaogangProperties {
     /** 单个 CODING 个人令牌的事项读取速率上限，0 表示不限制。 */
     private int codingIssueQpsPerToken = 25;
 
+    /** Shared read budgets for all PATs on the configured CODING team. */
+    private int codingIssueQpsPerTeam = 25;
+
+    private int codingWorklogQpsPerTeam = 25;
+
     /** 事项批量读取的进程级调度线程数，不代表 CODING 并发数。 */
     private int codingIssueExecutorConcurrency = 32;
 

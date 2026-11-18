@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang;
 
 import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -17,8 +18,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /** 批量查验事项，按 PAT 隔离缓存和并发。 */
+@Slf4j
 @Component
 public class CodingIssueSnapshotLoader implements AutoCloseable {
 
@@ -44,6 +47,16 @@ public class CodingIssueSnapshotLoader implements AutoCloseable {
     private record Batch(String token, String fingerprint, Iterator<IssueKey> issues) {
     }
 
+    private static final class TokenQueue {
+        private final Map<CompletableFuture<CheckedIssue>, Runnable> foreground = new LinkedHashMap<>();
+        private final Map<CompletableFuture<CheckedIssue>, Runnable> background = new LinkedHashMap<>();
+
+        void promote(CompletableFuture<CheckedIssue> future) {
+            Runnable queued = background.remove(future);
+            if (queued != null) foreground.put(future, queued);
+        }
+    }
+
     private final CodingOpenApiPort coding;
     private final Clock clock;
     private final Duration issueTtl;
@@ -53,11 +66,12 @@ public class CodingIssueSnapshotLoader implements AutoCloseable {
     private final int perToken;
     private final Map<CacheKey, CheckedIssue> cache = new LinkedHashMap<>(16, 0.75f, true);
     private final Map<CacheKey, CompletableFuture<CheckedIssue>> inFlight = new HashMap<>();
-    private final Map<String, ArrayDeque<Runnable>> waiting = new LinkedHashMap<>();
+    private final Map<String, TokenQueue> waiting = new LinkedHashMap<>();
     private final Map<String, Integer> activeByToken = new HashMap<>();
     private int active;
     private int queued;
     private boolean stopped;
+    private int foregroundStarts;
 
     @Autowired
     public CodingIssueSnapshotLoader(CodingOpenApiPort coding, ZhaogangProperties properties) {
@@ -96,6 +110,14 @@ public class CodingIssueSnapshotLoader implements AutoCloseable {
                 ? checked : null;
     }
 
+    /** Offers one lookup without blocking an HTTP caller on a large background batch. */
+    public synchronized CompletableFuture<CheckedIssue> offerWorklogIssue(
+            String token, IssueKey issue, boolean refresh, boolean foreground) {
+        if (stopped) return CompletableFuture.failedFuture(new IllegalStateException("CODING 事项查询已停止"));
+        var key = new CacheKey(CodingRequestLimiter.fingerprint(token), issue);
+        return offer(token, key, refresh, worklogTtl, true, foreground);
+    }
+
     private Map<String, Map<IssueKey, CheckedIssue>> load(
             Map<String, ? extends Collection<IssueKey>> requested, boolean refresh,
             Duration maxAge, boolean reuseMissing) {
@@ -127,22 +149,8 @@ public class CodingIssueSnapshotLoader implements AutoCloseable {
     private synchronized CompletableFuture<CheckedIssue> submit(String token, CacheKey key, boolean refresh,
                                                                 Duration maxAge, boolean reuseMissing) {
         while (!stopped) {
-            CheckedIssue cached = cache.get(key);
-            if (!refresh && !maxAge.isZero() && cached != null && (reuseMissing || !cached.lookup().missing())
-                    && clock.instant().isBefore(cached.checkedAt().plus(maxAge))) {
-                return CompletableFuture.completedFuture(cached);
-            }
-            CompletableFuture<CheckedIssue> running = inFlight.get(key);
-            if (running != null) return running;
-            if ((long) queued < (long) threads * 8) {
-                var future = new CompletableFuture<CheckedIssue>();
-                inFlight.put(key, future);
-                waiting.computeIfAbsent(key.tokenFingerprint(), ignored -> new ArrayDeque<>())
-                        .addLast(() -> fetch(token, key, future));
-                queued++;
-                dispatch();
-                return future;
-            }
+            var future = offer(token, key, refresh, maxAge, reuseMissing, !reuseMissing);
+            if (future != null) return future;
             try {
                 wait();
             } catch (InterruptedException error) {
@@ -153,23 +161,71 @@ public class CodingIssueSnapshotLoader implements AutoCloseable {
         throw new IllegalStateException("CODING 事项查询已停止");
     }
 
-    // 仅给有空闲配额的 PAT 分配线程，每次调度后轮换到队尾。
+    private CompletableFuture<CheckedIssue> offer(String token, CacheKey key, boolean refresh, Duration maxAge,
+                                                   boolean reuseMissing, boolean foreground) {
+        CheckedIssue cached = cache.get(key);
+        if (!refresh && !maxAge.isZero() && cached != null && (reuseMissing || !cached.lookup().missing())
+                && clock.instant().isBefore(cached.checkedAt().plus(maxAge))) {
+            return CompletableFuture.completedFuture(cached);
+        }
+        CompletableFuture<CheckedIssue> running = inFlight.get(key);
+        if (running != null) {
+            TokenQueue queue = waiting.get(key.tokenFingerprint());
+            if (foreground && queue != null) {
+                queue.promote(running);
+                dispatch();
+            }
+            return running;
+        }
+        // Leave queue capacity for interactive requests even during a large monthly check.
+        long capacity = (long) threads * (foreground ? 16 : 8);
+        if (queued >= capacity) return null;
+        var future = new CompletableFuture<CheckedIssue>();
+        inFlight.put(key, future);
+        var queue = waiting.computeIfAbsent(key.tokenFingerprint(), ignored -> new TokenQueue());
+        var requests = foreground ? queue.foreground : queue.background;
+        long queuedAt = System.nanoTime();
+        requests.put(future, () -> {
+            log.debug("CODING 事项调度 queueMs={}", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queuedAt));
+            fetch(token, key, future);
+        });
+        queued++;
+        dispatch();
+        return future;
+    }
+
+    private Map.Entry<String, TokenQueue> nextToken(boolean foreground) {
+        for (var entry : waiting.entrySet()) {
+            var queue = foreground ? entry.getValue().foreground : entry.getValue().background;
+            if (!queue.isEmpty() && activeByToken.getOrDefault(entry.getKey(), 0) < perToken) return entry;
+        }
+        return null;
+    }
+
+    // Rotate eligible PATs and let background checks keep progressing during sustained interactive traffic.
     private void dispatch() {
         while (!stopped && active < threads) {
-            var next = waiting.entrySet().stream()
-                    .filter(entry -> activeByToken.getOrDefault(entry.getKey(), 0) < perToken)
-                    .findFirst().orElse(null);
-            if (next == null) return;
+            boolean foreground = foregroundStarts < 8;
+            var next = nextToken(foreground);
+            if (next == null) {
+                foreground = !foreground;
+                next = nextToken(foreground);
+                if (next == null) return;
+            }
+            foregroundStarts = foreground ? Math.min(foregroundStarts + 1, 8) : 0;
             String fingerprint = next.getKey();
-            var tasks = waiting.remove(fingerprint);
-            Runnable task = tasks.removeFirst();
-            if (!tasks.isEmpty()) waiting.put(fingerprint, tasks);
+            var queue = waiting.remove(fingerprint);
+            var requests = foreground ? queue.foreground : queue.background;
+            var iterator = requests.values().iterator();
+            Runnable request = iterator.next();
+            iterator.remove();
+            if (!queue.foreground.isEmpty() || !queue.background.isEmpty()) waiting.put(fingerprint, queue);
             queued--;
             active++;
             activeByToken.merge(fingerprint, 1, Integer::sum);
             executor.execute(() -> {
                 try {
-                    task.run();
+                    request.run();
                 } finally {
                     synchronized (this) {
                         active--;

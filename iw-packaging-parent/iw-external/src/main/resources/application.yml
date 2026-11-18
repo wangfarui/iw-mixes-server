@@ -56,6 +56,8 @@ iw:
       web-env: ${IW_WEB_ENV:dev}
       coding-concurrency-per-token: ${IW_CODING_CONCURRENCY_PER_TOKEN:4}
       coding-issue-qps-per-token: ${IW_CODING_ISSUE_QPS_PER_TOKEN:25}
+      coding-issue-qps-per-team: ${IW_CODING_ISSUE_QPS_PER_TEAM:25}
+      coding-worklog-qps-per-team: ${IW_CODING_WORKLOG_QPS_PER_TEAM:25}
       coding-issue-executor-concurrency: ${IW_CODING_ISSUE_EXECUTOR_CONCURRENCY:32}
       coding-issue-cache-seconds: ${IW_CODING_ISSUE_CACHE_SECONDS:30}
       code-git-line-stats-enabled: ${IW_ZHAOGANG_CODE_GIT_LINE_STATS_ENABLED:true}

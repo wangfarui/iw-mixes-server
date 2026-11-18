@@ -819,6 +819,43 @@ class CodingOpenApiClientTest {
                 new CodingOpenApiPort.CodingCommitQuery(1, 1, "CODING", "main", "2026-10-01", "2026-10-31", 1, 100)));
     }
 
+    @Test
+    void retriesRateLimitedIssueAfterRetryAfterAndKeepsWorklogActionAvailable() throws Exception {
+        var issueCalls = new java.util.concurrent.atomic.AtomicInteger();
+        var firstIssueRequest = new java.util.concurrent.CountDownLatch(1);
+        var retryStarted = new java.util.concurrent.atomic.AtomicLong();
+        var firstStarted = new java.util.concurrent.atomic.AtomicLong();
+        CodingOpenApiClient client = client(exchange -> {
+            JsonNode request = objectMapper.readTree(exchange.getRequestBody());
+            if ("DescribeAllProjectsIssueWorkLogList".equals(request.path("Action").asText())) {
+                respond(exchange, "{\"Response\":{\"WorkLogs\":[]}}");
+                return;
+            }
+            if (issueCalls.incrementAndGet() == 1) {
+                firstStarted.set(System.nanoTime());
+                exchange.getResponseHeaders().set("Retry-After", "1");
+                exchange.sendResponseHeaders(429, -1);
+                exchange.close();
+                firstIssueRequest.countDown();
+                return;
+            }
+            retryStarted.set(System.nanoTime());
+            respond(exchange, "{\"Response\":{\"Issue\":{\"Code\":1,\"Title\":\"恢复查询\"}}}");
+        });
+        var workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var issue = workers.submit(() -> client.issue("admin", "project", 1));
+            assertTrue(firstIssueRequest.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            var logs = workers.submit(() -> client.worklogPage("admin", 1, 2, 3, 0, 1000));
+            assertTrue(logs.get(2, java.util.concurrent.TimeUnit.SECONDS).items().isEmpty());
+            assertEquals("恢复查询", issue.get(4, java.util.concurrent.TimeUnit.SECONDS).title());
+            assertEquals(2, issueCalls.get());
+            assertTrue(retryStarted.get() - firstStarted.get() >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1));
+        } finally {
+            workers.shutdownNow();
+        }
+    }
+
     private CodingOpenApiClient client(com.sun.net.httpserver.HttpHandler handler) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/open-api", handler);

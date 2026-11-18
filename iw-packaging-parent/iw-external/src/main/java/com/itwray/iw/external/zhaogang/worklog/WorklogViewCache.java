@@ -108,7 +108,9 @@ class WorklogViewCache {
 
     void putEntries(String key, Entries entries) {
         // 有待补齐详情的响应可以先展示，后台结束后重读时使用已查到的事项。
-        if (entries.issueCheck() == null || entries.issueCheck().checkId() == null) putByKey(key, entries);
+        if (entries.issueCheck() == null || entries.issueCheck().checkId() == null && !entries.issueCheck().incomplete()) {
+            putByKey(key, entries);
+        }
     }
 
     private void putByKey(String key, Object result) {

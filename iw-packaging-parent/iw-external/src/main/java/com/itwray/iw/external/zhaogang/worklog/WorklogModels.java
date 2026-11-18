@@ -88,10 +88,16 @@ public final class WorklogModels {
         }
     }
 
-    public record IssueCheck(long deletionRevision, String checkId) {
+    public record IssueCheck(long deletionRevision, String checkId, boolean incomplete) {
+        public IssueCheck(long deletionRevision, String checkId) {
+            this(deletionRevision, checkId, false);
+        }
     }
 
-    public record IssueCheckStatus(long deletionRevision, boolean pending) {
+    public record IssueUpdate(int rowIndex, Issue issue, Project project, String issueUrl) {
+    }
+
+    public record IssueCheckStatus(long deletionRevision, boolean pending, List<IssueUpdate> updates, boolean incomplete) {
     }
 
     record MonthlySnapshot(Statistics statistics, Absence absences) {

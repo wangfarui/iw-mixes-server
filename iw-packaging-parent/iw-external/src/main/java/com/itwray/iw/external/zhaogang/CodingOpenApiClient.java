@@ -30,9 +30,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -43,6 +45,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 /**
  * CODING OpenAPI 的 HTTP adapter。只记录调用结果，不输出令牌和原始响应。
@@ -735,10 +739,14 @@ class CodingOpenApiClient implements CodingOpenApiPort {
     private JsonNode invoke(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
         boolean repositoryRead = java.util.Set.of("DescribeMyDepots", "DescribeProjectDepotBranches",
                 "DescribeGitCommitsInPage", "DescribeGitCommitDiff").contains(action);
-        boolean worklogRead = "DescribeAllProjectsIssueWorkLogList".equals(action);
+        boolean protectedRead = CodingRequestLimiter.WORKLOG_ACTION.equals(action)
+                || CodingRequestLimiter.ISSUE_ACTION.equals(action);
+        long deadline = protectedRead
+                ? System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(properties.getRequestTimeoutMs())
+                : Long.MAX_VALUE;
         for (int attempt = 0; ; attempt++) {
             try {
-                return invokeOnce(token, action, parameters, maxResponseBytes);
+                return invokeOnce(token, action, parameters, maxResponseBytes, deadline);
             } catch (CodingOpenApiException error) {
                 String code = error.code();
                 boolean rateLimited = code.startsWith("RequestLimitExceeded") || "HTTP_429".equals(code)
@@ -746,12 +754,20 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 boolean transientFailure = rateLimited || code.startsWith("InternalError") || code.startsWith("HTTP_5")
                         || (error.httpStatus() != null && error.httpStatus() >= 500)
                         || error.getCause() instanceof java.io.IOException;
-                if (!(repositoryRead && transientFailure || worklogRead && rateLimited)
-                        || Thread.currentThread().isInterrupted()) throw error;
+                if (protectedRead && rateLimited) {
+                    long delay = error.retryAfterMillis() == null
+                            ? ThreadLocalRandom.current().nextLong(400L << Math.min(attempt, 2), 601L << Math.min(attempt, 2))
+                            : error.retryAfterMillis();
+                    requestLimiter.defer(action, delay);
+                    log.debug("CODING read throttled action={} attempt={} cooldownMs={}", action, attempt + 1, delay);
+                    if (attempt < 2 && TimeUnit.MILLISECONDS.toNanos(delay) < deadline - System.nanoTime()
+                            && !Thread.currentThread().isInterrupted()) continue;
+                    throw error;
+                }
+                if (!repositoryRead || !transientFailure || Thread.currentThread().isInterrupted()) throw error;
                 if (attempt >= 2) {
                     throw new CodingOpenApiException(action, code,
-                            repositoryRead ? "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描"
-                                    : "CODING 工时请求达到频率限制，请稍后重试",
+                            "CODING 代码仓库服务暂时不可用，已重试 3 次，请稍后重新扫描",
                             error.httpStatus(), error.getCause());
                 }
                 try {
@@ -764,19 +780,49 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         }
     }
 
-    private JsonNode invokeOnce(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
+    private Long retryAfter(HttpResponse<?> response) {
+        var header = response.headers().firstValue("Retry-After");
+        if (header.isEmpty()) return null;
+        String value = header.get().trim();
+        try {
+            long seconds = Long.parseLong(value);
+            if (seconds < 0) return null;
+            return TimeUnit.SECONDS.toMillis(seconds);
+        } catch (NumberFormatException notSeconds) {
+            try {
+                Instant retryAt = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+                return Math.max(0, Duration.between(Instant.now(), retryAt).toMillis());
+            } catch (DateTimeException | ArithmeticException invalidDate) {
+                return null;
+            }
+        }
+    }
+
+    private JsonNode invokeOnce(String token, String action, Map<String, Object> parameters, long maxResponseBytes,
+                                long deadline) {
+        long start = System.nanoTime();
+        long admitted = start;
         boolean acquired = false;
         Integer httpStatus = null;
         try {
-            requestLimiter.acquire(token, action);
+            requestLimiter.acquire(token, action, deadline);
             acquired = true;
+            admitted = System.nanoTime();
             ObjectNode body = objectMapper.createObjectNode();
             body.put("Action", action);
             parameters.forEach((key, value) -> body.set(key, objectMapper.valueToTree(value)));
+            long timeoutMs = "DescribeGitCommitDiff".equals(action)
+                    ? Math.max(properties.getRequestTimeoutMs(), properties.getCodeDiffTimeoutMs())
+                    : properties.getRequestTimeoutMs();
+            if (deadline != Long.MAX_VALUE) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    throw new CodingOpenApiException(action, "CODING_ADMISSION_TIMEOUT", "CODING 请求排队超时，请稍后重试");
+                }
+                timeoutMs = Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining));
+            }
             HttpRequest request = HttpRequest.newBuilder(URI.create(properties.safeApiUrl()))
-                    .timeout(Duration.ofMillis("DescribeGitCommitDiff".equals(action)
-                            ? Math.max(properties.getRequestTimeoutMs(), properties.getCodeDiffTimeoutMs())
-                            : properties.getRequestTimeoutMs()))
+                    .timeout(Duration.ofMillis(timeoutMs))
                     .header(HttpHeaders.AUTHORIZATION, "token " + token)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
@@ -797,7 +843,8 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 response = root == null ? objectMapper.missingNode() : root.path("Response");
             } catch (com.fasterxml.jackson.core.JsonProcessingException invalidJson) {
                 if (httpStatus < 200 || httpStatus >= 300) {
-                    throw new CodingOpenApiException(action, "HTTP_" + httpStatus, "CODING 请求失败", httpStatus, null);
+                    throw new CodingOpenApiException(action, "HTTP_" + httpStatus, "CODING 请求失败", httpStatus, null,
+                            retryAfter(httpResponse));
                 }
                 if ("DescribeGitCommitDiff".equals(action)) {
                     throw new CodingOpenApiException(action, "InvalidDiffResponse", "CODING 未返回可用的 diff", httpStatus, null);
@@ -813,7 +860,8 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                     safeMessage = safeMessage.replace(token, "[redacted]");
                     code = code.replace(token, "[redacted]");
                 }
-                throw new CodingOpenApiException(action, code, safeMessage, httpResponse.statusCode(), null);
+                throw new CodingOpenApiException(action, code, safeMessage, httpResponse.statusCode(), null,
+                        retryAfter(httpResponse));
             }
             return response;
         } catch (CodingOpenApiException e) {
@@ -825,6 +873,12 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             throw new CodingOpenApiException(action, "", "CODING 服务暂不可用", httpStatus, e);
         } finally {
             if (acquired) requestLimiter.release(token);
+            if (deadline != Long.MAX_VALUE && log.isDebugEnabled()) {
+                long end = System.nanoTime();
+                log.debug("CODING read action={} status={} admissionMs={} upstreamMs={}", action, httpStatus,
+                        TimeUnit.NANOSECONDS.toMillis((acquired ? admitted : end) - start),
+                        acquired ? TimeUnit.NANOSECONDS.toMillis(end - admitted) : 0);
+            }
         }
     }
 

@@ -25,6 +25,44 @@ import static org.mockito.Mockito.when;
 class CodingIssueSnapshotLoaderTest {
 
     @Test
+    void promotesSharedPatLookupAndLetsIndependentPersonalPatRunWhileTeamIsBlocked() throws Exception {
+        var coding = mock(CodingOpenApiPort.class);
+        var properties = new ZhaogangProperties();
+        properties.setCodingConcurrencyPerToken(1);
+        properties.setCodingIssueExecutorConcurrency(4);
+        var adminStarted = new CountDownLatch(1);
+        var releaseAdmin = new CountDownLatch(1);
+        var order = new java.util.concurrent.CopyOnWriteArrayList<Long>();
+        when(coding.issue("admin", "project", 1L)).thenAnswer(call -> {
+            adminStarted.countDown();
+            if (!releaseAdmin.await(5, TimeUnit.SECONDS)) throw new AssertionError("team lookup was not released");
+            return null;
+        });
+        when(coding.issue("admin", "project", 2L)).thenAnswer(call -> { order.add(2L); return null; });
+        when(coding.issue("admin", "project", 3L)).thenAnswer(call -> { order.add(3L); return null; });
+
+        try (var loader = new CodingIssueSnapshotLoader(coding, properties)) {
+            var active = loader.offerWorklogIssue("admin", new CodingIssueSnapshotLoader.IssueKey("project", 1), false, false);
+            try {
+                assertThat(adminStarted.await(2, TimeUnit.SECONDS)).isTrue();
+                var background = loader.offerWorklogIssue("admin", new CodingIssueSnapshotLoader.IssueKey("project", 2), false, false);
+                var next = new CodingIssueSnapshotLoader.IssueKey("project", 3);
+                var shared = loader.offerWorklogIssue("admin", next, false, false);
+                assertThat(loader.offerWorklogIssue("admin", next, false, true)).isSameAs(shared);
+                loader.offerWorklogIssue("personal", next, false, true).get(2, TimeUnit.SECONDS);
+                assertThat(shared.isDone()).isFalse();
+                releaseAdmin.countDown();
+                active.get(2, TimeUnit.SECONDS);
+                shared.get(2, TimeUnit.SECONDS);
+                background.get(2, TimeUnit.SECONDS);
+                assertThat(order).containsExactly(3L, 2L);
+            } finally {
+                releaseAdmin.countDown();
+            }
+        }
+    }
+
+    @Test
     void successfulCodingEditMustNotLeaveOldTitleInSnapshot() {
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         ZhaogangProperties properties = new ZhaogangProperties();
