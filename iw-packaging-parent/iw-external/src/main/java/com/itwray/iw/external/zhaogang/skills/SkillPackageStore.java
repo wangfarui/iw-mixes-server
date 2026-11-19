@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -31,11 +32,21 @@ class SkillPackageStore {
         }
         this.bucket = bucket;
         this.oss = endpoint.isBlank() || bucket.isBlank() || accessKey.isBlank() || secretKey.isBlank()
-                ? null : new OSSClientBuilder().build(endpoint, accessKey, secretKey);
+                ? null : new OSSClientBuilder().build(serviceEndpoint(endpoint, bucket), accessKey, secretKey);
         this.local = directory.isBlank() ? null : Path.of(directory).toAbsolutePath().normalize();
     }
 
     boolean enabled() { return oss != null || local != null; }
+
+    private static String serviceEndpoint(String endpoint, String bucket) {
+        String host = URI.create(endpoint).getHost();
+        // OSS SDK appends the bucket itself. Accept a copied OSS bucket URL as well.
+        if (host != null && host.startsWith(bucket + ".")
+                && host.substring(bucket.length() + 1).matches("oss-[a-z0-9-]+\\.aliyuncs\\.com")) {
+            return "https://" + endpoint.substring("https://".length() + bucket.length() + 1);
+        }
+        return endpoint;
+    }
 
     void put(String id, byte[] bytes) {
         available();
