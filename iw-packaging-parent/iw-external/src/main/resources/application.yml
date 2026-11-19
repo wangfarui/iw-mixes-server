@@ -70,6 +70,10 @@ iw:
       calendar-manager-user-id: ${IW_ZHAOGANG_CALENDAR_MANAGER_USER_ID:9292850}
       # Agent 票据兑换必须走 API 入口；web.itwray.com 仅提供前端静态资源。
       agent-backend-url: ${IW_ZHAOGANG_AGENT_BACKEND_URL:https://api.itwray.com}
+      k8s-default-tokens:
+        test: ${IW_ZHAOGANG_K8S_DEFAULT_TOKEN_TEST:}
+        uat: ${IW_ZHAOGANG_K8S_DEFAULT_TOKEN_UAT:}
+        prd: ${IW_ZHAOGANG_K8S_DEFAULT_TOKEN_PRD:}
       ai-default-model: ${IW_ZHAOGANG_AI_DEFAULT_MODEL:gpt-5.6-terra}
       ai-connect-timeout-ms: ${IW_ZHAOGANG_AI_CONNECT_TIMEOUT_MS:5000}
       ai-request-timeout-ms: ${IW_ZHAOGANG_AI_REQUEST_TIMEOUT_MS:60000}

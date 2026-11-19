@@ -1,8 +1,11 @@
 package com.itwray.iw.external.zhaogang;
 
 import lombok.Data;
+import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.util.Map;
 
 /**
  * Dev Hub 的固定 CODING 连接配置。
@@ -17,6 +20,9 @@ public class ZhaogangProperties {
 
     /** 复用已有内部密钥作为 Cookie 加密材料，避免增加生产配置项。 */
     private String sessionKey = "dev-secret";
+
+    @ToString.Exclude
+    private Map<String, String> k8sDefaultTokens = Map.of();
 
     private int sessionDays = 30;
 

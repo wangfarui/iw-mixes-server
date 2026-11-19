@@ -20,6 +20,7 @@ import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.UpdateRole;
 import com.itwray.iw.external.zhaogang.k8s.K8sTokenService;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.K8sTokenStatus;
+import com.itwray.iw.external.zhaogang.ZhaogangModels.K8sTokenValue;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +32,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpHeaders;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,13 +65,6 @@ public class ZhaogangController {
 
     private final K8sTokenService k8sTokens;
 
-    public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
-                              ZhaogangCatalogService catalogService, ZhaogangProperties properties,
-                              WorklogModule worklogModule) {
-        this(sessionManager, workbenchService, catalogService, properties, worklogModule, null);
-    }
-
-    @Autowired
     public ZhaogangController(ZhaogangSessionManager sessionManager, ZhaogangWorkbenchService workbenchService,
                               ZhaogangCatalogService catalogService, ZhaogangProperties properties,
                               WorklogModule worklogModule, K8sTokenService k8sTokens) {
@@ -131,12 +124,7 @@ public class ZhaogangController {
     @Operation(summary = "查询当前用户的 K8s Token 配置状态")
     public GeneralResponse<K8sTokenStatus> k8sTokenStatus(HttpServletRequest request, HttpServletResponse response) {
         ZhaogangSession session = sessionManager.resolve(request, response);
-        if (k8sTokens == null) {
-            return GeneralResponse.success(new K8sTokenStatus(List.of("test", "uat", "prd"),
-                    java.util.Map.of("test", false, "uat", false, "prd", false)));
-        }
-        return GeneralResponse.success(new K8sTokenStatus(k8sTokens.environments(),
-                k8sTokens.statuses(session.teamId() == null ? 0 : session.teamId(), session.userId())));
+        return k8sTokenStatus(session, response);
     }
 
     @PostMapping("/k8s-tokens")
@@ -144,24 +132,18 @@ public class ZhaogangController {
     public GeneralResponse<K8sTokenStatus> upsertK8sToken(@Valid @RequestBody com.itwray.iw.external.zhaogang.k8s.ZhaogangK8sTokenDto dto,
                                                           HttpServletRequest request, HttpServletResponse response) {
         ZhaogangSession session = sessionManager.resolve(request, response);
-        if (k8sTokens == null) {
-            throw new IllegalStateException("K8s Token 服务未初始化");
-        }
         k8sTokens.upsert(session.teamId() == null ? 0 : session.teamId(), session.userId(), dto.getEnvironment(), dto.getToken());
-        return k8sTokenStatus(request, response);
+        return k8sTokenStatus(session, response);
     }
 
     @GetMapping("/k8s-tokens/{environment}")
     @Operation(summary = "读取当前用户指定环境的 K8s Token")
-    public GeneralResponse<TokenValue> k8sToken(@PathVariable String environment,
+    public GeneralResponse<K8sTokenValue> k8sToken(@PathVariable String environment,
                                                 HttpServletRequest request, HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store, max-age=0");
         response.setHeader(HttpHeaders.PRAGMA, "no-cache");
         ZhaogangSession session = sessionManager.resolve(request, response);
-        if (k8sTokens == null) {
-            throw new IllegalStateException("K8s Token 服务未初始化");
-        }
-        return GeneralResponse.success(new TokenValue(k8sTokens.token(session.teamId() == null ? 0 : session.teamId(), session.userId(), environment)));
+        return GeneralResponse.success(k8sTokens.token(session.teamId() == null ? 0 : session.teamId(), session.userId(), environment));
     }
 
     @DeleteMapping("/k8s-tokens/{environment}")
@@ -169,10 +151,13 @@ public class ZhaogangController {
     public GeneralResponse<K8sTokenStatus> deleteK8sToken(@PathVariable String environment,
                                                           HttpServletRequest request, HttpServletResponse response) {
         ZhaogangSession session = sessionManager.resolve(request, response);
-        if (k8sTokens != null) {
-            k8sTokens.delete(session.teamId() == null ? 0 : session.teamId(), session.userId(), environment);
-        }
-        return k8sTokenStatus(request, response);
+        k8sTokens.delete(session.teamId() == null ? 0 : session.teamId(), session.userId(), environment);
+        return k8sTokenStatus(session, response);
+    }
+
+    private GeneralResponse<K8sTokenStatus> k8sTokenStatus(ZhaogangSession session, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return GeneralResponse.success(k8sTokens.statuses(session.teamId() == null ? 0 : session.teamId(), session.userId()));
     }
 
     @GetMapping("/build-plan-catalog")

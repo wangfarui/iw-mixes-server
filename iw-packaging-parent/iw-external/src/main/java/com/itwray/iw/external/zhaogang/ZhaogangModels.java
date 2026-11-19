@@ -3,6 +3,7 @@ package com.itwray.iw.external.zhaogang;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.RolePreference;
 
 import java.util.List;
+import java.util.Map;
 
 /** 对 Web 保持稳定的 Dev Hub 返回模型。 */
 public final class ZhaogangModels {
@@ -18,7 +19,20 @@ public final class ZhaogangModels {
     public record TokenValue(String token) {
     }
 
-    public record K8sTokenStatus(List<String> environments, java.util.Map<String, Boolean> configured) {
+    public record K8sTokenStatus(List<String> environments, Map<String, Boolean> configured,
+                                 Map<String, K8sTokenDisplay> credentials) {
+    }
+
+    public enum K8sTokenSource { PERSONAL, DEFAULT, NONE }
+
+    public record K8sTokenDisplay(K8sTokenSource source, String maskedToken, String revision, boolean defaultAvailable) {
+    }
+
+    public record K8sTokenValue(String token, String revision) {
+        @Override
+        public String toString() {
+            return "K8sTokenValue[revision=" + revision + "]";
+        }
     }
 
     public record Project(long id, String name, String displayName) {

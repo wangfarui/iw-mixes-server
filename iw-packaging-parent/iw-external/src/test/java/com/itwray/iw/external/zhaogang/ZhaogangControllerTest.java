@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang;
 
 import com.itwray.iw.external.zhaogang.ZhaogangModels.TokenValue;
+import com.itwray.iw.external.zhaogang.k8s.K8sTokenService;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModule;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -22,7 +23,7 @@ class ZhaogangControllerTest {
         ZhaogangWorkbenchService workbenchService = mock(ZhaogangWorkbenchService.class);
         ZhaogangCatalogService catalogService = mock(ZhaogangCatalogService.class);
         ZhaogangController controller = new ZhaogangController(sessionManager, workbenchService, catalogService,
-                new ZhaogangProperties(), mock(WorklogModule.class));
+                new ZhaogangProperties(), mock(WorklogModule.class), mock(K8sTokenService.class));
         ZhaogangSession session = new ZhaogangSession("test-token", 183478L, "tester", "", "g-iijw5014");
         MockHttpServletResponse response = new MockHttpServletResponse();
         when(sessionManager.resolve(any(), any())).thenReturn(session);
@@ -41,7 +42,7 @@ class ZhaogangControllerTest {
         ZhaogangWorkbenchService workbenchService = mock(ZhaogangWorkbenchService.class);
         ZhaogangCatalogService catalogService = mock(ZhaogangCatalogService.class);
         ZhaogangController controller = new ZhaogangController(sessionManager, workbenchService, catalogService,
-                new ZhaogangProperties(), mock(WorklogModule.class));
+                new ZhaogangProperties(), mock(WorklogModule.class), mock(K8sTokenService.class));
         ZhaogangSession corrupted = new ZhaogangSession("test-token", 9292850L, "??????(?????????)", "", "g-iijw5014");
         ZhaogangSession repaired = new ZhaogangSession("test-token", 9292850L, "步步(王发瑞)", "avatar", "g-iijw5014");
         MockHttpServletRequest request = new MockHttpServletRequest();
