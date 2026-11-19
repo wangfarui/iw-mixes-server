@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -134,6 +135,52 @@ class DefaultWorklogModuleTest {
 
         assertThat(module.entries(context, "2026-08-01", "2026-08-07", "SELF", null, false)).isSameAs(fresh);
         verify(cache).putEntries("test-entries-key", fresh);
+    }
+
+    @Test
+    void entriesPageSortsAcrossMembersAndFiltersBeforeSlicingTheCachedSnapshot() {
+        WorklogScopeDirectory directory = mock(WorklogScopeDirectory.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        Team team = new Team(1L, "研发团队", "https://fixture.invalid");
+        var first = new WorklogModule.MemberCredential(100L, "成员甲", "", "first-token");
+        var second = new WorklogModule.MemberCredential(200L, "成员乙", "", "second-token");
+        when(directory.workbenchTeam(context, 1L))
+                .thenReturn(new WorklogScopeDirectory.TeamSelection(team, List.of(first, second)));
+        long start = Instant.parse("2026-08-05T01:00:00Z").toEpochMilli();
+        for (var member : List.of(first, second)) {
+            // CODING returns oldest first in this fixture. Adjacent rows alternate members after sorting.
+            long firstId = member.userId() == 100L ? 1 : 2;
+            List<Worklog> rows = LongStream.iterate(firstId, id -> id <= 24, id -> id + 2)
+                    .mapToObj(id -> new Worklog(id, 11L, 100 + id, "project-a", member.userId(),
+                            BigDecimal.ONE, "", start + id, start + id, start + id))
+                    .toList();
+            when(coding.worklogPage(eq(member.token()), anyLong(), anyLong(), eq(member.userId()), eq(0), eq(1000)))
+                    .thenReturn(new WorklogPage(rows));
+        }
+        var module = module(directory, queryService(coding), redisCache());
+        var page1 = module.entriesPage(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", 1L, null, null, false);
+        var page2 = module.entriesPage(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", 1L, null, page1.nextCursor(), false);
+        var page3 = module.entriesPage(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", 1L, null, page2.nextCursor(), false);
+        var filtered = module.entriesPage(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", 1L, 200L, null, false);
+        var filteredNext = module.entriesPage(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", 1L, 200L,
+                filtered.nextCursor(), false);
+
+        assertThat(page1.entries().items()).extracting(WorklogModels.Item::workLogId)
+                .containsExactly(24L, 23L, 22L, 21L, 20L, 19L, 18L, 17L, 16L, 15L);
+        assertThat(page2.entries().items()).extracting(WorklogModels.Item::workLogId)
+                .containsExactly(14L, 13L, 12L, 11L, 10L, 9L, 8L, 7L, 6L, 5L);
+        assertThat(page3.entries().items()).extracting(WorklogModels.Item::workLogId).containsExactly(4L, 3L, 2L, 1L);
+        assertThat(page3.nextCursor()).isNull();
+        assertThat(page3.entries().totalHours()).isEqualByComparingTo("24");
+        assertThat(filtered.entries().items()).hasSize(10).allMatch(row -> row.user().id() == 200L);
+        assertThat(filteredNext.entries().items()).extracting(WorklogModels.Item::workLogId).containsExactly(4L, 2L);
+        assertThat(filteredNext.entries().totalHours()).isEqualByComparingTo("12");
+        assertThat(filteredNext.nextCursor()).isNull();
+        assertThatThrownBy(() -> module.entriesPage(context, "2026-08-01", "2026-08-07", "WORKBENCH_TEAM", 1L,
+                999L, null, false)).isInstanceOf(CodingOpenApiException.class);
+        for (var member : List.of(first, second)) {
+            verify(coding).worklogPage(eq(member.token()), anyLong(), anyLong(), eq(member.userId()), eq(0), eq(1000));
+        }
     }
 
     private DefaultWorklogModule module(WorklogScopeDirectory directory, WorklogQueryService queryService,

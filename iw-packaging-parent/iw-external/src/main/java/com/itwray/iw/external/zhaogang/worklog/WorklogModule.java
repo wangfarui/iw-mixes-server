@@ -3,6 +3,7 @@ package com.itwray.iw.external.zhaogang.worklog;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 
@@ -13,6 +14,9 @@ public interface WorklogModule {
     Statistics statistics(Context context, String month, String scope, Long workbenchTeamId, boolean refresh);
 
     Entries entries(Context context, String from, String to, String scope, Long workbenchTeamId, boolean refresh);
+
+    EntriesPage entriesPage(Context context, String from, String to, String scope, Long workbenchTeamId,
+                            Long memberUserId, String cursor, boolean refresh);
 
     Absence absences(Context context, String month, String scope, Long workbenchTeamId, boolean refresh);
 

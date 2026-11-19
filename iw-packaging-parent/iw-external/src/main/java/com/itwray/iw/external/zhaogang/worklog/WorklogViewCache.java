@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.credential.CodingCredentialService;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesSnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MonthlySnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Scope;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -87,6 +88,16 @@ class WorklogViewCache {
 
     Optional<Entries> getEntries(String key) {
         return getByKey(key, Entries.class);
+    }
+
+    EntriesSnapshot loadEntriesSnapshot(String key, boolean refresh, Supplier<EntriesSnapshot> loader) {
+        if (!refresh) {
+            Optional<EntriesSnapshot> cached = getByKey(key, EntriesSnapshot.class);
+            if (cached.isPresent()) return cached.get();
+        }
+        EntriesSnapshot snapshot = loader.get();
+        putByKey(key, snapshot);
+        return snapshot;
     }
 
     private <T> Optional<T> getByKey(String key, Class<T> type) {

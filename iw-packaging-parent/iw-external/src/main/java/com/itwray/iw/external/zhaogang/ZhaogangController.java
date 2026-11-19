@@ -12,6 +12,7 @@ import com.itwray.iw.external.zhaogang.ZhaogangModels.SessionStatus;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.TokenValue;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
@@ -245,6 +246,20 @@ public class ZhaogangController {
                                                     HttpServletRequest request, HttpServletResponse response) {
         return GeneralResponse.success(worklogModule.entries(worklogContext(sessionManager.resolve(request, response)),
                 from, to, scope, workbenchTeamId, refresh));
+    }
+
+    @GetMapping("/worklogs/entries/page")
+    @Operation(summary = "分页查询日期范围内的工时登记")
+    public GeneralResponse<EntriesPage> worklogEntriesPage(@RequestParam @NotBlank String from,
+                                                          @RequestParam @NotBlank String to,
+                                                          @RequestParam @NotBlank String scope,
+                                                          @RequestParam(required = false) Long workbenchTeamId,
+                                                          @RequestParam(required = false) Long memberUserId,
+                                                          @RequestParam(required = false) String cursor,
+                                                          @RequestParam(defaultValue = "false") boolean refresh,
+                                                          HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(worklogModule.entriesPage(worklogContext(sessionManager.resolve(request, response)),
+                from, to, scope, workbenchTeamId, memberUserId, cursor, refresh));
     }
 
     @GetMapping("/worklogs/absences")

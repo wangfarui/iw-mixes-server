@@ -6,6 +6,7 @@ import com.itwray.iw.external.zhaogang.calendar.PersonalLeaveResolver;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Schedule;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarResolver;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MonthlySnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
@@ -68,27 +69,42 @@ class DefaultWorklogModule implements WorklogModule {
     @Override
     public Entries entries(Context context, String fromValue, String toValue, String scopeValue,
                            Long workbenchTeamId, boolean refresh) {
-        LocalDate from = parseDate(fromValue, "开始日期");
-        LocalDate to = parseDate(toValue, "结束日期");
-        if (to.isBefore(from)) {
-            throw new CodingOpenApiException("工时登记结束日期不能早于开始日期");
-        }
-        if (ChronoUnit.DAYS.between(from, to) > 30) {
-            throw new CodingOpenApiException("工时登记时间范围最多选择一个月（31天）");
-        }
+        EntryRange range = entryRange(fromValue, toValue);
         Scope scope = parseScope(scopeValue);
         TeamSelection selection = selection(context, scope, workbenchTeamId);
         long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
         long revision = deletedIssues.revision(context.codingTeamId());
-        String key = cache.entriesKey(context, scope, scopeId, from, to, selection.members(), revision);
+        String key = cache.entriesKey(context, scope, scopeId, range.from(), range.to(), selection.members(), revision);
         if (!refresh) {
             Optional<Entries> cached = cache.getEntries(key);
             if (cached.isPresent()) return cached.get();
         }
         Entries result = queryService.queryEntries(context, selection.team(), scope, workbenchTeamId,
-                selection.members(), from, to.plusDays(1), revision, refresh);
+                selection.members(), range.from(), range.to().plusDays(1), revision, refresh);
         cache.putEntries(key, result);
         return result;
+    }
+
+    @Override
+    public EntriesPage entriesPage(Context context, String fromValue, String toValue, String scopeValue,
+                                   Long workbenchTeamId, Long memberUserId, String cursor, boolean refresh) {
+        var after = WorklogQueryService.EntryPosition.decode(cursor);
+        EntryRange range = entryRange(fromValue, toValue);
+        Scope scope = parseScope(scopeValue);
+        TeamSelection selection = selection(context, scope, workbenchTeamId);
+        if (memberUserId != null && (scope != Scope.WORKBENCH_TEAM
+                || selection.members().stream().noneMatch(member -> member.userId() == memberUserId))) {
+            throw new CodingOpenApiException("请选择参与团队工时统计的成员");
+        }
+        long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
+        long revision = deletedIssues.revision(context.codingTeamId());
+        String key = cache.entriesKey(context, scope, scopeId, range.from(), range.to(), selection.members(), revision)
+                + ":snapshot:" + queryService.today();
+        LocalDate toExclusive = range.to().plusDays(1);
+        var snapshot = cache.loadEntriesSnapshot(key, refresh, () -> queryService.collectEntries(context, scope,
+                workbenchTeamId, selection.members(), range.from(), toExclusive));
+        return queryService.pageEntries(context, selection.team(), selection.members(), range.from(), toExclusive,
+                snapshot, memberUserId, after, revision, refresh);
     }
 
     @Override
@@ -170,6 +186,21 @@ class DefaultWorklogModule implements WorklogModule {
         } catch (DateTimeParseException | NullPointerException e) {
             throw new CodingOpenApiException(label + "格式应为 YYYY-MM-DD");
         }
+    }
+
+    private EntryRange entryRange(String fromValue, String toValue) {
+        LocalDate from = parseDate(fromValue, "开始日期");
+        LocalDate to = parseDate(toValue, "结束日期");
+        if (to.isBefore(from)) {
+            throw new CodingOpenApiException("工时登记结束日期不能早于开始日期");
+        }
+        if (ChronoUnit.DAYS.between(from, to) > 30) {
+            throw new CodingOpenApiException("工时登记时间范围最多选择一个月（31天）");
+        }
+        return new EntryRange(from, to);
+    }
+
+    private record EntryRange(LocalDate from, LocalDate to) {
     }
 
     private record TeamSelection(Team team, List<WorklogModule.MemberCredential> members) {

@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.worklog;
 
 import com.itwray.iw.external.zhaogang.CodingPermissionError;
+import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Worklog;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarDefaults;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.DayType;
 
@@ -109,6 +110,15 @@ public final class WorklogModels {
                        BigDecimal totalHours, List<Item> items) {
             this(coverage, from, toExclusive, syncedAt, totalHours, items, null);
         }
+    }
+
+    public record EntriesPage(Entries entries, String nextCursor) {
+    }
+
+    record EntriesSnapshot(Coverage coverage, String syncedAt, List<EntryRow> rows) {
+    }
+
+    record EntryRow(Worklog worklog, long memberId) {
     }
 
     public record Absence(Coverage coverage, String month, String from, String toExclusive, String syncedAt,

@@ -15,6 +15,9 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.DailyTotal;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.AbsenceDay;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesSnapshot;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntryRow;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Item;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberDailyTotal;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MemberAbsence;
@@ -33,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,6 +45,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -64,6 +69,10 @@ class WorklogQueryService {
     private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
     private static final int PAGE_LIMIT = 1000;
     private static final int MAX_PAGES = 100;
+    private static final int ENTRIES_PAGE_SIZE = 10;
+    private static final Comparator<EntryPosition> ENTRY_ORDER = Comparator.comparingLong(EntryPosition::startAt)
+            .thenComparingLong(EntryPosition::updatedAt).thenComparingLong(EntryPosition::id)
+            .thenComparing(EntryPosition::key).reversed();
 
     private final CodingOpenApiPort coding;
     private final CodingIssueLinkBuilder issueLinkBuilder;
@@ -203,26 +212,59 @@ class WorklogQueryService {
         if (members.isEmpty() && scope == Scope.WORKBENCH_TEAM) {
             return emptyEntries(scope, workbenchTeamId, from, toExclusive);
         }
+        EntriesSnapshot snapshot = collectEntries(context, scope, workbenchTeamId, members, from, toExclusive);
+        return renderEntries(context, team, members, from, toExclusive, snapshot, snapshot.rows(), snapshot.rows(),
+                deletionRevision, refresh);
+    }
+
+    EntriesSnapshot collectEntries(WorklogModule.Context context, Scope scope, Long workbenchTeamId,
+                                   List<WorklogModule.MemberCredential> requestedMembers, LocalDate from,
+                                   LocalDate toExclusive) {
+        List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
         List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive, today());
         List<PendingWorklog> items = worklogsInRange(memberResults, from, toExclusive);
         List<PendingWorklog> worklogs = distinctWorklogs(excludeDeleted(items, findDeleted(context, items.stream())));
-        Comparator<Worklog> byRegistrationTime = Comparator.comparingLong(this::sortStart).reversed()
-                .thenComparing(Comparator.comparingLong(this::sortSecondary).reversed())
-                .thenComparing(Comparator.comparingLong(Worklog::id).reversed());
+        List<EntryRow> sorted = worklogs.stream()
+                .sorted(Comparator.comparing(item -> entryPosition(item.worklog()), ENTRY_ORDER))
+                .map(item -> new EntryRow(item.worklog(), item.memberId())).toList();
+        Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
+                projectCount(worklogs.stream().map(PendingWorklog::worklog).toList()));
+        return new EntriesSnapshot(coverage, syncedAt(), sorted);
+    }
+
+    EntriesPage pageEntries(WorklogModule.Context context, Team team, List<WorklogModule.MemberCredential> members,
+                            LocalDate from, LocalDate toExclusive, EntriesSnapshot snapshot, Long memberUserId,
+                            EntryPosition after, long deletionRevision, boolean refresh) {
+        List<EntryRow> matching = memberUserId == null ? snapshot.rows() : snapshot.rows().stream()
+                .filter(row -> row.worklog().userId() == memberUserId).toList();
+        // Compare against the sort key even if the prior row expired or was deleted between requests.
+        List<EntryRow> candidates = matching.stream()
+                .filter(row -> after == null || ENTRY_ORDER.compare(entryPosition(row.worklog()), after) > 0)
+                .limit(ENTRIES_PAGE_SIZE + 1).toList();
+        boolean hasMore = candidates.size() > ENTRIES_PAGE_SIZE;
+        List<EntryRow> page = hasMore ? candidates.subList(0, ENTRIES_PAGE_SIZE) : candidates;
+        String nextCursor = hasMore ? entryPosition(page.get(page.size() - 1).worklog()).encode() : null;
+        Entries entries = renderEntries(context, team, members, from, toExclusive, snapshot, matching, page,
+                deletionRevision, refresh);
+        return new EntriesPage(entries, nextCursor);
+    }
+
+    private Entries renderEntries(WorklogModule.Context context, Team team, List<WorklogModule.MemberCredential> members,
+                                  LocalDate from, LocalDate toExclusive, EntriesSnapshot snapshot,
+                                  List<EntryRow> matching, List<EntryRow> page, long deletionRevision, boolean refresh) {
         Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(LinkedHashMap::new,
                 (map, member) -> map.put(member.userId(), member), LinkedHashMap::putAll);
-        List<PendingWorklog> sorted = worklogs.stream()
-                .sorted(Comparator.comparing(PendingWorklog::worklog, byRegistrationTime)).toList();
-        var check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
-                sorted.stream(), team.host(), deletionRevision, refresh);
-        List<Item> entries = sorted.stream()
+        List<PendingWorklog> pageItems = page.stream().map(row ->
+                pendingWorklog(row.worklog(), row.memberId(), memberMap.get(row.memberId()).token())).toList();
+        Long teamId = snapshot.coverage().scope() == Scope.WORKBENCH_TEAM ? snapshot.coverage().workbenchTeamId() : null;
+        var check = enqueueCheck(context, teamId, pageItems.stream(), team.host(), deletionRevision, refresh);
+        List<Item> entries = pageItems.stream()
                 .map(item -> toItem(context, team, memberMap, item.issueKey() == null ? null
                         : issueChecks.cachedIssue(item.token(), item.issueKey()), item.worklog()))
                 .toList();
-        BigDecimal totalHours = entries.stream().map(Item::hours).reduce(BigDecimal.ZERO, BigDecimal::add);
-        Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
-                projectCount(worklogs.stream().map(PendingWorklog::worklog).toList()));
-        return new Entries(coverage, from.toString(), toExclusive.toString(), syncedAt(),
+        BigDecimal totalHours = matching.stream().map(row -> normalizeHours(row.worklog().hours()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new Entries(snapshot.coverage(), from.toString(), toExclusive.toString(), snapshot.syncedAt(),
                 normalizeHours(totalHours), entries, check);
     }
 
@@ -517,12 +559,16 @@ class WorklogQueryService {
         List<PendingWorklog> items = new ArrayList<>();
         for (MemberLogs member : memberResults) {
             for (Worklog item : deduplicate(member.items(), from, toExclusive)) {
-                IssueKey key = item.issueCode() > 0 && StringUtils.isNotBlank(item.projectName())
-                        ? new IssueKey(item.projectName(), item.issueCode()) : null;
-                items.add(new PendingWorklog(item, member.userId(), member.token(), key));
+                items.add(pendingWorklog(item, member.userId(), member.token()));
             }
         }
         return items;
+    }
+
+    private PendingWorklog pendingWorklog(Worklog item, long memberId, String token) {
+        IssueKey key = item.issueCode() > 0 && StringUtils.isNotBlank(item.projectName())
+                ? new IssueKey(item.projectName(), item.issueCode()) : null;
+        return new PendingWorklog(item, memberId, token, key);
     }
 
     private Set<Long> findDeleted(WorklogModule.Context context, Stream<PendingWorklog> items) {
@@ -587,13 +633,10 @@ class WorklogQueryService {
         return item.startAt() != null && item.startAt() > 0 ? item.startAt() : null;
     }
 
-    private long sortStart(Worklog item) {
-        return item.startAt();
-    }
-
-    private long sortSecondary(Worklog item) {
+    private EntryPosition entryPosition(Worklog item) {
         Long value = item.updatedAt() != null ? item.updatedAt() : item.createdAt();
-        return value == null ? 0 : value;
+        return new EntryPosition(item.startAt(), value == null ? 0 : value, item.id(),
+                item.id() > 0 ? "" : worklogKey(item));
     }
 
     private String formatTime(Long epochMillis) {
@@ -620,6 +663,27 @@ class WorklogQueryService {
     }
 
     private record PendingWorklog(Worklog worklog, long memberId, String token, IssueKey issueKey) {
+    }
+
+    record EntryPosition(long startAt, long updatedAt, long id, String key) {
+        String encode() {
+            String value = startAt + ":" + updatedAt + ":" + id + ":" + key;
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+        }
+
+        static EntryPosition decode(String cursor) {
+            if (cursor == null) return null;
+            try {
+                String[] parts = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8).split(":", 4);
+                if (parts.length == 4) {
+                    return new EntryPosition(Long.parseLong(parts[0]), Long.parseLong(parts[1]),
+                            Long.parseLong(parts[2]), parts[3]);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Malformed Base64 or numeric sort fields.
+            }
+            throw new CodingOpenApiException("工时分页游标无效，请重新查询");
+        }
     }
 
     private static ThreadFactory daemonThreadFactory() {
