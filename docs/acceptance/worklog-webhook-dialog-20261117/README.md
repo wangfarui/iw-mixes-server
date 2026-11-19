@@ -26,7 +26,7 @@ Web（相对 iw-mixes-web-platform）：
 - `src/api/zhaogangNotification.ts`：草稿测试入参与结果。
 - `src/types/zhaogangNotification.ts`：脱敏提示、历史与测试结果类型。
 
-联合工作区资料：`context/zhaogang-workbench-product-knowledge.md`、`context/zhaogang-workbench-technical-reference.md`。
+联合工作区资料：`context/devhub-product-knowledge.md`、`context/devhub-technical-reference.md`。
 
 ## 验证
 

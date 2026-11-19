@@ -509,6 +509,7 @@ create table external_zhaogang_code_identity
     key idx_scope_member (coding_team_id, scope_type, scope_id, coding_user_id)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码作者身份映射';
 
+
 create table if not exists external_zhaogang_workbench_profile
 (
     coding_team_id  bigint unsigned not null comment 'CODING顶层团队ID',

@@ -189,7 +189,7 @@ curl -s http://127.0.0.1:18000/external-service/api/zhaogang/code-stats/options
 
 ### S3 绑定只读 PAT 并跑通选项接口（需 §7 授权）
 
-在浏览器 `http://127.0.0.1:5173/zhaogang/settings` 用**本人**CODING 个人令牌完成绑定，权限范围按 [README.md](README.md) 与 `context/zhaogang-workbench-technical-reference.md` 的建议（含“代码仓库（只读）”）。
+在浏览器 `http://127.0.0.1:5173/zhaogang/settings` 用**本人**CODING 个人令牌完成绑定，权限范围按 [README.md](README.md) 与 `context/devhub-technical-reference.md` 的建议（含“代码仓库（只读）”）。
 
 前置硬性要求：令牌仅通过浏览器输入，不出现在 shell 命令、curl、URL、日志、截图、文档或 AC 记录中；不使用他人 PAT、不使用生产管理员 PAT 做实验。
 

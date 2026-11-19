@@ -98,9 +98,9 @@
 
 ### 资料
 
-- `context/zhaogang-workbench-product-knowledge.md`
-- `context/zhaogang-workbench-technical-reference.md`
-- `context/zhaogang-workbench-operations-and-verification.md`
+- `context/devhub-product-knowledge.md`
+- `context/devhub-technical-reference.md`
+- `context/devhub-operations-and-verification.md`
 - 交接包 `docs/plans/zhaogang-code-stats-20261030/` 保留，未修改设计结论。
 
 ## 7. 数据与残留

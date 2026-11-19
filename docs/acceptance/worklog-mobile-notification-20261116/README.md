@@ -61,7 +61,7 @@ Web 路径均相对 `iw-mixes-web-platform/`：
 | `src/views/zhaogang/team/ZhaogangTeamView.vue` | 成员手机号列及管理员编辑框 |
 | `src/views/zhaogang/team/TeamWorklogNotification.vue` | 汇总提醒人选择、缺号提示及保存 |
 
-联合工作区资料同步更新：`context/zhaogang-workbench-product-knowledge.md`、`context/zhaogang-workbench-technical-reference.md`、`context/zhaogang-workbench-operations-and-verification.md`。
+联合工作区资料同步更新：`context/devhub-product-knowledge.md`、`context/devhub-technical-reference.md`、`context/devhub-operations-and-verification.md`。
 
 ## 验证证据与边界
 

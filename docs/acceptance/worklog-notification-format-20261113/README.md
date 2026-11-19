@@ -19,7 +19,7 @@
 - `main/java/com/itwray/iw/external/zhaogang/notification/WorklogMessageFormatter.java`：汇总分类名单、标题、个人记录分块及多次登记合并。
 - 对应 `CodingOpenApiClientTest`、`WorklogDailyReaderTest`、`WorklogMessageFormatterTest`：项目查询契约、类型识别、失败回退、精确格式和长消息回归。
 
-同步更新联合工作区 `context/zhaogang-workbench-product-knowledge.md`、`context/zhaogang-workbench-technical-reference.md`，以及原通知方案中的示例和规则。
+同步更新联合工作区 `context/devhub-product-knowledge.md`、`context/devhub-technical-reference.md`，以及原通知方案中的示例和规则。
 
 ## 验证结果
 

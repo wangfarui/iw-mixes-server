@@ -160,7 +160,7 @@
 
 HEAD 只用于定位，不代表未来实施时的现状。实施会话必须重新检查工作区，保护已有修改；不得 reset、checkout 或覆盖未提交工作。精确文件指纹见 [BASELINE.json](BASELINE.json)（33 个源码/契约文件，覆盖后端和 Web）。
 
-`context/` 下的工作台知识文档是会话资料，不在 `BASELINE.json` 指纹范围；实施会话仍需先读 [工作台开发入口](../../../../context/zhaogang-workbench-feature-development-context.md)。
+`context/` 下的工作台知识文档是会话资料，不在 `BASELINE.json` 指纹范围；实施会话仍需先读 [Dev Hub 开发入口](../../../../context/devhub-feature-development-context.md)。
 
 ### 3.2 关键源码事实与复用点
 
@@ -240,7 +240,7 @@ Web 页面、组件和交互见 [web-pages.md](web-pages.md)。
 | 11 | Web `views/zhaogang/code/ZhaogangCodeMineView.vue` 及组件 | 时间范围、KPI、六类图表、提交明细、我的 Git 身份、扫描状态/空/失败 | `npm run type-check`、`npm run build`、浏览器检查 `/zhaogang/code/mine` |
 | 12 | Web `views/zhaogang/code/ZhaogangCodeTeamView.vue` 及组件 | 团队选择、KPI、成员 x 轴两图、指定成员分析、未归属作者、重扫/冷却 | `npm run type-check`、`npm run build`、浏览器检查 `/zhaogang/code/team` |
 | 13 | Web 共享组件 | `CodeStatsHeader`、`CodeStatsRangePicker`、`CodeStatsScanBanner`、`CodeStatsKpiCards`、`CodeStatsBarChart`、`CodeStatsDivergingChart`、`CodeStatsLineBarChart`、`CodeStatsCalendarHeatmap`、`CodeCommitTable`、`CodeIdentityDialog`、`CodeScanScopeDrawer`、`CodeUnmappedDrawer` | 组件独立渲染；键盘/只读/空数据 |
-| 14 | 文档与发布 | 更新 `zhaogang-workbench-product-knowledge.md`、`zhaogang-workbench-technical-reference.md`、`zhaogang-workbench-operations-and-verification.md`、`public/zhaogang-release-notes.json` | 文档链接；`npm run check:zhaogang-release-notes` |
+| 14 | 文档与发布 | 更新 `devhub-product-knowledge.md`、`devhub-technical-reference.md`、`devhub-operations-and-verification.md`、`public/zhaogang-release-notes.json` | 文档链接；`npm run check:zhaogang-release-notes` |
 | 15 | 端到端 | `scripts/local-backend.sh` 启动后端；Web dev；真实只读 PAT；按 AC 验证；记录数据残留 | 见第 6 节；未授权前不执行 |
 
 依赖顺序：1→2→3→4→5→6→7→8；Web 9/10 可与后端并行，11/12 依赖 9/10 和 8 的联调；13 随 11/12；14 最后；15 需实施授权和真实环境。
