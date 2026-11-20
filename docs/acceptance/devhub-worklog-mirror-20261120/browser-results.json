@@ -1,0 +1,46 @@
+{
+  "time": "同步时间：2026-11-20 19:29:58",
+  "loading": false,
+  "summary": "工时统计\n\n总计工时 10.5h · 3 人 · 加班天数 0天 · 加班工时 0h · 平均工时 0.88h",
+  "sourceStatus": {
+    "running": false,
+    "syncedAt": "2026-11-20T11:29:58.846Z",
+    "dataVersion": "4917a4a216a909ad7d9bb276aa7f34709f184be68dbab2dbbdbbcb882c3a16bf",
+    "partial": false,
+    "members": [
+      {
+        "user": {
+          "id": 101,
+          "name": "验收成员101",
+          "avatar": ""
+        },
+        "source": "PERSONAL",
+        "state": "READY",
+        "syncedAt": "2026-11-20T11:29:54.818Z",
+        "message": ""
+      },
+      {
+        "user": {
+          "id": 202,
+          "name": "验收成员202",
+          "avatar": ""
+        },
+        "source": "PERSONAL",
+        "state": "READY",
+        "syncedAt": "2026-11-20T11:29:54.852Z",
+        "message": ""
+      },
+      {
+        "user": {
+          "id": 303,
+          "name": "验收成员303",
+          "avatar": ""
+        },
+        "source": "TEAM_MANAGED",
+        "state": "READY",
+        "syncedAt": "2026-11-20T11:29:58.846Z",
+        "message": ""
+      }
+    ]
+  }
+}

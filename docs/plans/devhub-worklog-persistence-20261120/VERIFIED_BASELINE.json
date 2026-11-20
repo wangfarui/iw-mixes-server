@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-20T11:37:38.248062+00:00",
+  "repos": {
+    "iw-mixes-server": {
+      "head": "cce9f44fd9cec8ba494d9dd98f30645f25e2340f",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "f0839afe130eeb1c118104e4265046dbec353792",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "3e058639ed2a5898a744a095790dc9b9270198a997c05cdccc61bd184ee45004",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/scripts/iw-external-migrate-20261120-worklog-mirror.sql",
+      "sha256": "8d76b55c5f70f70403b789a836b53658a4d3f80e34edadae0743a28499e4d00e",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/DefaultWorklogModule.java",
+      "sha256": "a958645401f55f289aa4fd67b170cd52b722ff9d45652afe28dc65289186865d",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirror.java",
+      "sha256": "f9ff4e342b8ad0d741abd5bd270a919b5cf3b5881bcb1321adbbd7930de72ad5",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirrorRepository.java",
+      "sha256": "a1ec7ba8c56a77e8a82c7cfcd2fdd192a0c2c9b7064b57fd3bcdf4d63a688e96",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirrorScheduler.java",
+      "sha256": "3c00c03c5550e31f7b8ecde879e198190d5967573e35280992d66c2bc2aaeac5",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogQueryService.java",
+      "sha256": "e4613c693216c86302a3e8f013a20fdd21d37eb4c27587a067c6e65ca9b1f39b",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogScopeDirectory.java",
+      "sha256": "f4cb1e47072e40e8ceaa94f039637307e890c4a341730e38c960dfa19c75e3b1",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/api/zhaogang.ts",
+      "sha256": "56b23f96196336d0df2d591161b907d478b3715b339f6b0a977331422ae90be1",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/types/zhaogang.ts",
+      "sha256": "30d0509d8e172830e271328b0869d47552511e00512c57d5185b30700d34dee7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/components/worklog/WorklogDashboard.vue",
+      "sha256": "15275e2f6d332425677983066af6b874467e9318fce6aa9d60ff346e24449562",
+      "tracked": true
+    }
+  ]
+}

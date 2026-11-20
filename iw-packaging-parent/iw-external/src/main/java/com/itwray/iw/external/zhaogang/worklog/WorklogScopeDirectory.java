@@ -49,7 +49,24 @@ class WorklogScopeDirectory {
     TeamSelection workbenchTeam(WorklogModule.Context context, long workbenchTeamId) {
         WorklogTeamScope scope = requireWorkbenchTeam(context, workbenchTeamId);
         return new TeamSelection(new Team(scope.id(), scope.name(), scope.codingTeamHost()),
-                memberCredentials(credentials, context.codingTeamId(), scope.members(), scope.managementCredential()));
+                preferredMemberCredentials(credentials, context.codingTeamId(), scope.members(), scope.managementCredential()));
+    }
+
+    WorklogModule.MemberCredential self(WorklogModule.Context context) {
+        // Latest server binding wins over an old browser cookie. Never restore a removed credential from that cookie.
+        return new WorklogModule.MemberCredential(context.userId(),context.userName(),context.avatar(),
+                credentials.token(context.codingTeamId(),context.userId()).orElse(""));
+    }
+
+    static List<WorklogModule.MemberCredential> preferredMemberCredentials(CodingCredentialService credentials,long teamId,
+            List<? extends StatisticsMember> members,TeamStatisticsCredential management) {
+        Map<Long,String> tokens=credentials.tokens(teamId,members.stream().map(StatisticsMember::userId).toList());
+        return members.stream().map(member->{
+            String token=tokens.getOrDefault(member.userId(),"");
+            boolean managed=token.isBlank();
+            return new WorklogModule.MemberCredential(member.userId(),member.userName(),member.avatar(),
+                    managed?management.token():token,managed);
+        }).toList();
     }
 
     static List<WorklogModule.MemberCredential> memberCredentials(CodingCredentialService credentials, long codingTeamId,

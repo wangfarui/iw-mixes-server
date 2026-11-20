@@ -1,0 +1,12 @@
+{
+  "initialPartial": false,
+  "firstPage": 10,
+  "secondPage": 2,
+  "localQueries": 20,
+  "localQueriesSeconds": 0.256,
+  "extraRemoteWorklogRequests": 0,
+  "incrementTotalHours": 6.5,
+  "timeAdvancedOnSuccess": true,
+  "failurePreservedTime": true,
+  "failureDidNotFallback": true
+}

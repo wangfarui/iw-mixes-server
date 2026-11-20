@@ -88,6 +88,12 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     private final CodingIssueMetadataCatalog metadataCatalog;
     private final TeamIterationReleasePlanResolver releasePlanResolver;
     private final CodingIssueSnapshotLoader issueSnapshotLoader;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    void setEventPublisher(org.springframework.context.ApplicationEventPublisher publisher) {
+        this.eventPublisher = publisher;
+    }
 
     DefaultTeamIterationModule(TeamIterationRepository repository, CodingOpenApiPort coding,
                                CodingIssueUrlParser urlParser) {
@@ -1206,6 +1212,8 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                     .add(worklog.getSpendHours());
             repository.updateCodingWorklogSummary(issue.getIterationId(), issue.getId(), recordedHours,
                     codingWorklogs.size() + 1, actor);
+            if (eventPublisher != null) eventPublisher.publishEvent(
+                    new com.itwray.iw.external.zhaogang.worklog.WorklogRegistered(actor.codingTeamId(), actor.userId()));
             return synced;
         } catch (CodingOpenApiException error) {
             IssueSyncStatus status = error.isTransportFailure() ? IssueSyncStatus.UNKNOWN : IssueSyncStatus.FAILED;

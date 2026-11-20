@@ -19,6 +19,11 @@ public final class WorklogModels {
         WORKBENCH_TEAM
     }
 
+    public record SyncStatus(boolean running, String syncedAt, String dataVersion, boolean partial,
+                             List<SyncMember> members) { }
+
+    public record SyncMember(User user, String source, String state, String syncedAt, String message) { }
+
     public record TeamOption(long id, String name, int memberCount, List<User> members) {
     }
 

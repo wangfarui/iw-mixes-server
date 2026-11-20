@@ -12,6 +12,8 @@ public interface WorklogModule {
 
     Options options(Context context);
 
+    WorklogModels.SyncStatus sync(Context context, String scope, Long workbenchTeamId, boolean trigger);
+
     RangeReport report(Context context, String from, String to, String scope,
                                      Long workbenchTeamId, boolean refresh);
 

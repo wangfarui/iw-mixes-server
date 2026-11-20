@@ -53,6 +53,9 @@ public class ZhaogangProperties {
 
     private int codingWorklogQpsPerTeam = 25;
 
+    /** Pause background acquisition without returning to remote page queries. */
+    private boolean worklogSyncEnabled = true;
+
     /** 事项批量读取的进程级调度线程数，不代表 CODING 并发数。 */
     private int codingIssueExecutorConcurrency = 32;
 

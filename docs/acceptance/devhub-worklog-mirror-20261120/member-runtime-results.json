@@ -1,0 +1,29 @@
+{
+  "port": 18006,
+  "jarSha256": "19cd47b1ab8b7926f6c47177b9760cfbdcff4f80d57e951a954ebfdb09440e27",
+  "teamIds": [
+    1,
+    2
+  ],
+  "totalHoursPerTeam": 10.5,
+  "localQueries": 12,
+  "extraWorklogRequestsFromSharedTeamQueries": 0,
+  "canonicalSources": [
+    {
+      "userId": 202,
+      "sourceCount": 1,
+      "historyBefore": 1767196800000
+    },
+    {
+      "userId": 101,
+      "sourceCount": 1,
+      "historyBefore": 1767196800000
+    },
+    {
+      "userId": 303,
+      "sourceCount": 1,
+      "historyBefore": 1767196800000
+    }
+  ],
+  "passed": true
+}

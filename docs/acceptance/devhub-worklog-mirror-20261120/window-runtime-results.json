@@ -1,0 +1,25 @@
+{
+  "port": 18006,
+  "jarSha256": "be650dd2355e84e3744345e9737519ef84739c50e1a87705dda025ec3e23c70b",
+  "syncedAt": "2026-11-20T12:17:08.793Z",
+  "memberSources": [
+    {
+      "userId": 101,
+      "source": "PERSONAL",
+      "state": "READY"
+    },
+    {
+      "userId": 202,
+      "source": "PERSONAL",
+      "state": "READY"
+    },
+    {
+      "userId": 303,
+      "source": "TEAM_MANAGED",
+      "state": "READY"
+    }
+  ],
+  "totalHours": 10.5,
+  "firstPageCount": 10,
+  "passed": true
+}

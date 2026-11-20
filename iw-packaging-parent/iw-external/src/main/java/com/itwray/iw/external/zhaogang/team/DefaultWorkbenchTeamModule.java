@@ -391,7 +391,15 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         repository.refreshProfile(actor);
         StoredTeam stored = requireMember(actor, require(teamId));
         return new WorklogTeamScope(stored.team().getId(), stored.team().getName(),
-                stored.team().getCodingTeamHost(), scopeMembers(stored), statisticsCredential(stored));
+                stored.team().getCodingTeamHost(), scopeMembers(stored),
+                managementCredential(teamId).map(ManagementCredential::value).orElse(TeamStatisticsCredential.EMPTY));
+    }
+
+    @Override
+    public Optional<CodeSyncTeam> findWorklogSyncTeam(long codingTeamId, long teamId) {
+        return findCodeSyncTeam(codingTeamId, teamId).map(team -> new CodeSyncTeam(team.name(),team.codingTeamKey(),
+                team.codingTeamHost(),team.members(),managementCredential(teamId).map(ManagementCredential::value)
+                .orElse(TeamStatisticsCredential.EMPTY),team.administratorUserId()));
     }
 
     @Override

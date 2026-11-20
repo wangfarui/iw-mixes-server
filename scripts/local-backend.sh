@@ -22,6 +22,9 @@ scripts/local-backend.sh status
 scripts/local-backend.sh logs core
 scripts/local-backend.sh restart all
 scripts/local-backend.sh stop all
+
+# 隔离验收可设置 IW_LOCAL_PORT_SCOPED=1，并指定独立端口和 IW_LOCAL_LOG_DIR；仅管理该端口。
+# 需要由调用方会话管理生命周期时，单服务 start 可加 IW_LOCAL_FOREGROUND=1。
 USAGE
 }
 
@@ -186,7 +189,7 @@ service_pids() {
   local pid
   local -a pids=()
 
-  if pid="$(managed_pid "$target")"; then
+  if pid="$(managed_pid "$target")" && { [ "${IW_LOCAL_PORT_SCOPED:-0}" != 1 ] || listening_pids "$(service_port "$target")" | awk -v expected="$pid" '$0 == expected {found=1} END {exit !found}'; }; then
     pids+=("$pid")
   fi
 
@@ -197,11 +200,13 @@ service_pids() {
   done < <(listening_pids "$(service_port "$target")")
 
   # 除默认端口外，IDE/Maven 可能使用了自定义端口；命令行扫描作为补充。
-  while IFS= read -r pid; do
-    if [ -n "$pid" ] && is_service_process "$target" "$pid"; then
-      pids+=("$pid")
-    fi
-  done < <(command_line_pids "$target")
+  if [ "${IW_LOCAL_PORT_SCOPED:-0}" != 1 ]; then
+    while IFS= read -r pid; do
+      if [ -n "$pid" ] && is_service_process "$target" "$pid"; then
+        pids+=("$pid")
+      fi
+    done < <(command_line_pids "$target")
+  fi
 
   if [ "${#pids[@]}" -gt 0 ]; then
     printf '%s\n' "${pids[@]}" | awk '!seen[$0]++'
@@ -364,6 +369,12 @@ start_service() {
   } >> "$log_path"
 
   echo "Starting ${name} on port ${port} ..."
+  if [ "${IW_LOCAL_FOREGROUND:-0}" = "1" ]; then
+    cd "$PROJECT_ROOT"
+    export IW_LOG_PATH="${IW_LOCAL_SPRING_LOG_DIR:-${PROJECT_ROOT}/logs/spring}"
+    # shellcheck disable=SC2086
+    exec java ${JAVA_OPTS} -jar "$jar_path" --spring.profiles.active="$PROFILE"
+  fi
   (
     cd "$PROJECT_ROOT"
     export IW_LOG_PATH="${IW_LOCAL_SPRING_LOG_DIR:-${PROJECT_ROOT}/logs/spring}"
@@ -372,7 +383,7 @@ start_service() {
     echo $! > "$(pid_file "$target")"
   )
 
-  pid="$(current_pid "$target")"
+  pid="$(cat "$(pid_file "$target")")"
   wait_for_port "$target" "$port" "$pid"
   echo "${name} started, PID ${pid}, log ${log_path}"
 }

@@ -237,6 +237,24 @@ public class ZhaogangController {
                 from, to, scope, workbenchTeamId, refresh));
     }
 
+    @GetMapping("/worklogs/sync")
+    @Operation(summary = "查询工时后台同步状态")
+    public GeneralResponse<com.itwray.iw.external.zhaogang.worklog.WorklogModels.SyncStatus> worklogSyncStatus(
+            @RequestParam @NotBlank String scope, @RequestParam(required=false) Long workbenchTeamId,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return GeneralResponse.success(worklogModule.sync(worklogContext(sessionManager.resolve(request,response)),scope,workbenchTeamId,false));
+    }
+
+    @PostMapping("/worklogs/sync")
+    @Operation(summary = "请求工时增量同步")
+    public GeneralResponse<com.itwray.iw.external.zhaogang.worklog.WorklogModels.SyncStatus> triggerWorklogSync(
+            @RequestParam @NotBlank String scope, @RequestParam(required=false) Long workbenchTeamId,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return GeneralResponse.success(worklogModule.sync(worklogContext(sessionManager.resolve(request,response)),scope,workbenchTeamId,true));
+    }
+
     @GetMapping("/worklogs/statistics")
     @Operation(summary = "查询月度工时统计")
     public GeneralResponse<Statistics> worklogStatistics(@RequestParam @NotBlank String month,

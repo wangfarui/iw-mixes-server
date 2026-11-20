@@ -67,6 +67,10 @@ public interface WorkbenchTeamModule {
 
     WorklogTeamScope resolveWorklogScope(Actor actor, long teamId);
 
+    default java.util.Optional<WorkbenchTeamModels.CodeSyncTeam> findWorklogSyncTeam(long codingTeamId, long teamId) {
+        return findCodeSyncTeam(codingTeamId, teamId);
+    }
+
     Optional<CodeSyncTeam> findCodeSyncTeam(long codingTeamId, long teamId);
 
     List<IterationTeamOption> iterationMemberOptions(Actor actor);

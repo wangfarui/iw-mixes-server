@@ -44,6 +44,15 @@ class DefaultWorklogModule implements WorklogModule {
     private final PersonalLeaveResolver personalLeave;
     private final WorklogDeletedIssues deletedIssues;
     private final WorklogIssueChecks issueChecks;
+    private WorklogMirror mirror;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    DefaultWorklogModule(WorklogScopeDirectory directory, WorklogQueryService queries, WorklogViewCache cache,
+                         WorkCalendarResolver calendar, PersonalLeaveResolver leaves, WorklogDeletedIssues deleted,
+                         WorklogIssueChecks checks, WorklogMirror mirror) {
+        this(directory, queries, cache, calendar, leaves, deleted, checks);
+        this.mirror = mirror;
+    }
 
     DefaultWorklogModule(WorklogScopeDirectory scopeDirectory, WorklogQueryService queryService,
                          WorklogViewCache cache, WorkCalendarResolver calendar, PersonalLeaveResolver personalLeave,
@@ -63,10 +72,12 @@ class DefaultWorklogModule implements WorklogModule {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public RangeReport report(Context context, String fromValue, String toValue, String scopeValue,
                               Long workbenchTeamId, boolean refresh) {
         EntryRange range = entryRange(fromValue, toValue);
         Scope scope = parseScope(scopeValue);
+        if (scope == Scope.SELF && workbenchTeamId != null) throw new CodingOpenApiException("个人工时不接受团队参数");
         TeamSelection selection = selection(context, scope, workbenchTeamId);
         List<MemberCredential> members = selection.members();
         List<Day> days = new ArrayList<>();
@@ -88,29 +99,33 @@ class DefaultWorklogModule implements WorklogModule {
         long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
         long revision = deletedIssues.revision(context.codingTeamId());
         String key = cache.rangeKey(context, scope, scopeId, range.from(), range.to(), today,
-                calendarVersions.toString(), leaveDates, members, revision);
+                calendarVersions.toString(), leaveDates, members, revision) + dataVersion(context, workbenchTeamId, members);
         return cache.loadRange(key, refresh, () -> queryService.queryRange(context, scope, workbenchTeamId,
                 members, range.from(), range.to().plusDays(1), schedule, leaveDates, today, revision, refresh));
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Statistics statistics(Context context, String month, String scopeValue, Long workbenchTeamId, boolean refresh) {
         YearMonth yearMonth = parseMonth(month);
         Scope scope = parseScope(scopeValue);
+        if (scope == Scope.SELF && workbenchTeamId != null) throw new CodingOpenApiException("个人工时不接受团队参数");
         TeamSelection selection = selection(context, scope, workbenchTeamId);
         return monthlySnapshot(context, yearMonth, scope, workbenchTeamId, selection, queryService.today(), refresh)
                 .statistics();
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Entries entries(Context context, String fromValue, String toValue, String scopeValue,
                            Long workbenchTeamId, boolean refresh) {
         EntryRange range = entryRange(fromValue, toValue);
         Scope scope = parseScope(scopeValue);
+        if (scope == Scope.SELF && workbenchTeamId != null) throw new CodingOpenApiException("个人工时不接受团队参数");
         TeamSelection selection = selection(context, scope, workbenchTeamId);
         long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
         long revision = deletedIssues.revision(context.codingTeamId());
-        String key = cache.entriesKey(context, scope, scopeId, range.from(), range.to(), selection.members(), revision);
+        String key = cache.entriesKey(context, scope, scopeId, range.from(), range.to(), selection.members(), revision) + dataVersion(context, workbenchTeamId, selection.members());
         if (!refresh) {
             Optional<Entries> cached = cache.getEntries(key);
             if (cached.isPresent()) return cached.get();
@@ -122,18 +137,22 @@ class DefaultWorklogModule implements WorklogModule {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public EntriesPage entriesPage(Context context, String fromValue, String toValue, String scopeValue,
                                    Long workbenchTeamId, Long memberUserId, String cursor, boolean refresh) {
         var after = WorklogQueryService.EntryPosition.decode(cursor);
         EntryRange range = entryRange(fromValue, toValue);
         Scope scope = parseScope(scopeValue);
+        if (scope == Scope.SELF && workbenchTeamId != null) throw new CodingOpenApiException("个人工时不接受团队参数");
         TeamSelection selection = selection(context, scope, workbenchTeamId);
         if (memberUserId != null && (scope != Scope.WORKBENCH_TEAM
                 || selection.members().stream().noneMatch(member -> member.userId() == memberUserId))) {
             throw new CodingOpenApiException("请选择参与团队工时统计的成员");
         }
-        long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
         long revision = deletedIssues.revision(context.codingTeamId());
+        if (mirror != null) return queryService.pageLocalEntries(context, selection.team(), scope, workbenchTeamId,
+                selection.members(), range.from(), range.to().plusDays(1), memberUserId, after, revision);
+        long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
         String key = cache.entriesKey(context, scope, scopeId, range.from(), range.to(), selection.members(), revision)
                 + ":snapshot:" + queryService.today();
         LocalDate toExclusive = range.to().plusDays(1);
@@ -144,9 +163,11 @@ class DefaultWorklogModule implements WorklogModule {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Absence absences(Context context, String month, String scopeValue, Long workbenchTeamId, boolean refresh) {
         YearMonth yearMonth = parseMonth(month);
         Scope scope = parseScope(scopeValue);
+        if (scope == Scope.SELF && workbenchTeamId != null) throw new CodingOpenApiException("个人工时不接受团队参数");
         TeamSelection selection = selection(context, scope, workbenchTeamId);
         LocalDate today = queryService.today();
         LocalDate absenceEnd = queryService.absenceEnd(yearMonth, today);
@@ -165,7 +186,7 @@ class DefaultWorklogModule implements WorklogModule {
         long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
         long revision = deletedIssues.revision(context.codingTeamId());
         String key = cache.monthlyKey(context, scope, scopeId, month, today, schedule.versionNo(), leaveDates,
-                members, revision);
+                members, revision) + dataVersion(context, workbenchTeamId, members);
         return cache.loadMonth(key, refresh, () -> queryService.queryMonth(context, scope, workbenchTeamId,
                 members, month, schedule, leaveDates, today, revision, refresh));
     }
@@ -181,11 +202,23 @@ class DefaultWorklogModule implements WorklogModule {
                 progress.pending(), progress.updates(), progress.incomplete());
     }
 
+    private String dataVersion(Context context, Long teamId, List<MemberCredential> members) {
+        return mirror == null ? "" : ":mirror:" + mirror.version(context, teamId, members);
+    }
+
+    @Override
+    public WorklogModels.SyncStatus sync(Context context, String scopeValue, Long teamId, boolean trigger) {
+        Scope scope = parseScope(scopeValue);
+        TeamSelection selected = selection(context, scope, teamId);
+        Long effectiveTeam = scope == Scope.SELF ? null : teamId;
+        return trigger ? mirror.request(context, effectiveTeam, selected.members()) : mirror.status(context, effectiveTeam, selected.members());
+    }
+
     private TeamSelection selection(Context context, Scope scope, Long workbenchTeamId) {
         if (scope == Scope.SELF) {
             Team team = scopeDirectory.selfTeam(context);
-            WorklogModule.MemberCredential self = new WorklogModule.MemberCredential(context.userId(),
-                    context.userName(), context.avatar(), context.token());
+            WorklogModule.MemberCredential self = mirror == null ? new WorklogModule.MemberCredential(context.userId(),
+                    context.userName(), context.avatar(), context.token()) : scopeDirectory.self(context);
             return new TeamSelection(team, List.of(self));
         }
         WorklogScopeDirectory.TeamSelection selection = scopeDirectory.workbenchTeam(context,

@@ -82,13 +82,15 @@ class WorklogQueryService {
     private final boolean ownsExecutor;
     private final WorklogDeletedIssues deletedIssues;
     private final WorklogIssueChecks issueChecks;
+    private WorklogMirror mirror;
 
     @Autowired
     WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder,
-                        ZhaogangProperties properties, WorklogDeletedIssues deletedIssues, WorklogIssueChecks issueChecks) {
+                        ZhaogangProperties properties, WorklogDeletedIssues deletedIssues, WorklogIssueChecks issueChecks, WorklogMirror mirror) {
         this(coding, issueLinkBuilder, Clock.system(CHINA_ZONE),
                 Executors.newFixedThreadPool(Math.max(1, properties.getWorklogExecutorConcurrency()),
                         daemonThreadFactory()), true, deletedIssues, issueChecks);
+        this.mirror = mirror;
     }
 
     WorklogQueryService(CodingOpenApiPort coding, CodingIssueLinkBuilder issueLinkBuilder, Clock clock,
@@ -125,12 +127,12 @@ class WorklogQueryService {
         List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
         LocalDate completedEnd = today.isBefore(toExclusive) ? today : toExclusive;
         if (completedEnd.isBefore(from)) completedEnd = from;
-        List<MemberLogs> results = fetchMembers(members, from, toExclusive, today);
+        List<MemberLogs> results = fetchMembers(context, workbenchTeamId, members, from, toExclusive, today);
         List<PendingWorklog> items = worklogsInRange(results, from, toExclusive);
         List<PendingWorklog> worklogs = excludeDeleted(items, findDeleted(context, items.stream()));
         IssueCheck check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
                 worklogs.stream(), null, deletionRevision, refresh);
-        String syncedAt = syncedAt();
+        String syncedAt = mirror == null ? syncedAt() : mirror.syncedAt(context, workbenchTeamId, members);
         YearMonth month = YearMonth.from(from);
         Statistics statistics = statistics(scope, workbenchTeamId, members, month, schedule, leaveDates,
                 results, worklogs, from, toExclusive, today, syncedAt, check);
@@ -159,7 +161,7 @@ class WorklogQueryService {
         }
 
         long fetchStarted = System.nanoTime();
-        List<MemberLogs> memberResults = fetchMembers(members, from, monthEnd, today);
+        List<MemberLogs> memberResults = fetchMembers(context, workbenchTeamId, members, from, monthEnd, today);
         long lookupStarted = System.nanoTime();
         List<PendingWorklog> monthItems = worklogsInRange(memberResults, from, monthEnd);
         // 先按登记日期裁剪再去重，两个视图共享事项查验结果。
@@ -175,7 +177,7 @@ class WorklogQueryService {
                 absenceItems == monthItems ? monthWorklogs.stream()
                 : Stream.concat(monthWorklogs.stream(), absenceWorklogs.stream()), null, deletionRevision, refresh);
         long aggregationStarted = System.nanoTime();
-        String syncedAt = syncedAt();
+        String syncedAt = mirror == null ? syncedAt() : mirror.syncedAt(context, workbenchTeamId, members);
         Statistics statistics = statistics(scope, workbenchTeamId, members, month, schedule, leaveDatesByMember,
                 memberResults, monthWorklogs, from, monthEnd, today, syncedAt, check);
         Absence absences = absenceEnd.equals(from)
@@ -250,7 +252,7 @@ class WorklogQueryService {
                                    List<WorklogModule.MemberCredential> requestedMembers, LocalDate from,
                                    LocalDate toExclusive) {
         List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
-        List<MemberLogs> memberResults = fetchMembers(members, from, toExclusive, today());
+        List<MemberLogs> memberResults = fetchMembers(context, workbenchTeamId, members, from, toExclusive, today());
         List<PendingWorklog> items = worklogsInRange(memberResults, from, toExclusive);
         List<PendingWorklog> worklogs = distinctWorklogs(excludeDeleted(items, findDeleted(context, items.stream())));
         List<EntryRow> sorted = worklogs.stream()
@@ -258,7 +260,7 @@ class WorklogQueryService {
                 .map(item -> new EntryRow(item.worklog(), item.memberId())).toList();
         Coverage coverage = coverage(scope, workbenchTeamId, members, memberResults,
                 projectCount(worklogs.stream().map(PendingWorklog::worklog).toList()));
-        return new EntriesSnapshot(coverage, syncedAt(), sorted);
+        return new EntriesSnapshot(coverage, mirror == null ? syncedAt() : mirror.syncedAt(context, workbenchTeamId, members), sorted);
     }
 
     EntriesPage pageEntries(WorklogModule.Context context, Team team, List<WorklogModule.MemberCredential> members,
@@ -278,6 +280,40 @@ class WorklogQueryService {
         return new EntriesPage(entries, nextCursor);
     }
 
+    EntriesPage pageLocalEntries(WorklogModule.Context context, Team team, Scope scope, Long teamId,
+                                List<WorklogModule.MemberCredential> members, LocalDate from, LocalDate to,
+                                Long memberId, EntryPosition after, long deletionRevision) {
+        // Acquire every source in a stable order before per-member reads in this transaction.
+        String dataVersion = mirror.version(context, teamId, members);
+        List<MemberLogs> states = members.stream().map(member -> {
+            var source = mirror.source(context, teamId, member);
+            var problem = mirror.problem(source, from, to);
+            return new MemberLogs(member.userId(), member.token(), List.of(), problem != null,
+                    source == null || source.blocked() || source.through() == 0, problem);
+        }).toList();
+        List<WorklogModule.MemberCredential> selected = memberId == null ? members : members.stream().filter(m -> m.userId() == memberId).toList();
+        String version = com.itwray.iw.external.zhaogang.credential.CodingCredentialService.fingerprint(
+                dataVersion + ":" + deletionRevision + ":" + context.userId()
+                        + ":" + teamId + ":" + from + ":" + to + ":" + memberId);
+        if (after != null && !after.key().matches(java.util.regex.Pattern.quote(version) + ",[0-9]{1,18}"))
+            throw new CodingOpenApiException("WORKLOG_CURSOR_EXPIRED", "工时数据已更新，请从第一页重新加载");
+        List<Worklog> candidates = mirror.rows(context, teamId, selected, from, to, after, ENTRIES_PAGE_SIZE + 1);
+        boolean more = candidates.size() > ENTRIES_PAGE_SIZE;
+        List<Worklog> page = more ? candidates.subList(0, ENTRIES_PAGE_SIZE) : candidates;
+        Map<Long, WorklogModule.MemberCredential> memberMap = members.stream().collect(Collectors.toMap(WorklogModule.MemberCredential::userId, m -> m));
+        List<CodingOpenApiPort.Issue> details = page.stream().map(row ->
+                mirror.issue(context, teamId, memberMap.get(row.userId()), row)).toList();
+        List<Item> items = java.util.stream.IntStream.range(0, page.size()).mapToObj(i ->
+                toItem(context, team, memberMap, details.get(i), page.get(i))).toList();
+        Coverage coverage = coverage(scope, teamId, members, states, mirror.projectCount(context, teamId, members, from, to));
+        var entries = new Entries(coverage, from.toString(), to.toString(), mirror.syncedAt(context, teamId, members),
+                mirror.total(context, teamId, selected, from, to), items,
+                new IssueCheck(deletionRevision, null, details.stream().anyMatch(java.util.Objects::isNull)));
+        EntryPosition last = more ? entryPosition(page.get(page.size()-1)) : null;
+        return new EntriesPage(entries, last == null ? null : new EntryPosition(last.startAt(), last.updatedAt(), last.id(),
+                version + "," + page.get(page.size()-1).userId()).encode());
+    }
+
     private Entries renderEntries(WorklogModule.Context context, Team team, List<WorklogModule.MemberCredential> members,
                                   LocalDate from, LocalDate toExclusive, EntriesSnapshot snapshot,
                                   List<EntryRow> matching, List<EntryRow> page, long deletionRevision, boolean refresh) {
@@ -289,7 +325,8 @@ class WorklogQueryService {
         var check = enqueueCheck(context, teamId, pageItems.stream(), team.host(), deletionRevision, refresh);
         List<Item> entries = pageItems.stream()
                 .map(item -> toItem(context, team, memberMap, item.issueKey() == null ? null
-                        : issueChecks.cachedIssue(item.token(), item.issueKey()), item.worklog()))
+                        : mirror == null ? issueChecks.cachedIssue(item.token(), item.issueKey())
+                        : mirror.issue(context, teamId, memberMap.get(item.memberId()), item.worklog()), item.worklog()))
                 .toList();
         BigDecimal totalHours = matching.stream().map(row -> normalizeHours(row.worklog().hours()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -330,8 +367,18 @@ class WorklogQueryService {
                 .values().stream().toList();
     }
 
-    private List<MemberLogs> fetchMembers(List<WorklogModule.MemberCredential> members, LocalDate from,
+    private List<MemberLogs> fetchMembers(WorklogModule.Context context, Long workbenchTeamId, List<WorklogModule.MemberCredential> members, LocalDate from,
                                           LocalDate toExclusive, LocalDate today) {
+        if (mirror != null) {
+            return members.stream().map(member -> {
+                var source = mirror.source(context, workbenchTeamId, member);
+                var problem = mirror.problem(source, from, toExclusive);
+                boolean failed = source == null || source.blocked() || source.through() == 0;
+                List<Worklog> rows = failed ? List.of() : mirror.rows(context, workbenchTeamId, List.of(member), from, toExclusive, null, 100_001);
+                if (rows.size() > 100_000) problem = new WorklogMirror.ReadProblem("PAGE_LIMIT", "本地工时记录超过单次统计保护上限");
+                return new MemberLogs(member.userId(), member.token(), rows, problem != null, failed, problem);
+            }).toList();
+        }
         // CODING 按提交时间返回记录。拉取至今天结束，才能覆盖历史区间内的补登工时。
         LocalDate tomorrow = today.plusDays(1);
         LocalDate fetchToExclusive = toExclusive.isBefore(tomorrow) ? tomorrow : toExclusive;
@@ -395,6 +442,7 @@ class WorklogQueryService {
 
     private MemberIssue memberIssue(WorklogModule.MemberCredential member, MemberLogs result) {
         User user = new User(member.userId(), member.userName(), member.avatar());
+        if (result.error() instanceof WorklogMirror.ReadProblem problem) return new MemberIssue(user, problem.code, problem.getMessage());
         if (StringUtils.isBlank(member.token())) {
             return new MemberIssue(user, "TOKEN_MISSING", member.managedStatistics()
                     ? "团队管理令牌不可用，请 Dev Hub 维护人在团队页检查配置"
@@ -620,6 +668,7 @@ class WorklogQueryService {
 
     private IssueCheck enqueueCheck(WorklogModule.Context context, Long workbenchTeamId, Stream<PendingWorklog> items,
                                     String teamHost, long deletionRevision, boolean refresh) {
+        if (mirror != null) return new IssueCheck(deletionRevision, null, false);
         Map<String, Map<IssueKey, WorklogIssueChecks.Candidate>> requested = new LinkedHashMap<>();
         var iterator = items.iterator();
         for (int index = 0; iterator.hasNext(); index++) {
