@@ -4,12 +4,14 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiException;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.calendar.PersonalLeaveResolver;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Schedule;
+import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Day;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarResolver;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.MonthlySnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.RangeReport;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Scope;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
@@ -20,6 +22,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +60,37 @@ class DefaultWorklogModule implements WorklogModule {
     @Override
     public Options options(Context context) {
         return scopeDirectory.options(context);
+    }
+
+    @Override
+    public RangeReport report(Context context, String fromValue, String toValue, String scopeValue,
+                              Long workbenchTeamId, boolean refresh) {
+        EntryRange range = entryRange(fromValue, toValue);
+        Scope scope = parseScope(scopeValue);
+        TeamSelection selection = selection(context, scope, workbenchTeamId);
+        List<MemberCredential> members = selection.members();
+        List<Day> days = new ArrayList<>();
+        Map<Long, Set<LocalDate>> leaveDates = new LinkedHashMap<>();
+        StringBuilder calendarVersions = new StringBuilder();
+        int calendarVersion = 0;
+        for (YearMonth month = YearMonth.from(range.from()); !month.isAfter(YearMonth.from(range.to()));
+             month = month.plusMonths(1)) {
+            Schedule schedule = calendar.resolve(context.codingTeamId(), month);
+            days.addAll(schedule.days());
+            calendarVersions.append(month).append('=').append(schedule.versionNo()).append(';');
+            calendarVersion = Math.max(calendarVersion, schedule.versionNo());
+            personalLeave.resolve(context.codingTeamId(), members.stream().map(MemberCredential::userId).toList(), month)
+                    .forEach((userId, dates) -> leaveDates.computeIfAbsent(userId,
+                            ignored -> new LinkedHashSet<>()).addAll(dates));
+        }
+        Schedule schedule = new Schedule(range.from() + ":" + range.to(), calendarVersion, days);
+        LocalDate today = queryService.today();
+        long scopeId = scope == Scope.SELF ? context.userId() : workbenchTeamId;
+        long revision = deletedIssues.revision(context.codingTeamId());
+        String key = cache.rangeKey(context, scope, scopeId, range.from(), range.to(), today,
+                calendarVersions.toString(), leaveDates, members, revision);
+        return cache.loadRange(key, refresh, () -> queryService.queryRange(context, scope, workbenchTeamId,
+                members, range.from(), range.to().plusDays(1), schedule, leaveDates, today, revision, refresh));
     }
 
     @Override

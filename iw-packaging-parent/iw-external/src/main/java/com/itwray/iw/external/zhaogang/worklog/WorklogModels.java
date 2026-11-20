@@ -53,7 +53,12 @@ public final class WorklogModels {
     public record User(long id, String name, String avatar) {
     }
 
-    public record Summary(int overtimeDays, BigDecimal overtimeHours, BigDecimal averageHours) {
+    public record Summary(int overtimeDays, BigDecimal overtimeHours, BigDecimal averageHours,
+                          int workdayCount, BigDecimal utilizationRate) {
+        public Summary(int overtimeDays, BigDecimal overtimeHours, BigDecimal averageHours) {
+            this(overtimeDays, overtimeHours, averageHours, 0, null);
+        }
+
         public static Summary empty() {
             return new Summary(0, BigDecimal.ZERO, BigDecimal.ZERO);
         }
@@ -102,6 +107,11 @@ public final class WorklogModels {
     }
 
     record MonthlySnapshot(Statistics statistics, Absence absences) {
+    }
+
+    /** Full selected range for the chart; ranking and absence stop strictly before today. */
+    public record RangeReport(String from, String toExclusive, String rankingToExclusive,
+                              Statistics statistics, Statistics ranking, Absence absences) {
     }
 
     public record Entries(Coverage coverage, String from, String toExclusive, String syncedAt,

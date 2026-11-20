@@ -15,6 +15,7 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.DailyTotal;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Absence;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.AbsenceDay;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.RangeReport;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesSnapshot;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntryRow;
@@ -114,6 +115,34 @@ class WorklogQueryService {
 
     LocalDate today() {
         return LocalDate.now(clock);
+    }
+
+    RangeReport queryRange(WorklogModule.Context context, Scope scope, Long workbenchTeamId,
+                           List<WorklogModule.MemberCredential> requestedMembers,
+                           LocalDate from, LocalDate toExclusive, Schedule schedule,
+                           Map<Long, Set<LocalDate>> leaveDates, LocalDate today,
+                           long deletionRevision, boolean refresh) {
+        List<WorklogModule.MemberCredential> members = normalizeMembers(requestedMembers);
+        LocalDate completedEnd = today.isBefore(toExclusive) ? today : toExclusive;
+        if (completedEnd.isBefore(from)) completedEnd = from;
+        List<MemberLogs> results = fetchMembers(members, from, toExclusive, today);
+        List<PendingWorklog> items = worklogsInRange(results, from, toExclusive);
+        List<PendingWorklog> worklogs = excludeDeleted(items, findDeleted(context, items.stream()));
+        IssueCheck check = enqueueCheck(context, scope == Scope.WORKBENCH_TEAM ? workbenchTeamId : null,
+                worklogs.stream(), null, deletionRevision, refresh);
+        String syncedAt = syncedAt();
+        YearMonth month = YearMonth.from(from);
+        Statistics statistics = statistics(scope, workbenchTeamId, members, month, schedule, leaveDates,
+                results, worklogs, from, toExclusive, today, syncedAt, check);
+        LocalDate rankingEnd = completedEnd;
+        List<PendingWorklog> completed = worklogs.stream()
+                .filter(item -> within(item.worklog(), from, rankingEnd)).toList();
+        Statistics ranking = statistics(scope, workbenchTeamId, members, month, schedule, leaveDates,
+                results, completed, from, completedEnd, today, syncedAt, check);
+        Absence absences = absences(scope, workbenchTeamId, members, month, schedule, leaveDates,
+                results, completed, from, completedEnd, syncedAt, check);
+        return new RangeReport(from.toString(), toExclusive.toString(), completedEnd.toString(),
+                statistics, ranking, absences);
     }
 
     MonthlySnapshot queryMonth(WorklogModule.Context context, Scope scope, Long workbenchTeamId,
@@ -497,7 +526,8 @@ class WorklogQueryService {
         }
         BigDecimal averageHours = workdayCount == 0 ? BigDecimal.ZERO
                 : totalHours.divide(BigDecimal.valueOf(workdayCount), 2, java.math.RoundingMode.HALF_UP);
-        return new Summary(overtimeDays, normalizeHours(overtimeHours), normalizeHours(averageHours));
+        return new Summary(overtimeDays, normalizeHours(overtimeHours), normalizeHours(averageHours),
+                workdayCount, utilizationRate(totalHours, workdayCount));
     }
 
     private Summary aggregateMemberSummaries(List<MemberDailyTotal> memberDailyTotals,
@@ -515,7 +545,14 @@ class WorklogQueryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal averageHours = workdayCount == 0 ? BigDecimal.ZERO
                 : totalHours.divide(BigDecimal.valueOf(workdayCount), 2, java.math.RoundingMode.HALF_UP);
-        return new Summary(overtimeDays, normalizeHours(overtimeHours), normalizeHours(averageHours));
+        return new Summary(overtimeDays, normalizeHours(overtimeHours), normalizeHours(averageHours),
+                workdayCount, utilizationRate(totalHours, workdayCount));
+    }
+
+    private BigDecimal utilizationRate(BigDecimal totalHours, int workdayCount) {
+        return workdayCount == 0 ? null : totalHours.multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(workdayCount).multiply(BigDecimal.valueOf(8)),
+                        2, java.math.RoundingMode.HALF_UP);
     }
 
     private int eligibleWorkdayCount(Schedule schedule, Set<LocalDate> leaveDates,

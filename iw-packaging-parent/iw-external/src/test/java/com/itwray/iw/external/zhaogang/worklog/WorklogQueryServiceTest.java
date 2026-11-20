@@ -391,6 +391,151 @@ class WorklogQueryServiceTest {
                 .doesNotContain("2026-07-01");
     }
 
+    @Test
+    void rangeReportKeepsTodayInChartButExcludesItAndFutureFromAllRankingMetricsAndAbsences() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        LocalDate today = LocalDate.of(2026, 11, 20);
+        List<Worklog> logs = List.of(
+                rangeWorklog(1, 1, "2026-11-16", 10),
+                rangeWorklog(2, 1, "2026-11-17", 7),
+                rangeWorklog(3, 1, "2026-11-20", 20),
+                rangeWorklog(4, 1, "2026-11-21", 15));
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(logs));
+        var service = service(coding, Clock.fixed(Instant.parse("2026-11-20T04:00:00Z"), CHINA_ZONE));
+        var report = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L,
+                List.of(new WorklogModule.MemberCredential(1, "成员", "", "token")),
+                LocalDate.parse("2026-11-16"), LocalDate.parse("2026-11-23"),
+                WorkCalendarDefaults.schedule(YearMonth.of(2026, 11)), Map.of(), today, 0, false);
+
+        assertThat(report.statistics().dailyTotals()).hasSize(7);
+        assertThat(report.statistics().dailyTotals().stream().map(WorklogModels.DailyTotal::hours)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo("52");
+        assertThat(report.statistics().summary().overtimeDays()).isEqualTo(3);
+        assertThat(report.rankingToExclusive()).isEqualTo("2026-11-20");
+        assertThat(report.ranking().dailyTotals()).hasSize(4);
+        var ranked = report.ranking().memberDailyTotals().get(0);
+        assertThat(ranked.dailyTotals().stream().map(WorklogModels.DailyTotal::hours)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo("17");
+        assertThat(ranked.summary().overtimeHours()).isEqualByComparingTo("2");
+        assertThat(ranked.summary().overtimeDays()).isEqualTo(1);
+        assertThat(report.absences().members().get(0).days()).extracting(WorklogModels.AbsenceDay::date)
+                .containsExactly("2026-11-17", "2026-11-18", "2026-11-19");
+        verify(coding).worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000));
+    }
+
+    @Test
+    void rangeReportSupportsHistoricalAndEntirelyFutureRangesAndPartialMembers() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of(rangeWorklog(1, 1, "2026-11-18", 7))));
+        var service = service(coding, Clock.fixed(Instant.parse("2026-11-20T04:00:00Z"), CHINA_ZONE));
+        var members = List.of(new WorklogModule.MemberCredential(1, "成功", "", "token"),
+                new WorklogModule.MemberCredential(2, "缺失凭证", "", ""));
+        var schedule = WorkCalendarDefaults.schedule(YearMonth.of(2026, 11));
+        var historical = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L, members,
+                LocalDate.parse("2026-11-18"), LocalDate.parse("2026-11-19"), schedule, Map.of(),
+                LocalDate.parse("2026-11-20"), 0, false);
+        assertThat(historical.rankingToExclusive()).isEqualTo("2026-11-19");
+        assertThat(historical.ranking().memberDailyTotals()).hasSize(1);
+        assertThat(historical.absences().coverage().failedMemberCount()).isEqualTo(1);
+        assertThat(historical.absences().members()).extracting(member -> member.user().id()).containsExactly(1L);
+        var future = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L, members,
+                LocalDate.parse("2026-11-20"), LocalDate.parse("2026-11-23"), schedule, Map.of(),
+                LocalDate.parse("2026-11-20"), 0, false);
+        assertThat(future.statistics().dailyTotals()).hasSize(3);
+        assertThat(future.rankingToExclusive()).isEqualTo(future.from());
+        assertThat(future.ranking().dailyTotals()).isEmpty();
+        assertThat(future.absences().members()).isEmpty();
+        var later = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L, members,
+                LocalDate.parse("2026-11-21"), LocalDate.parse("2026-11-23"), schedule, Map.of(),
+                LocalDate.parse("2026-11-20"), 0, false);
+        assertThat(later.rankingToExclusive()).isEqualTo(later.from());
+        assertThat(later.absences().members()).isEmpty();
+    }
+
+    @Test
+    void utilizationUsesCalendarAndIndividualLeaveAndRoundsOnlyTheFinalPercentage() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        for (long id = 1; id <= 3; id++) {
+            when(coding.worklogPage(eq("token-" + id), anyLong(), anyLong(), eq(id), eq(0), eq(1000)))
+                    .thenReturn(new WorklogPage(List.of(rangeWorklog(id, id, "2026-11-14", new BigDecimal("6.67")))));
+        }
+        var service = service(coding, Clock.fixed(Instant.parse("2026-11-20T04:00:00Z"), CHINA_ZONE));
+        var schedule = scheduleWithOverrides(YearMonth.of(2026, 11),
+                new Day(LocalDate.parse("2026-11-15"), DayType.WORKDAY, true),
+                new Day(LocalDate.parse("2026-11-18"), DayType.REST_DAY, true));
+        var allWorkdays = Set.of(LocalDate.parse("2026-11-15"), LocalDate.parse("2026-11-16"),
+                LocalDate.parse("2026-11-17"), LocalDate.parse("2026-11-19"));
+        var report = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L,
+                List.of(new WorklogModule.MemberCredential(1, "请假一天", "", "token-1"),
+                        new WorklogModule.MemberCredential(2, "无请假", "", "token-2"),
+                        new WorklogModule.MemberCredential(3, "全部请假", "", "token-3")),
+                LocalDate.parse("2026-11-14"), LocalDate.parse("2026-11-21"), schedule,
+                Map.of(1L, Set.of(LocalDate.parse("2026-11-17")), 3L, allWorkdays),
+                LocalDate.parse("2026-11-20"), 0, false);
+        var summaries = report.ranking().memberDailyTotals().stream()
+                .collect(java.util.stream.Collectors.toMap(member -> member.user().id(), WorklogModels.MemberDailyTotal::summary));
+        assertThat(summaries.get(1L).workdayCount()).isEqualTo(3);
+        assertThat(summaries.get(1L).averageHours()).isEqualByComparingTo("2.22");
+        // 6.67 / (3 * 8) * 100 = 27.79, rather than 2.22 / 8 * 100 = 27.75.
+        assertThat(summaries.get(1L).utilizationRate()).isEqualByComparingTo("27.79");
+        assertThat(summaries.get(2L).workdayCount()).isEqualTo(4);
+        assertThat(summaries.get(2L).utilizationRate()).isEqualByComparingTo("20.84");
+        assertThat(summaries.get(3L).workdayCount()).isZero();
+        assertThat(summaries.get(3L).utilizationRate()).isNull();
+    }
+
+    @Test
+    void utilizationIncludesRestDayHoursAndCanExceed100Percent() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of(rangeWorklog(1, 1, "2026-11-09", 40),
+                        rangeWorklog(2, 1, "2026-11-14", 2))));
+        var service = service(coding, Clock.fixed(Instant.parse("2026-11-20T04:00:00Z"), CHINA_ZONE));
+        var report = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L,
+                List.of(new WorklogModule.MemberCredential(1, "成员", "", "token")),
+                LocalDate.parse("2026-11-09"), LocalDate.parse("2026-11-16"),
+                WorkCalendarDefaults.schedule(YearMonth.of(2026, 11)), Map.of(), LocalDate.parse("2026-11-20"), 0, false);
+        var summary = report.ranking().memberDailyTotals().get(0).summary();
+        assertThat(summary.workdayCount()).isEqualTo(5);
+        assertThat(summary.utilizationRate()).isEqualByComparingTo("105.00");
+        assertThat(summary.utilizationRate().scale()).isEqualTo(2);
+    }
+
+    @Test
+    void utilizationHalfRoundsUpAndDistinguishesZeroHoursFromZeroWorkdays() {
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(1L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of(rangeWorklog(1, 1, "2026-11-16", 1))),
+                        new WorklogPage(List.of()), new WorklogPage(List.of()));
+        var service = service(coding, Clock.fixed(Instant.parse("2026-11-20T04:00:00Z"), CHINA_ZONE));
+        var members = List.of(new WorklogModule.MemberCredential(1, "成员", "", "token"));
+        var schedule = WorkCalendarDefaults.schedule(YearMonth.of(2026, 11));
+        var report = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L, members,
+                LocalDate.parse("2026-11-16"), LocalDate.parse("2026-11-23"), schedule, Map.of(),
+                LocalDate.parse("2026-11-20"), 0, false);
+        assertThat(report.ranking().memberDailyTotals().get(0).summary().workdayCount()).isEqualTo(4);
+        assertThat(report.ranking().memberDailyTotals().get(0).summary().utilizationRate()).isEqualByComparingTo("3.13");
+        var zeroHours = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L, members,
+                LocalDate.parse("2026-11-16"), LocalDate.parse("2026-11-20"), schedule, Map.of(),
+                LocalDate.parse("2026-11-20"), 0, false);
+        assertThat(zeroHours.ranking().memberDailyTotals().get(0).summary().utilizationRate()).isEqualByComparingTo("0.00");
+        var restOnly = service.queryRange(viewer, Scope.WORKBENCH_TEAM, 1L, members,
+                LocalDate.parse("2026-11-14"), LocalDate.parse("2026-11-16"), schedule, Map.of(),
+                LocalDate.parse("2026-11-20"), 0, false);
+        assertThat(restOnly.ranking().memberDailyTotals().get(0).summary().utilizationRate()).isNull();
+    }
+
+    private Worklog rangeWorklog(long id, long userId, String date, int hours) {
+        return rangeWorklog(id, userId, date, BigDecimal.valueOf(hours));
+    }
+
+    private Worklog rangeWorklog(long id, long userId, String date, BigDecimal hours) {
+        long start = LocalDate.parse(date).atStartOfDay(CHINA_ZONE).toInstant().toEpochMilli();
+        return new Worklog(id, id, id, "project-a", userId, hours, "工时", start, start, start);
+    }
+
     private WorklogQueryService service(CodingOpenApiPort coding, Clock clock) {
         return new WorklogQueryService(coding, new CodingIssueLinkBuilder(), clock, deletedIssues, issueChecks);
     }

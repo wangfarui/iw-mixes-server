@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.worklog;
 
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Options;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.RangeReport;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.IssueCheckStatus;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.EntriesPage;
@@ -10,6 +11,9 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Statistics;
 public interface WorklogModule {
 
     Options options(Context context);
+
+    RangeReport report(Context context, String from, String to, String scope,
+                                     Long workbenchTeamId, boolean refresh);
 
     Statistics statistics(Context context, String month, String scope, Long workbenchTeamId, boolean refresh);
 

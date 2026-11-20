@@ -3,6 +3,12 @@ package com.itwray.iw.external.zhaogang;
 import com.itwray.iw.external.zhaogang.ZhaogangModels.TokenValue;
 import com.itwray.iw.external.zhaogang.k8s.K8sTokenService;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModule;
+import com.itwray.iw.external.zhaogang.worklog.WorklogModels.RangeReport;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -16,6 +22,33 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class ZhaogangControllerTest {
+
+    @Test
+    void rangeReportBindsDatesAndResolvesTheAuthenticatedContext() throws Exception {
+        ZhaogangSessionManager sessions = mock(ZhaogangSessionManager.class);
+        WorklogModule worklogs = mock(WorklogModule.class);
+        ZhaogangProperties properties = new ZhaogangProperties();
+        var controller = new ZhaogangController(sessions, mock(ZhaogangWorkbenchService.class),
+                mock(ZhaogangCatalogService.class), properties, worklogs, mock(K8sTokenService.class));
+        var session = new ZhaogangSession("fixture-token", 100L, "测试成员", "", "fixture", 10L);
+        when(sessions.resolve(any(), any())).thenReturn(session);
+        var context = new WorklogModule.Context("fixture-token", 100L, "测试成员", "", 10L,
+                "fixture", properties.configuredTeamHost());
+        var report = new RangeReport(
+                "2026-10-28", "2026-11-04", "2026-11-04", null, null, null);
+        when(worklogs.report(context, "2026-10-28", "2026-11-03", "WORKBENCH_TEAM", 1L, true))
+                .thenReturn(report);
+        var mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(get("/external-service/api/zhaogang/worklogs/report")
+                        .param("from", "2026-10-28").param("to", "2026-11-03")
+                        .param("scope", "WORKBENCH_TEAM").param("workbenchTeamId", "1").param("refresh", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.from")
+                        .value("2026-10-28"))
+                .andExpect(jsonPath("$.data.toExclusive")
+                        .value("2026-11-04"));
+        verify(worklogs).report(context, "2026-10-28", "2026-11-03", "WORKBENCH_TEAM", 1L, true);
+    }
 
     @Test
     void tokenResponseIsMarkedAsNonCacheable() {

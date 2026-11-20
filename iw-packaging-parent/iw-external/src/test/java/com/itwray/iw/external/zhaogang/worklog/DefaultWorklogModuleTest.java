@@ -8,6 +8,9 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiPort.WorklogPage;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort.Team;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarDefaults;
+import com.itwray.iw.external.zhaogang.calendar.WorkCalendarModels.Schedule;
+import com.itwray.iw.external.zhaogang.calendar.WorkCalendarResolver;
+import com.itwray.iw.external.zhaogang.calendar.PersonalLeaveResolver;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Coverage;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Entries;
 import com.itwray.iw.external.zhaogang.worklog.WorklogModels.Scope;
@@ -21,6 +24,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.YearMonth;
+import java.util.Set;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +186,63 @@ class DefaultWorklogModuleTest {
         for (var member : List.of(first, second)) {
             verify(coding).worklogPage(eq(member.token()), anyLong(), anyLong(), eq(member.userId()), eq(0), eq(1000));
         }
+    }
+
+    @Test
+    void rangeReportCombinesCrossMonthCalendarsAndLeavesAndInvalidatesEitherCalendarVersion() {
+        WorklogScopeDirectory directory = mock(WorklogScopeDirectory.class);
+        CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
+        when(directory.selfTeam(context)).thenReturn(new Team(10L, "测试", "https://fixture.invalid"));
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(100L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of()));
+        var calendar = mock(WorkCalendarResolver.class);
+        var leaves = mock(PersonalLeaveResolver.class);
+        var july = YearMonth.of(2026, 7);
+        var august = YearMonth.of(2026, 8);
+        when(calendar.resolve(10, july)).thenReturn(WorkCalendarDefaults.schedule(july));
+        when(calendar.resolve(10, august)).thenReturn(WorkCalendarDefaults.schedule(august));
+        when(leaves.resolve(eq(10L), any(), eq(july)))
+                .thenReturn(Map.of(100L, Set.of(LocalDate.parse("2026-07-31"))));
+        when(leaves.resolve(eq(10L), any(), eq(august)))
+                .thenReturn(Map.of(100L, Set.of(LocalDate.parse("2026-08-03"))));
+        var module = new DefaultWorklogModule(directory, queryService(coding), redisCache(), calendar, leaves,
+                deletedIssues, issueChecks);
+
+        var report = module.report(context, "2026-07-30", "2026-08-04", "SELF", null, false);
+        assertThat(report.statistics().dailyTotals()).hasSize(6);
+        assertThat(report.statistics().dailyTotals()).extracting(WorklogModels.DailyTotal::date)
+                .containsExactly("2026-07-30", "2026-07-31", "2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04");
+        assertThat(report.absences().members().get(0).days()).extracting(WorklogModels.AbsenceDay::date)
+                .containsExactly("2026-07-30", "2026-08-04");
+        module.report(context, "2026-07-30", "2026-08-04", "SELF", null, false);
+        verify(coding).worklogPage(eq("token"), anyLong(), anyLong(), eq(100L), eq(0), eq(1000));
+        when(calendar.resolve(10, august)).thenReturn(new Schedule(
+                august.toString(), 1, WorkCalendarDefaults.schedule(august).days()));
+        module.report(context, "2026-07-30", "2026-08-04", "SELF", null, false);
+        verify(coding, times(2)).worklogPage(eq("token"), anyLong(), anyLong(), eq(100L), eq(0), eq(1000));
+        module.report(context, "2026-07-30", "2026-08-04", "SELF", null, true);
+        verify(coding, times(3)).worklogPage(eq("token"), anyLong(), anyLong(), eq(100L), eq(0), eq(1000));
+    }
+
+    @Test
+    void rangeReportValidatesBoundsAndAccepts31DaysAcrossMonths() {
+        var directory = mock(WorklogScopeDirectory.class);
+        var coding = mock(CodingOpenApiPort.class);
+        when(directory.selfTeam(context)).thenReturn(new Team(10L, "测试", "https://fixture.invalid"));
+        when(coding.worklogPage(eq("token"), anyLong(), anyLong(), eq(100L), eq(0), eq(1000)))
+                .thenReturn(new WorklogPage(List.of()));
+        var module = module(directory, queryService(coding), redisCache());
+        assertThatThrownBy(() -> module.report(context, "2026-07-30", "2026-08-30", "SELF", null, false))
+                .isInstanceOf(CodingOpenApiException.class);
+        assertThatThrownBy(() -> module.report(context, "2026-08-02", "2026-08-01", "SELF", null, false))
+                .isInstanceOf(CodingOpenApiException.class);
+        assertThatThrownBy(() -> module.report(context, "bad", "2026-08-01", "SELF", null, false))
+                .isInstanceOf(CodingOpenApiException.class);
+        assertThatThrownBy(() -> module.report(context, "2026-08-01", "2026-08-02", "WORKBENCH_TEAM", null, false))
+                .isInstanceOf(CodingOpenApiException.class);
+        var report = module.report(context, "2026-07-30", "2026-08-29", "SELF", null, false);
+        assertThat(report.statistics().dailyTotals()).hasSize(31);
+        assertThat(report.rankingToExclusive()).isEqualTo("2026-08-26");
     }
 
     private DefaultWorklogModule module(WorklogScopeDirectory directory, WorklogQueryService queryService,
