@@ -346,7 +346,8 @@ public class AuthUserServiceImpl implements AuthUserService {
      * 获取指定token的用户id
      */
     private Integer getLoginId(String token) {
-        Boolean validity = this.validateToken(token, false);
+        // 普通业务请求和字典版本轮询都通过此入口解析身份，同时续期当前会话。
+        Boolean validity = this.validateToken(token);
         if (!validity) {
             throw new AuthorizedException("登录状态已失效，请重新登录");
         }

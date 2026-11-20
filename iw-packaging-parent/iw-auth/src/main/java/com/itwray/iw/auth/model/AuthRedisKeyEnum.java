@@ -15,14 +15,14 @@ public enum AuthRedisKeyEnum implements RedisKeyManager {
     /**
      * 用户token key:[token]
      * <p>用户:token = 1:n</p>
-     * <p>该缓存有效期会在每次网关调用时刷新</p>
+     * <p>该缓存有效期会在每次成功校验Token或解析登录用户身份时刷新</p>
      */
     USER_TOKEN_KEY("auth:token:%s", 3 * 24 * 60 * 60L),
 
     /**
      * 用户token集合key:[userId]
      * <p>用户已登录的所有token</p>
-     * <p>该缓存有效期会在每次登录和每次网关调用时刷新</p>
+     * <p>该缓存有效期会在每次登录、成功校验Token或解析登录用户身份时刷新</p>
      */
     USER_TOKEN_SET_KEY("auth:token:set:%s", 3 * 24 * 60 * 60L),
 
