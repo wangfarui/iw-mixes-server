@@ -48,6 +48,16 @@ class WorklogMirrorRepository {
   }
 
   void ensure(String key, long team, long user, long managementTeam, String fingerprint) {
+    var existing = source(key);
+    var legacyKeys = jdbc.queryForList("""
+        SELECT source_key FROM external_zhaogang_worklog_source
+        WHERE coding_team_id=:team AND coding_user_id=:user AND source_key<>:key AND state<>'RETIRED'
+        ORDER BY source_key
+        """, Map.of("key", key, "team", team, "user", user), String.class);
+    // Report transactions and sync polling share these sources. Unchanged sources must
+    // remain ordinary reads; no-op upserts/range updates still acquire InnoDB locks.
+    if (existing != null && existing.fingerprint().equals(fingerprint)
+        && existing.managementTeamId() == managementTeam && legacyKeys.isEmpty()) return;
     tx.executeWithoutResult(
         status -> {
           jdbc.update(
@@ -94,12 +104,13 @@ class WorklogMirrorRepository {
           }
           // Old, unpublished releases used per-team/per-token source keys. Retain their audit rows
           // only.
-          jdbc.update(
-              """
-        UPDATE external_zhaogang_worklog_source SET state='RETIRED',blocked=1,lease_id='',lease_until=0
-        WHERE coding_team_id=:team AND coding_user_id=:user AND source_key<>:key AND state<>'RETIRED'
-        """,
-              Map.of("key", key, "team", team, "user", user));
+          for (String legacyKey : legacyKeys) {
+            jdbc.update(
+                """
+                UPDATE external_zhaogang_worklog_source SET state='RETIRED',blocked=1,lease_id='',lease_until=0
+                WHERE source_key=:key AND state<>'RETIRED'
+                """, Map.of("key", legacyKey));
+          }
         });
   }
 
@@ -444,6 +455,11 @@ class WorklogMirrorRepository {
   }
 
   ScopeTimes scope(String key, long now, boolean request) {
+    var existing = jdbc.query(
+        "SELECT requested_at,synced_at FROM external_zhaogang_worklog_sync_scope WHERE scope_key=:key",
+        Map.of("key", key),
+        (rs, n) -> new ScopeTimes(rs.getLong(1), rs.getLong(2)));
+    if (!request && !existing.isEmpty()) return existing.get(0);
     jdbc.update(
         "INSERT INTO external_zhaogang_worklog_sync_scope(scope_key,requested_at) VALUES"
             + " (:key,:now) ON DUPLICATE KEY UPDATE scope_key=scope_key",

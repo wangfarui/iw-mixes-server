@@ -19,6 +19,7 @@ import com.itwray.iw.external.zhaogang.worklog.WorklogModule.*;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.core.io.FileSystemResource;
@@ -99,6 +100,80 @@ class WorklogMirrorIntegrationTest {
   @AfterEach
   void close() {
     if (mirror != null) mirror.shutdown();
+  }
+
+  @Test
+  void unchangedSourcesAndSyncStatusCanBeReadWithoutDatabaseWrites() {
+    mirror.status(context, 1L, List.of(member));
+    run();
+    var before = mirror.status(context, 1L, List.of(member));
+    var manager = new DataSourceTransactionManager(jdbc.getJdbcTemplate().getDataSource());
+    var readOnly = new TransactionTemplate(manager);
+    readOnly.setReadOnly(true);
+    readOnly.executeWithoutResult(ignored -> {
+      assertThat(mirror.status(context, 1L, List.of(member))).isEqualTo(before);
+      assertThat(mirror.version(context, 1L, List.of(member))).isEqualTo(before.dataVersion());
+      mirror.rows(context, 1L, List.of(member), date("2026-11-01"), date("2026-12-01"), null, 10);
+    });
+  }
+
+  @Test
+  void reportAndSyncStatusCanReadTheSameTeamConcurrently() throws Exception {
+    var second = new MemberCredential(202, "第二成员", "", "synthetic-second");
+    when(credentials.token(10, 202)).thenReturn(Optional.of(second.token()));
+    var members = List.of(member, second);
+    remote.add(row(1, "2026-11-19", clock.millis() - 1000, 8));
+    mirror.status(context, 1L, members);
+    run();
+    mirror.status(context, 1L, members);
+    var transaction = new TransactionTemplate(
+        new DataSourceTransactionManager(jdbc.getJdbcTemplate().getDataSource()));
+    transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+    var query = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), new ZhaogangProperties(),
+        deleted, mock(WorklogIssueChecks.class), mirror);
+    var pool = Executors.newFixedThreadPool(2);
+    clearInvocations(coding);
+    try {
+      for (int round = 0; round < 20; round++) {
+        var start = new CountDownLatch(1);
+        var report = pool.submit(() -> {
+          start.await();
+          return transaction.execute(ignored -> {
+            mirror.version(context, 1L, members);
+            var day = date("2026-11-19");
+            return query.queryRange(context, Scope.WORKBENCH_TEAM, 1L, members, day, day.plusDays(1),
+                new Schedule("2026-11", 1, List.of(new Day(day, DayType.WORKDAY, false))),
+                Map.of(), date("2026-11-20"), 0, false);
+          });
+        });
+        var sync = pool.submit(() -> {
+          start.await();
+          return mirror.status(context, 1L, members);
+        });
+        start.countDown();
+        assertThat(report.get(10, TimeUnit.SECONDS).statistics().dailyTotals().get(0).hours())
+            .isEqualByComparingTo("8");
+        assertThat(sync.get(10, TimeUnit.SECONDS).members()).hasSize(2);
+      }
+      verifyNoInteractions(coding);
+    } finally {
+      pool.shutdownNow();
+      query.shutdown();
+    }
+  }
+
+  @Test
+  void unchangedCanonicalSourceStillRetiresLegacySources() {
+    mirror.status(context, 1L, List.of(member));
+    String legacyKey = "a".repeat(64);
+    jdbc.update("""
+        INSERT INTO external_zhaogang_worklog_source
+          (source_key,coding_team_id,coding_user_id,credential_fingerprint)
+        VALUES (:key,10,101,'legacy')
+        """, Map.of("key", legacyKey));
+    mirror.status(context, 1L, List.of(member));
+    assertThat(repo.source(legacyKey).state()).isEqualTo("RETIRED");
+    assertThat(repo.source(key()).state()).isEqualTo("QUEUED");
   }
 
   @Test
