@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @Component
 class WorklogViewCache {
 
-    private static final String KEY_PREFIX = "zhaogang:worklog:v8:";
+    private static final String KEY_PREFIX = "zhaogang:worklog:v9:";
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;

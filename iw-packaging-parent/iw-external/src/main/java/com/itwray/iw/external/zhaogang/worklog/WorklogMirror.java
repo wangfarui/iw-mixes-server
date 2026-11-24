@@ -298,9 +298,9 @@ class WorklogMirror {
     if (existing != null) return existing;
     if (millis(from) < INITIAL_FROM)
       return new ReadProblem("OUTSIDE_COVERAGE", "工时镜像从 2026-01-01 起采集，更早日期的数据不完整");
-    return repo.missing(s.key(), millis(from), millis(to)) > 0
-        ? new ReadProblem("INCOMPLETE", "本次日期范围有工时在当前令牌下已不再可见，暂不据此判断缺勤")
-        : null;
+    // A complete, stable reconciliation defines the current visible record set.
+    // Removed worklogs remain as audit rows, not evidence of an incomplete scan.
+    return null;
   }
 
   int projectCount(

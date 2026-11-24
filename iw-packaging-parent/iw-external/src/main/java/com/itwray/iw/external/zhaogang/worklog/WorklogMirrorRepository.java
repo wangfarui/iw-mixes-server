@@ -323,12 +323,6 @@ class WorklogMirrorRepository {
                           encode(issue),
                           "now",
                           now)));
-          long missing =
-              jdbc.queryForObject(
-                  "SELECT COUNT(*) FROM external_zhaogang_worklog_entry WHERE source_key=:key AND"
-                      + " missing=1",
-                  Map.of("key", source.key()),
-                  Long.class);
           long historyBefore =
               source.through() == 0 || source.requestedFrom() == -2 ? from : locked.historyBefore();
           boolean moreHistory = historyBefore > WorklogMirror.INITIAL_FROM;
@@ -357,9 +351,7 @@ class WorklogMirrorRepository {
                   "incomplete",
                   incomplete,
                   "warning",
-                  missing > 0
-                      ? "部分历史工时在当前令牌下已不再可见，暂不据此判断缺勤"
-                      : incomplete ? "部分工时缺少必要字段或事项信息，暂不据此判断缺勤" : ""));
+                  incomplete ? "部分工时缺少必要字段或事项信息，暂不据此判断缺勤" : ""));
         });
   }
 
@@ -409,18 +401,6 @@ class WorklogMirrorRepository {
         "SELECT COALESCE(SUM(e.hours),0) " + visible(),
         Map.of("keys", keys, "from", from, "to", to),
         BigDecimal.class);
-  }
-
-  long missing(String key, long from, long to) {
-    return jdbc.queryForObject(
-        """
-        SELECT COUNT(*) FROM external_zhaogang_worklog_entry e
-        WHERE source_key=:key AND missing=1 AND start_at>=:from AND start_at<:to
-          AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_issue d
-            WHERE d.coding_team_id=e.coding_team_id AND d.coding_issue_id=e.issue_id)
-        """,
-        Map.of("key", key, "from", from, "to", to),
-        Long.class);
   }
 
   int projectCount(List<String> keys, long from, long to) {

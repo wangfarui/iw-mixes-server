@@ -270,8 +270,9 @@ class WorklogMirrorIntegrationTest {
   }
 
   @Test
-  void reconciliationMovesDatesAndMakesMissingSourceRowsPartialWithoutPermanentDeletion() {
+  void reconciliationAppliesWorklogEditsAndDeletionsWithoutIncompleteCoverage() {
     remote.add(row(1, "2026-10-19", clock.millis() - 86_400_000, 4));
+    remote.add(row(2, "2026-11-19", clock.millis() - 1000, 2));
     mirror.status(context, null, List.of(member));
     run();
     remote.set(0, row(1, "2026-11-19", remote.get(0).createdAt(), 6));
@@ -280,21 +281,64 @@ class WorklogMirrorIntegrationTest {
     assertThat(mirror.total(context, null, List.of(member), date("2026-10-01"), date("2026-11-01")))
         .isZero();
     assertThat(mirror.total(context, null, List.of(member), date("2026-11-01"), date("2026-12-01")))
-        .isEqualByComparingTo("6");
-    remote.clear();
+        .isEqualByComparingTo("8");
+    remote.remove(0);
     mirror.reconcile(context, null, List.of(member), 0);
     run();
     assertThat(mirror.total(context, null, List.of(member), date("2026-11-01"), date("2026-12-01")))
-        .isZero();
+        .isEqualByComparingTo("2");
     assertThat(mirror.problem(repo.source(key()), date("2026-11-01"), date("2026-12-01")))
-        .isNotNull();
+        .isNull();
     assertThat(mirror.problem(repo.source(key()), date("2026-10-01"), date("2026-11-01"))).isNull();
-    assertThat(repo.source(key()).warning()).contains("不再可见");
+    assertThat(repo.source(key()).warning()).isEmpty();
+    assertThat(jdbc.queryForObject(
+        "SELECT COUNT(*) FROM external_zhaogang_worklog_entry WHERE source_key=:key AND missing=1",
+        Map.of("key", key()), Long.class)).isEqualTo(1);
+    var query = new WorklogQueryService(coding, new CodingIssueLinkBuilder(), new ZhaogangProperties(),
+        deleted, mock(WorklogIssueChecks.class), mirror);
+    try {
+      var day = date("2026-11-19");
+      var report = query.queryRange(context, Scope.WORKBENCH_TEAM, 1L, List.of(member), day,
+          day.plusDays(1), new Schedule("2026-11", 1, List.of(new Day(day, DayType.WORKDAY, false))),
+          Map.of(), date("2026-11-20"), 0, false);
+      assertThat(report.statistics().coverage().partial()).isFalse();
+      assertThat(report.statistics().dailyTotals().get(0).hours()).isEqualByComparingTo("2");
+      assertThat(report.absences().members()).hasSize(1);
+      assertThat(report.absences().coverage().partial()).isFalse();
+    } finally {
+      query.shutdown();
+    }
     assertThat(
             jdbc.getJdbcTemplate()
                 .queryForObject(
                     "SELECT COUNT(*) FROM external_zhaogang_worklog_deleted_issue", Long.class))
         .isZero();
+  }
+
+  @Test
+  void deletingTheLastWorklogProducesCompleteZeroHoursAndReappearingRowsAreVisibleAgain() {
+    var original = row(1, "2026-11-19", clock.millis() - 1000, 8);
+    remote.add(original);
+    mirror.status(context, null, List.of(member));
+    run();
+    remote.clear();
+    mirror.reconcile(context, null, List.of(member), 0);
+    run();
+    var from = date("2026-11-01");
+    var to = date("2026-12-01");
+    assertThat(mirror.total(context, null, List.of(member), from, to)).isZero();
+    assertThat(mirror.rows(context, null, List.of(member), from, to, null, 10)).isEmpty();
+    assertThat(mirror.problem(repo.source(key()), from, to)).isNull();
+    assertThat(mirror.status(context, null, List.of(member)).partial()).isFalse();
+    assertThat(repo.source(key()).warning()).isEmpty();
+
+    remote.add(original);
+    mirror.reconcile(context, null, List.of(member), 0);
+    run();
+    assertThat(mirror.rows(context, null, List.of(member), from, to, null, 10))
+        .extracting(Worklog::id).containsExactly(original.id());
+    assertThat(mirror.total(context, null, List.of(member), from, to)).isEqualByComparingTo("8");
+    assertThat(mirror.problem(repo.source(key()), from, to)).isNull();
   }
 
   @Test
