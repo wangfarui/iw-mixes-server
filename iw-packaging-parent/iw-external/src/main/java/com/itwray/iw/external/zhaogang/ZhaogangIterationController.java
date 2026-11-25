@@ -31,6 +31,7 @@ import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UpdateIssue
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.SelectionOption;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels.UserSnapshot;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationModule;
+import com.itwray.iw.external.zhaogang.iteration.TeamIterationModels;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.IterationTeamOption;
 import com.itwray.iw.external.zhaogang.ZhaogangProperties;
 import io.swagger.v3.oas.annotations.Operation;
@@ -246,6 +247,19 @@ public class ZhaogangIterationController {
         return GeneralResponse.success(module.syncCodingIssues(actor(request, response), iterationId));
     }
 
+    @GetMapping("/iterations/{iterationId}/issues/{issueId}/worklogs")
+    public GeneralResponse<List<IssueWorklog>> worklogs(@PathVariable long iterationId, @PathVariable long issueId,
+                                                       HttpServletRequest request, HttpServletResponse response) {
+        return GeneralResponse.success(module.worklogs(actor(request, response), iterationId, issueId));
+    }
+
+    @DeleteMapping("/iterations/{iterationId}/issues/{issueId}/worklogs/{worklogId}")
+    public GeneralResponse<Void> deleteWorklog(@PathVariable long iterationId, @PathVariable long issueId,
+                                               @PathVariable long worklogId, HttpServletRequest request, HttpServletResponse response) {
+        module.deleteWorklog(actor(request, response), iterationId, issueId, worklogId);
+        return GeneralResponse.success();
+    }
+
     @PostMapping("/iterations/{iterationId}/issues/{issueId}/worklogs")
     public GeneralResponse<IssueWorklog> registerWorklog(@PathVariable long iterationId,
                                                          @PathVariable long issueId,
@@ -267,20 +281,20 @@ public class ZhaogangIterationController {
     }
 
     @DeleteMapping("/iterations/{iterationId}/issues/{issueId}")
-    public GeneralResponse<Void> removeIssue(@PathVariable long iterationId, @PathVariable long issueId,
+    public GeneralResponse<TeamIterationModels.RemoveIssuesResult> removeIssue(@PathVariable long iterationId, @PathVariable long issueId,
+                                             @RequestParam(defaultValue = "false") boolean deleteCoding,
                                              HttpServletRequest request, HttpServletResponse response) {
-        module.removeIssue(actor(request, response), iterationId, issueId);
-        return GeneralResponse.success();
+        return GeneralResponse.success(module.removeIssues(actor(request, response), iterationId,
+                new RemoveIssuesCommand(List.of(issueId), deleteCoding)));
     }
 
     @PostMapping("/iterations/{iterationId}/issues/batch-delete")
-    @Operation(summary = "批量删除 Dev Hub 中的迭代事项，不删除 CODING 数据")
-    public GeneralResponse<Void> removeIssues(@PathVariable long iterationId,
+    @Operation(summary = "批量移除迭代事项，可选同步删除 CODING 事项")
+    public GeneralResponse<TeamIterationModels.RemoveIssuesResult> removeIssues(@PathVariable long iterationId,
                                               @RequestBody RemoveIssuesCommand command,
                                               HttpServletRequest request,
                                               HttpServletResponse response) {
-        module.removeIssues(actor(request, response), iterationId, command);
-        return GeneralResponse.success();
+        return GeneralResponse.success(module.removeIssues(actor(request, response), iterationId, command));
     }
 
     @PostMapping("/iterations/{iterationId}/release-plans")

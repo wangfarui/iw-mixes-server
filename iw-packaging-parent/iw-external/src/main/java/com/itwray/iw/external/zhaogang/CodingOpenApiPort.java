@@ -112,6 +112,23 @@ public interface CodingOpenApiPort {
     String createIssueWorkHours(String token, String projectName, long issueCode, BigDecimal spendHour,
                                 BigDecimal remainingHour, long startAt);
 
+    default String createIssueWorkHours(String token, String projectName, long issueCode, BigDecimal spendHour,
+                                        BigDecimal remainingHour, long startAt, String workingDesc) {
+        return createIssueWorkHours(token, projectName, issueCode, spendHour, remainingHour, startAt);
+    }
+
+    default void deleteIssueWorkHours(String token, String projectName, long issueCode, long worklogId) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现工时删除");
+    }
+
+    default void verifyIssueDeletionScope(String token, String projectName, long issueCode, java.util.Set<Long> allowedCodes) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现事项删除范围核验");
+    }
+
+    default void deleteIssue(String token, String projectName, long issueCode) {
+        throw new UnsupportedOperationException("当前 CODING 适配器未实现事项删除");
+    }
+
     record IssueType(long id, String name, String systemType, boolean system, String splitType,
                      List<Long> splitTargetIssueTypeIds) {
         public IssueType(long id, String name, String systemType, boolean system) {
@@ -167,7 +184,11 @@ public interface CodingOpenApiPort {
     }
 
     record IssueWorklog(long id, BigDecimal spendHours, BigDecimal remainingHours, long startAt,
-                        long createdAt, long updatedAt) {
+                        long createdAt, long updatedAt, long userId, String userName, String workingDesc) {
+        public IssueWorklog(long id, BigDecimal spendHours, BigDecimal remainingHours, long startAt,
+                            long createdAt, long updatedAt) {
+            this(id, spendHours, remainingHours, startAt, createdAt, updatedAt, 0, "", "");
+        }
     }
 
     record Team(long id, String name, String host) {

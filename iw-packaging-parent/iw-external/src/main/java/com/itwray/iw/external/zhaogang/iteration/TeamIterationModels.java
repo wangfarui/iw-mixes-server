@@ -169,7 +169,13 @@ public final class TeamIterationModels {
     public record ParentIssueOption(long issueCode, String title, CodingIssueType issueType, String issueTypeName) {
     }
 
-    public record RemoveIssuesCommand(List<Long> issueIds) {
+    public record RemoveIssuesResult(List<Long> removedIssueIds, List<CodingSyncFailure> failures) {
+        public RemoveIssuesResult { removedIssueIds = List.copyOf(removedIssueIds); failures = List.copyOf(failures); }
+    }
+
+    public record RemoveIssuesCommand(List<Long> issueIds, boolean deleteCoding, List<Long> expectedIssueIds) {
+        public RemoveIssuesCommand(List<Long> issueIds) { this(issueIds, false, null); }
+        public RemoveIssuesCommand(List<Long> issueIds, boolean deleteCoding) { this(issueIds, deleteCoding, null); }
         public RemoveIssuesCommand {
             issueIds = issueIds == null ? List.of() : issueIds.stream()
                     .filter(id -> id != null && id > 0)
@@ -197,7 +203,8 @@ public final class TeamIterationModels {
 
     public record IssueWorklog(long id, BigDecimal spendHours, LocalDateTime registeredAt,
                                IssueSyncStatus syncStatus, String syncMessage, LocalDateTime syncedAt,
-                               UserSnapshot creator, LocalDateTime createdAt) {
+                               UserSnapshot creator, LocalDateTime createdAt, Long codingWorklogId, String source,
+                               boolean canDelete) {
     }
 
     public record CodingSyncFailure(long issueId, String title, String reason,

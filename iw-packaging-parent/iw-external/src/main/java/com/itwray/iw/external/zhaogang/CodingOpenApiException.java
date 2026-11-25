@@ -26,9 +26,12 @@ public class CodingOpenApiException extends RuntimeException {
             Map.entry("DescribeProjectIssueFieldList", List.of("项目协同（读写）")),
             Map.entry("DescribeProjectIssueStatusList", List.of("项目协同（读写）")),
             Map.entry("DescribeIssueWorkLogList", List.of("项目协同（读写）")),
+            Map.entry("DescribeSubIssueList", List.of("项目协同（读写）")),
             Map.entry("CreateIssue", List.of("项目协同（读写）")),
             Map.entry("ModifyIssue", List.of("项目协同（读写）")),
-            Map.entry("CreateIssueWorkHours", List.of("项目协同（读写）"))
+            Map.entry("CreateIssueWorkHours", List.of("项目协同（读写）")),
+            Map.entry("DeleteIssueWorkHours", List.of("项目协同（读写）")),
+            Map.entry("DeleteIssue", List.of("项目协同（读写）"))
     );
 
     private final String action;

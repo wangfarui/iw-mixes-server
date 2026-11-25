@@ -87,9 +87,13 @@ public interface TeamIterationModule {
 
     IssueWorklog retryWorklog(Actor actor, long iterationId, long issueId, long worklogId);
 
+    List<IssueWorklog> worklogs(Actor actor, long iterationId, long issueId);
+
+    void deleteWorklog(Actor actor, long iterationId, long issueId, long worklogId);
+
     void removeIssue(Actor actor, long iterationId, long issueId);
 
-    void removeIssues(Actor actor, long iterationId, RemoveIssuesCommand command);
+    TeamIterationModels.RemoveIssuesResult removeIssues(Actor actor, long iterationId, RemoveIssuesCommand command);
 
     ReleasePlan addReleasePlan(Actor actor, long iterationId, AddReleasePlanCommand command);
 

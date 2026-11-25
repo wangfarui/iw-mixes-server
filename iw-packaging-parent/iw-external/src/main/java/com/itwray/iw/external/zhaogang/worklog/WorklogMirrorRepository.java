@@ -416,6 +416,10 @@ class WorklogMirrorRepository {
     return """
                 FROM external_zhaogang_worklog_entry e JOIN external_zhaogang_worklog_source s ON s.source_key=e.source_key
                 WHERE e.source_key IN (:keys) AND s.blocked=0 AND e.missing=0 AND e.start_at>=:from AND e.start_at<:to
+                AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_issue_key k
+                    WHERE k.coding_team_id=e.coding_team_id AND k.project_name=e.project_name AND k.issue_code=e.issue_code)
+                AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_entry w
+                    WHERE w.coding_team_id=e.coding_team_id AND w.worklog_id=e.worklog_id)
                 AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_issue d
                     WHERE d.coding_team_id=e.coding_team_id AND d.coding_issue_id=e.issue_id)
                 """;

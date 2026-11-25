@@ -1189,7 +1189,7 @@ class DefaultTeamIterationModuleTest {
                 "PROCESSING", new BigDecimal("8")));
         when(coding.issueWorklogs("token", "project-a", 8001L)).thenReturn(List.of());
         when(coding.createIssueWorkHours(eq("token"), eq("project-a"), eq(8001L),
-                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong())).thenReturn("request-1");
+                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong(), eq("Dev Hub 工时登记 #9"))).thenReturn("request-1");
         IssueWorklogEntity synced = worklog(9L, IssueSyncStatus.SYNCED);
         when(repository.markWorklogSynced(9L, "request-1")).thenReturn(synced);
         DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
@@ -1200,7 +1200,7 @@ class DefaultTeamIterationModuleTest {
 
         assertThat(result.syncStatus()).isEqualTo(IssueSyncStatus.SYNCED);
         verify(coding).createIssueWorkHours(eq("token"), eq("project-a"), eq(8001L),
-                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong());
+                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong(), eq("Dev Hub 工时登记 #9"));
         verify(repository).updateCodingWorklogSummary(1L, 2L, new BigDecimal("2.5"), 1, actor);
     }
 
@@ -1831,6 +1831,138 @@ class DefaultTeamIterationModuleTest {
     private CodingOpenApiPort.IssueField selectField(long id, String name, String title, String value) {
         return new CodingOpenApiPort.IssueField(id, name, "CUSTOM", "SELECT", true, false, "",
                 List.of(new CodingOpenApiPort.IssueFieldOption(value, title)));
+    }
+
+
+    @Test
+    void worklogDetailsReadOnlyLocalRecordsAndSortNewestFirst() {
+        var repository = mock(TeamIterationRepository.class);
+        var coding = mock(CodingOpenApiPort.class);
+        var first = worklog(9L, IssueSyncStatus.SYNCED); first.setCodingWorklogId(1001L);
+        var newer = worklog(10L, IssueSyncStatus.FAILED); newer.setRegisteredAt(first.getRegisteredAt().plusDays(1));
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(),
+                List.of(linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现")), List.of(first, newer))));
+        var result = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser()).worklogs(actor, 1L, 2L);
+        assertThat(result).extracting(TeamIterationModels.IssueWorklog::id).containsExactly(10L, 9L);
+        assertThat(result.get(1).codingWorklogId()).isEqualTo(1001L);
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void deletingRemoteWorklogUsesRemoteIdAndRefreshesSnapshot() {
+        var repository = mock(TeamIterationRepository.class);
+        var coding = mock(CodingOpenApiPort.class);
+        var entry = worklog(9L, IssueSyncStatus.SYNCED); entry.setCodingWorklogId(1001L);
+        var issue = linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(issue), List.of(entry))));
+        when(repository.claimWorklogDeletion(9L)).thenReturn(true);
+        when(coding.issueWorklogs("token", "project-a", 7780L)).thenReturn(List.of(
+                new CodingOpenApiPort.IssueWorklog(1001L, new BigDecimal("2.5"), BigDecimal.ZERO, 1, 1, 1),
+                new CodingOpenApiPort.IssueWorklog(1002L, BigDecimal.ONE, BigDecimal.ZERO, 2, 2, 2)));
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        module.deleteWorklog(actor, 1, 2, 9);
+        verify(coding).deleteIssueWorkHours("token", "project-a", 7780, 1001);
+        verify(repository).updateCodingWorklogSummary(1, 2, BigDecimal.ONE, 1, actor);
+        verify(repository).releaseWorklogDeletion(9);
+    }
+
+    @Test
+    void failedRemoteWorklogDeletionKeepsLocalRecordAndReleasesClaim() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var entry = worklog(9L, IssueSyncStatus.SYNCED); entry.setCodingWorklogId(1001L);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(),
+                List.of(linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现")), List.of(entry))));
+        when(repository.claimWorklogDeletion(9L)).thenReturn(true);
+        when(coding.issueWorklogs(anyString(), anyString(), anyLong())).thenReturn(List.of(
+                new CodingOpenApiPort.IssueWorklog(1001, BigDecimal.ONE, BigDecimal.ZERO, 1, 1, 1)));
+        org.mockito.Mockito.doThrow(new CodingOpenApiException("DeleteIssueWorkHours", "UnauthorizedOperation", "权限不足"))
+                .when(coding).deleteIssueWorkHours(anyString(), anyString(), anyLong(), anyLong());
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThatThrownBy(() -> module.deleteWorklog(actor, 1, 2, 9)).isInstanceOf(TeamIterationException.class);
+        verify(repository, never()).deleteWorklog(anyLong(), anyLong(), anyLong(), any());
+        verify(repository, never()).replaceCodingWorklogs(anyLong(), anyLong(), any(), any());
+        verify(repository).releaseWorklogDeletion(9);
+    }
+
+    @Test
+    void deletingWorklogStillRequiresExplicitRemoteSuccessWhenListDoesNotContainIt() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var entry = worklog(9L, IssueSyncStatus.SYNCED); entry.setCodingWorklogId(1001L);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(),
+                List.of(linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现")), List.of(entry))));
+        when(repository.claimWorklogDeletion(9L)).thenReturn(true);
+        when(coding.issueWorklogs(anyString(), anyString(), anyLong())).thenReturn(List.of());
+        new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser()).deleteWorklog(actor, 1, 2, 9);
+        verify(coding).deleteIssueWorkHours("token", "project-a", 7780, 1001);
+        verify(repository).updateCodingWorklogSummary(1, 2, BigDecimal.ZERO, 0, actor);
+    }
+
+    @Test
+    void deletingFailedUnsentWorklogRemovesOnlyLocalAudit() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var entry = worklog(9L, IssueSyncStatus.FAILED);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(),
+                List.of(linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现")), List.of(entry))));
+        when(repository.claimWorklogDeletion(9L)).thenReturn(true);
+        new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser()).deleteWorklog(actor, 1, 2, 9);
+        verify(repository).deleteWorklog(1, 2, 9, actor); verifyNoInteractions(coding);
+    }
+
+    @Test
+    void deletionRejectsAmbiguousLegacyAuditWithoutMutatingRemote() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var entry = worklog(9L, IssueSyncStatus.UNKNOWN);
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(),
+                List.of(linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现")), List.of(entry))));
+        when(repository.claimWorklogDeletion(9L)).thenReturn(true);
+        assertThatThrownBy(() -> new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser())
+                .deleteWorklog(actor, 1, 2, 9)).hasMessageContaining("先同步");
+        verifyNoInteractions(coding);
+    }
+
+    @Test
+    void deletionRejectsChangedConfirmationScopeBeforeAnyMutation() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var parent = linkedIssue(1L, CodingIssueType.REQUIREMENT, 100L, "需求");
+        var child = linkedChild(2L, 1L, CodingIssueType.SUB_TASK, 101L, "实现");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(parent, child))));
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThatThrownBy(() -> module.removeIssues(actor, 1,
+                new RemoveIssuesCommand(List.of(1L), true, List.of(1L)))).hasMessageContaining("范围已变化");
+        verifyNoInteractions(coding);
+        verify(repository, never()).removeIssueTrees(anyLong(), any(), any());
+    }
+
+    @Test
+    void remoteDeletionIsChildFirstAndDeduplicatesSelectedParentAndChild() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var parent = linkedIssue(1L, CodingIssueType.REQUIREMENT, 100L, "需求");
+        var child = linkedChild(2L, 1L, CodingIssueType.SUB_TASK, 101L, "实现");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(parent, child))));
+        var result = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser()).removeIssues(actor, 1,
+                new RemoveIssuesCommand(List.of(1L, 2L, 1L), true));
+        assertThat(result.removedIssueIds()).containsExactly(2L, 1L); assertThat(result.failures()).isEmpty();
+        var order = org.mockito.Mockito.inOrder(coding);
+        order.verify(coding).deleteIssue("token", "project-a", 101L);
+        order.verify(coding).deleteIssue("token", "project-a", 100L);
+    }
+
+    @Test
+    void failedChildDeletionPreservesParentAndContinuesOtherRoots() {
+        var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
+        var parent = linkedIssue(1L, CodingIssueType.REQUIREMENT, 100L, "需求");
+        var child = linkedChild(2L, 1L, CodingIssueType.SUB_TASK, 101L, "实现");
+        var other = linkedIssue(3L, CodingIssueType.TASK, 102L, "独立任务");
+        when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(), List.of(parent, child, other))));
+        org.mockito.Mockito.doThrow(new CodingOpenApiException("DeleteIssue", "UnauthorizedOperation", "权限不足"))
+                .when(coding).deleteIssue("token", "project-a", 101L);
+        var result = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser()).removeIssues(actor, 1,
+                new RemoveIssuesCommand(List.of(1L, 3L), true));
+        assertThat(result.removedIssueIds()).containsExactly(3L);
+        assertThat(result.failures()).extracting(TeamIterationModels.CodingSyncFailure::issueId).containsExactly(2L, 1L);
+        assertThat(result.failures().get(0).permissionError().action()).isEqualTo("DeleteIssue");
+        verify(coding, never()).deleteIssue("token", "project-a", 100L);
+        verify(repository, never()).removeIssueTrees(1, List.of(1L), actor);
     }
 
     private IssueWorklogEntity worklog(long id, IssueSyncStatus status) {

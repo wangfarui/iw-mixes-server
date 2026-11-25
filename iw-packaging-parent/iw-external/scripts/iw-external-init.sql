@@ -308,6 +308,7 @@ create table external_zhaogang_iteration_issue
     task_type         varchar(128)                          null comment '子工作项任务类型业务值',
     priority          varchar(1)                            null comment '子工作项优先级：0低/1中/2高/3紧急',
     coding_recorded_hours decimal(10, 2)                    null comment 'CODING已记录工时（小时）',
+    coding_worklogs_loaded tinyint(1) not null default 0 comment '已同步工时明细',
     coding_worklog_count int unsigned                       null comment 'CODING工时记录次数',
     online_bug        tinyint(1)                            null comment '缺陷是否线上Bug',
     bug_priority      varchar(64)                           null comment '缺陷Bug优先级业务值',
@@ -342,6 +343,10 @@ create table external_zhaogang_iteration_issue_worklog
     sync_error_code    varchar(128)                       null comment '最近CODING错误码',
     sync_started_at    datetime                           null comment '最近同步开始时间',
     sync_attempt_count int unsigned default 0             not null comment '同步尝试次数',
+    delete_started_at  datetime null comment '删除操作租约',
+    coding_worklog_id  bigint unsigned null comment 'CODING工时日志ID',
+    source             varchar(16) not null default 'WORKBENCH' comment 'WORKBENCH/CODING',
+    coding_missing     tinyint(1) not null default 0 comment '同步确认已不存在或主动删除',
     coding_request_id  varchar(128)                       null comment 'CODING请求ID',
     synced_at          datetime                           null comment '同步到CODING时间',
     creator_user_id    bigint unsigned                    not null comment '登记人CODING用户ID',
@@ -351,6 +356,7 @@ create table external_zhaogang_iteration_issue_worklog
     update_time        datetime default current_timestamp not null on update current_timestamp comment '更新时间',
     primary key (id),
     key idx_iteration_issue_time (iteration_id, issue_id, registered_at, id),
+    unique key uk_issue_coding_worklog (issue_id, coding_worklog_id),
     key idx_worklog_sync (sync_status, sync_started_at)
 ) engine = InnoDB default charset = utf8mb4 comment '工作台子工作项工时登记';
 
@@ -743,4 +749,21 @@ CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_sync_scope (
     requested_at BIGINT NOT NULL,
     synced_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (scope_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Confirmed worklog deletions prevent a stale/background mirror from showing a removed entry again.
+CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deleted_entry (
+    coding_team_id BIGINT NOT NULL,
+    coding_team_key VARCHAR(64) NOT NULL,
+    worklog_id BIGINT NOT NULL,
+    confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (coding_team_id, worklog_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deleted_issue_key (
+    coding_team_id BIGINT NOT NULL,
+    project_name VARCHAR(255) NOT NULL,
+    issue_code BIGINT NOT NULL,
+    confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(coding_team_id,project_name,issue_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

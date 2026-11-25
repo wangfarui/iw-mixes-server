@@ -97,6 +97,8 @@ public final class TeamIterationEntities {
         private String priority;
         private BigDecimal codingRecordedHours;
         private Integer codingWorklogCount;
+        @TableField(updateStrategy = FieldStrategy.NEVER)
+        private Boolean codingWorklogsLoaded;
         private Boolean onlineBug;
         private String bugPriority;
         private String syncStatus;
@@ -126,6 +128,10 @@ public final class TeamIterationEntities {
         private LocalDateTime syncStartedAt;
         private Integer syncAttemptCount;
         private String codingRequestId;
+        private Long codingWorklogId;
+        private String source;
+        private Boolean codingMissing;
+        private LocalDateTime deleteStartedAt;
         private LocalDateTime syncedAt;
         private Long creatorUserId;
         private String creatorUserName;

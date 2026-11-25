@@ -89,6 +89,12 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     private final TeamIterationReleasePlanResolver releasePlanResolver;
     private final CodingIssueSnapshotLoader issueSnapshotLoader;
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private com.itwray.iw.external.zhaogang.worklog.WorklogMutationJournal mutationJournal;
+
+    @Autowired
+    void setMutationJournal(com.itwray.iw.external.zhaogang.worklog.WorklogMutationJournal journal) {
+        this.mutationJournal = journal;
+    }
 
     @Autowired
     void setEventPublisher(org.springframework.context.ApplicationEventPublisher publisher) {
@@ -772,6 +778,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     private IssueEntity applyCodingWorklogSummary(Actor actor, long iterationId, IssueEntity entity,
                                                   CodingWorklogSummary summary) {
         if (summary == null || entity == null || entity.getId() == null) return entity;
+        repository.replaceCodingWorklogs(iterationId, entity.getId(), summary.worklogs(), actor);
         entity.setCodingRecordedHours(summary.recordedHours());
         entity.setCodingWorklogCount(summary.worklogCount());
         IssueEntity updated = repository.updateCodingWorklogSummary(iterationId, entity.getId(),
@@ -780,10 +787,12 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     }
 
     private CodingWorklogSummary codingWorklogSummary(Actor actor, String projectName, long issueCode) {
-        List<CodingOpenApiPort.IssueWorklog> worklogs = coding.issueWorklogs(actor.token(), projectName, issueCode);
+        Set<Long> deleted = mutationJournal == null ? Set.of() : mutationJournal.deletedWorklogs(actor.codingTeamId());
+        List<CodingOpenApiPort.IssueWorklog> worklogs = coding.issueWorklogs(actor.token(), projectName, issueCode)
+                .stream().filter(w -> !deleted.contains(w.id())).toList();
         BigDecimal total = worklogs.stream().map(CodingOpenApiPort.IssueWorklog::spendHours)
                 .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new CodingWorklogSummary(total, worklogs.size());
+        return new CodingWorklogSummary(total, worklogs.size(), worklogs);
     }
 
     @Override
@@ -822,22 +831,120 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     }
 
     @Override
+    public List<IssueWorklog> worklogs(Actor actor, long iterationId, long issueId) {
+        StoredIteration stored = requireStored(iterationId);
+        requireMember(actor, stored);
+        if (stored.issues().stream().noneMatch(i -> i.getId() == issueId)) throw new TeamIterationException("事项不存在");
+        Set<Long> deleted = mutationJournal == null ? Set.of() : mutationJournal.deletedWorklogs(actor.codingTeamId());
+        return stored.worklogs().stream().filter(w -> w.getIssueId() == issueId && !Boolean.TRUE.equals(w.getCodingMissing())
+                        && (w.getCodingWorklogId() == null || !deleted.contains(w.getCodingWorklogId())))
+                .sorted(Comparator.comparing(IssueWorklogEntity::getRegisteredAt).reversed()
+                        .thenComparing(IssueWorklogEntity::getId, Comparator.reverseOrder()))
+                .map(this::toWorklog).toList();
+    }
+
+    @Override
+    public void deleteWorklog(Actor actor, long iterationId, long issueId, long worklogId) {
+        StoredIteration stored = requireStored(iterationId);
+        requireMember(actor, stored);
+        IssueEntity issue = stored.issues().stream().filter(i -> i.getId() == issueId).findFirst()
+                .orElseThrow(() -> new TeamIterationException("事项不存在"));
+        IssueWorklogEntity entry = stored.worklogs().stream().filter(w -> w.getIssueId() == issueId && w.getId() == worklogId)
+                .findFirst().orElseThrow(() -> new TeamIterationException("工时记录不存在，请刷新后重试"));
+        if ("SYNCING".equals(entry.getSyncStatus())) throw new TeamIterationException("工时正在同步，请稍后再试");
+        if (!repository.claimWorklogDeletion(worklogId)) throw new TeamIterationException("工时记录正在处理，请稍后刷新重试");
+        try {
+            if (entry.getCodingWorklogId() == null) {
+                if ("SYNCED".equals(entry.getSyncStatus()) || "UNKNOWN".equals(entry.getSyncStatus())) {
+                    throw new TeamIterationException("该记录尚未匹配 CODING 工时 ID，请先同步 CODING 事项后重试");
+                }
+                repository.deleteWorklog(iterationId, issueId, worklogId, actor);
+                return;
+            }
+            try {
+                // The list supplies the refreshed snapshot. Only an explicit successful delete confirms deletion.
+                List<CodingOpenApiPort.IssueWorklog> current = coding.issueWorklogs(actor.token(), issue.getProjectName(), issue.getIssueCode());
+                coding.deleteIssueWorkHours(actor.token(), issue.getProjectName(), issue.getIssueCode(), entry.getCodingWorklogId());
+                if (mutationJournal != null) mutationJournal.worklogDeleted(actor.codingTeamId(), actor.teamKey(), entry.getCodingWorklogId());
+                var remaining = current.stream().filter(w -> w.id() != entry.getCodingWorklogId()).toList();
+                BigDecimal total = remaining.stream().map(CodingOpenApiPort.IssueWorklog::spendHours).reduce(BigDecimal.ZERO, BigDecimal::add);
+                repository.replaceCodingWorklogs(iterationId, issueId, remaining, actor);
+                repository.updateCodingWorklogSummary(iterationId, issueId, total, remaining.size(), actor);
+                invalidateIssueSnapshot(issue.getProjectName(), issue.getIssueCode());
+            } catch (CodingOpenApiException error) {
+                throw codingUpdateException(error, "删除 CODING 工时失败，请刷新核对后重试");
+            }
+        } finally {
+            repository.releaseWorklogDeletion(worklogId);
+        }
+    }
+
+    @Override
     public void removeIssue(Actor actor, long iterationId, long issueId) {
         removeIssues(actor, iterationId, new RemoveIssuesCommand(List.of(issueId)));
     }
 
     @Override
-    public void removeIssues(Actor actor, long iterationId, RemoveIssuesCommand command) {
+    public TeamIterationModels.RemoveIssuesResult removeIssues(Actor actor, long iterationId, RemoveIssuesCommand command) {
         StoredIteration stored = requireStored(iterationId);
         requireMember(actor, stored);
-        if (command == null || command.issueIds().isEmpty()) {
-            throw new TeamIterationException("请选择要删除的迭代事项");
+        if (command == null || command.issueIds().isEmpty()) throw new TeamIterationException("请选择要删除的迭代事项");
+        Map<Long, IssueEntity> byId = stored.issues().stream().collect(java.util.stream.Collectors.toMap(IssueEntity::getId, i -> i));
+        if (!byId.keySet().containsAll(command.issueIds())) throw new TeamIterationException("部分事项不存在，请刷新后重试");
+        Set<Long> scope = new LinkedHashSet<>(command.issueIds());
+        boolean changed;
+        do { changed = false; for (var i : stored.issues()) if (i.getParentId() != null && scope.contains(i.getParentId())) changed |= scope.add(i.getId()); } while (changed);
+        if (command.expectedIssueIds() != null && !scope.equals(new HashSet<>(command.expectedIssueIds()))) {
+            throw new TeamIterationException("事项范围已变化，请关闭确认框并刷新列表后重试");
         }
-        Set<Long> existingIssueIds = new HashSet<>(stored.issues().stream().map(IssueEntity::getId).toList());
-        if (!existingIssueIds.containsAll(command.issueIds())) {
-            throw new TeamIterationException("部分事项不存在，请刷新后重试");
+        if (!command.deleteCoding()) {
+            repository.removeIssueTrees(iterationId, command.issueIds(), actor);
+            return new TeamIterationModels.RemoveIssuesResult(List.copyOf(scope), List.of());
         }
-        repository.removeIssueTrees(iterationId, command.issueIds(), actor);
+        List<Long> removed = new ArrayList<>();
+        List<CodingSyncFailure> failures = new ArrayList<>();
+        Set<Long> pending = new LinkedHashSet<>(scope);
+        Set<Long> failed = new HashSet<>();
+        while (!pending.isEmpty()) {
+            var leaves = pending.stream().filter(id -> pending.stream().noneMatch(child -> java.util.Objects.equals(byId.get(child).getParentId(), id))).toList();
+            if (leaves.isEmpty()) throw new TeamIterationException("事项层级异常，请刷新后重试");
+            for (Long id : leaves) {
+                IssueEntity issue = byId.get(id);
+                pending.remove(id);
+                if (stored.issues().stream().anyMatch(i -> java.util.Objects.equals(i.getParentId(), id) && failed.contains(i.getId()))) {
+                    failures.add(new CodingSyncFailure(id, issue.getTitle(), "子事项未能全部删除，已保留父事项", null)); failed.add(id); continue;
+                }
+                try {
+                    if (isCodingBacked(issue)) {
+                        // Check current remote identity before mutation; missing issues are already removed.
+                        boolean exists = true;
+                        try { coding.issue(actor.token(), issue.getProjectName(), issue.getIssueCode()); }
+                        catch (CodingOpenApiException error) { if (issueMissing(error)) exists = false; else throw error; }
+                        if (exists) {
+                            Set<Long> allowedCodes = scope.stream().map(byId::get)
+                                    .filter(i -> issue.getProjectName().equals(i.getProjectName()) && i.getIssueCode() != null)
+                                    .map(IssueEntity::getIssueCode).collect(java.util.stream.Collectors.toSet());
+                            coding.verifyIssueDeletionScope(actor.token(), issue.getProjectName(), issue.getIssueCode(), allowedCodes);
+                            coding.deleteIssue(actor.token(), issue.getProjectName(), issue.getIssueCode());
+                        }
+                        if (exists && mutationJournal != null) mutationJournal.issueDeleted(actor.codingTeamId(), issue.getProjectName(), issue.getIssueCode());
+                        invalidateIssueSnapshot(issue.getProjectName(), issue.getIssueCode());
+                    }
+                    repository.removeIssueTrees(iterationId, List.of(id), actor);
+                    removed.add(id);
+                } catch (CodingOpenApiException error) {
+                    failures.add(new CodingSyncFailure(id, issue.getTitle(), error.isPermissionDenied() ? error.permissionMessage() : error.isTransportFailure() ? "CODING 删除结果待核对，请刷新后重试" : StringUtils.defaultIfBlank(error.getMessage(), "CODING 删除失败，请刷新后重试"),
+                            error.isPermissionDenied() ? CodingPermissionError.from(error) : null)); failed.add(id);
+                } catch (RuntimeException error) {
+                    failures.add(new CodingSyncFailure(id, issue.getTitle(), "删除未完成，请刷新核对后重试", null)); failed.add(id);
+                }
+            }
+        }
+        return new TeamIterationModels.RemoveIssuesResult(removed, failures);
+    }
+
+    private boolean issueMissing(CodingOpenApiException error) {
+        return "InvalidParameterValue".equals(error.code()) && "issue_not_exist".equals(error.getMessage());
     }
 
     @Override
@@ -1193,8 +1300,9 @@ class DefaultTeamIterationModule implements TeamIterationModule {
         try {
             CodingOpenApiPort.Issue codingIssue = coding.issue(actor.token(), issue.getProjectName(),
                     issue.getIssueCode());
+            Set<Long> deletedWorklogs = mutationJournal == null ? Set.of() : mutationJournal.deletedWorklogs(actor.codingTeamId());
             List<CodingOpenApiPort.IssueWorklog> codingWorklogs = coding.issueWorklogs(actor.token(),
-                    issue.getProjectName(), issue.getIssueCode());
+                    issue.getProjectName(), issue.getIssueCode()).stream().filter(w -> !deletedWorklogs.contains(w.id())).toList();
             BigDecimal currentRemaining = codingWorklogs.stream()
                     .max(Comparator.comparingLong(CodingOpenApiPort.IssueWorklog::updatedAt)
                     .thenComparingLong(CodingOpenApiPort.IssueWorklog::createdAt)
@@ -1205,7 +1313,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             BigDecimal remaining = currentRemaining.subtract(worklog.getSpendHours()).max(BigDecimal.ZERO);
             long startAt = worklog.getRegisteredAt().atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
             String requestId = coding.createIssueWorkHours(actor.token(), issue.getProjectName(), issue.getIssueCode(),
-                    worklog.getSpendHours(), remaining, startAt);
+                    worklog.getSpendHours(), remaining, startAt, "Dev Hub 工时登记 #" + worklog.getId());
             IssueWorklogEntity synced = repository.markWorklogSynced(worklog.getId(), requestId);
             BigDecimal recordedHours = codingWorklogs.stream().map(CodingOpenApiPort.IssueWorklog::spendHours)
                     .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -1214,6 +1322,14 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                     codingWorklogs.size() + 1, actor);
             if (eventPublisher != null) eventPublisher.publishEvent(
                     new com.itwray.iw.external.zhaogang.worklog.WorklogRegistered(actor.codingTeamId(), actor.userId()));
+            try {
+                var summary = codingWorklogSummary(actor, issue.getProjectName(), issue.getIssueCode());
+                if (summary.worklogs().stream().anyMatch(w -> ("Dev Hub 工时登记 #" + worklog.getId()).equals(w.workingDesc()))) {
+                    applyCodingWorklogSummary(actor, issue.getIterationId(), issue, summary);
+                }
+            } catch (RuntimeException readbackFailure) {
+                // Registration was accepted. The next explicit sync can resolve its remote ID.
+            }
             return synced;
         } catch (CodingOpenApiException error) {
             IssueSyncStatus status = error.isTransportFailure() ? IssueSyncStatus.UNKNOWN : IssueSyncStatus.FAILED;
@@ -1309,7 +1425,12 @@ class DefaultTeamIterationModule implements TeamIterationModule {
     private IssueWorklog toWorklog(IssueWorklogEntity entity) {
         return new IssueWorklog(entity.getId(), entity.getSpendHours(), entity.getRegisteredAt(),
                 IssueSyncStatus.valueOf(entity.getSyncStatus()), entity.getSyncMessage(), entity.getSyncedAt(),
-                new UserSnapshot(entity.getCreatorUserId(), entity.getCreatorUserName(), ""), entity.getCreateTime());
+                new UserSnapshot(entity.getCreatorUserId(), entity.getCreatorUserName(), ""), entity.getCreateTime(),
+                entity.getCodingWorklogId(), StringUtils.defaultIfBlank(entity.getSource(), "WORKBENCH"),
+                !"SYNCING".equals(entity.getSyncStatus())
+                && (entity.getDeleteStartedAt() == null || entity.getDeleteStartedAt().isBefore(java.time.LocalDateTime.now().minusMinutes(2)))
+                && (entity.getCodingWorklogId() != null
+                || !"SYNCED".equals(entity.getSyncStatus()) && !"UNKNOWN".equals(entity.getSyncStatus())));
     }
 
     private CodingIssueType supportedType(CodingOpenApiPort.Issue issue) {

@@ -63,6 +63,10 @@ class WorklogMirrorIntegrationTest {
     sql.execute(ds);
     sql.execute(ds); // Migration is repeatable on MySQL.
     jdbc = new NamedParameterJdbcTemplate(ds);
+    jdbc.getJdbcTemplate().execute("CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deleted_entry (coding_team_id BIGINT NOT NULL,coding_team_key VARCHAR(64) NOT NULL,worklog_id BIGINT NOT NULL,confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(coding_team_id,worklog_id))");
+    jdbc.getJdbcTemplate().execute("DELETE FROM external_zhaogang_worklog_deleted_entry");
+    jdbc.getJdbcTemplate().execute("CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deleted_issue_key (coding_team_id BIGINT NOT NULL,project_name VARCHAR(255) NOT NULL,issue_code BIGINT NOT NULL,confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(coding_team_id,project_name,issue_code))");
+    jdbc.getJdbcTemplate().execute("DELETE FROM external_zhaogang_worklog_deleted_issue_key");
     for (String table : List.of("entry", "source", "issue_snapshot", "sync_scope"))
       jdbc.getJdbcTemplate().execute("DELETE FROM external_zhaogang_worklog_" + table);
     repo =
@@ -100,6 +104,35 @@ class WorklogMirrorIntegrationTest {
   @AfterEach
   void close() {
     if (mirror != null) mirror.shutdown();
+  }
+
+  @Test
+  void confirmedIssueDeletionExcludesWorklogsByProjectAndCodeWithoutGuessingInternalIssueId() {
+    remote.add(row(99002, "2026-11-19", clock.millis() - 1000, 8));
+    mirror.status(context, 1L, List.of(member));
+    run();
+    var keys = mirror.keys(context, 1L, List.of(member));
+    long from = date("2026-11-19").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
+    long to = date("2026-11-20").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
+    assertThat(repo.total(keys, from, to)).isEqualByComparingTo("8");
+    var entry = remote.get(0);
+    new WorklogMutationJournal(jdbc).issueDeleted(10,entry.projectName(),entry.issueCode());
+    assertThat(repo.total(keys, from, to)).isZero();
+  }
+
+  @Test
+  void confirmedDeletionImmediatelyLeavesReportsEvenIfMirrorStillContainsTheRemoteRow() {
+    remote.add(row(99001, "2026-11-19", clock.millis() - 1000, 8));
+    mirror.status(context, 1L, List.of(member));
+    run();
+    var keys = mirror.keys(context, 1L, List.of(member));
+    long from = date("2026-11-19").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
+    long to = date("2026-11-20").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
+    assertThat(repo.total(keys, from, to)).isEqualByComparingTo("8");
+    var journal = new WorklogMutationJournal(jdbc);
+    journal.worklogDeleted(10,"fixture",99001);
+    assertThat(repo.total(keys, from, to)).isZero();
+    assertThat(jdbc.getJdbcTemplate().queryForObject("SELECT COUNT(*) FROM external_zhaogang_worklog_entry WHERE worklog_id=99001",Integer.class)).isPositive();
   }
 
   @Test

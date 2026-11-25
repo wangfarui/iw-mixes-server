@@ -32,6 +32,40 @@ class CodingOpenApiClientTest {
     }
 
     @Test
+    void parentDeletionGuardRejectsChildrenOutsideReviewedScope() throws Exception {
+        var client = client(exchange -> {
+            var request = objectMapper.readTree(exchange.getRequestBody());
+            if ("DescribeIssue".equals(request.path("Action").asText())) {
+                respond(exchange,"{\"Response\":{\"Issue\":{\"Code\":22,\"Type\":\"REQUIREMENT\",\"SubTasks\":[{\"Code\":23}]}}}");
+            } else {
+                assertEquals("DescribeSubIssueList",request.path("Action").asText());
+                assertEquals(22,request.path("IssueCode").asLong());
+                respond(exchange,"{\"Response\":{\"SubIssueList\":[{\"Code\":24}]}}");
+            }
+        });
+        org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class,
+                () -> client.verifyIssueDeletionScope("synthetic-token","fixture",22,java.util.Set.of(22L,23L)));
+        client.verifyIssueDeletionScope("synthetic-token","fixture",22,java.util.Set.of(22L,23L,24L));
+    }
+
+    @Test
+    void deletionActionsUseOfficialRemoteIdentifiersAndRollbackRemainingHours() throws Exception {
+        var calls = new java.util.ArrayList<JsonNode>();
+        CodingOpenApiClient client = client(exchange -> {
+            calls.add(objectMapper.readTree(exchange.getRequestBody()));
+            respond(exchange, "{\"Response\":{\"RequestId\":\"fixture\"}}");
+        });
+        client.deleteIssueWorkHours("synthetic-token", "fixture-project", 22, 9001);
+        client.deleteIssue("synthetic-token", "fixture-project", 22);
+        assertEquals("DeleteIssueWorkHours", calls.get(0).path("Action").asText());
+        assertEquals(9001L, calls.get(0).path("WorkHourLogId").asLong());
+        assertTrue(calls.get(0).path("RollbackRemainingHours").asBoolean());
+        assertEquals("DeleteIssue", calls.get(1).path("Action").asText());
+        assertEquals("fixture-project", calls.get(1).path("ProjectName").asText());
+        assertEquals(22L, calls.get(1).path("IssueCode").asLong());
+    }
+
+    @Test
     void projectsQueriesOnlyProjectsJoinedByCurrentUser() throws Exception {
         long userId = 183478L;
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

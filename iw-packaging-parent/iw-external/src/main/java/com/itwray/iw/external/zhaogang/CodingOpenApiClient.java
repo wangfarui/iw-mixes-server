@@ -495,7 +495,8 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         for (JsonNode item : array(response, "WorkLogs", "WorkLogList", "IssueWorkLogs", "IssueWorkLogList")) {
             result.add(new CodingOpenApiPort.IssueWorklog(longValue(item, "Id", "WorkLogId"),
                     decimal(item, "RecordHours", "SpendHour"), decimal(item, "RemainingHours", "RemainingHour"),
-                    longValue(item, "StartAt"), longValue(item, "CreatedAt"), longValue(item, "UpdatedAt")));
+                    longValue(item, "StartAt"), longValue(item, "CreatedAt"), longValue(item, "UpdatedAt"),
+                    longValue(item, "UserId"), text(item.path("User"), "Name", "DisplayName"), text(item, "WorkingDesc")));
         }
         return result;
     }
@@ -551,6 +552,45 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 "RemainingHour", remainingHour,
                 "StartAt", startAt));
         return text(response, "RequestId");
+    }
+
+    @Override
+    public String createIssueWorkHours(String token, String projectName, long issueCode, BigDecimal spendHour,
+                                       BigDecimal remainingHour, long startAt, String workingDesc) {
+        return text(invoke(token, "CreateIssueWorkHours", Map.of("ProjectName", projectName,
+                "IssueCode", issueCode, "SpendHour", spendHour, "RemainingHour", remainingHour,
+                "StartAt", startAt, "WorkingDesc", workingDesc)), "RequestId");
+    }
+
+    @Override
+    public void deleteIssueWorkHours(String token, String projectName, long issueCode, long worklogId) {
+        invoke(token, "DeleteIssueWorkHours", Map.of("ProjectName", projectName, "IssueCode", issueCode,
+                "WorkHourLogId", worklogId, "RollbackRemainingHours", true));
+    }
+
+    @Override
+    public void verifyIssueDeletionScope(String token, String projectName, long issueCode, java.util.Set<Long> allowedCodes) {
+        JsonNode response = invoke(token, "DescribeIssue", Map.of("ProjectName", projectName, "IssueCode", issueCode));
+        JsonNode detail = firstObject(response, "Issue", "Data");
+        var issue = toIssue(detail);
+        if ("SUB_TASK".equalsIgnoreCase(issue.type())) return;
+        JsonNode subtasks = detail.path("SubTasks");
+        if (!subtasks.isArray()) throw new CodingOpenApiException("无法核对 CODING 子事项范围，请同步事项后重试");
+        for (var child : subtasks) verifyAllowedChild(child, allowedCodes);
+        JsonNode children = invoke(token, "DescribeSubIssueList", Map.of("ProjectName", projectName, "IssueCode", issueCode)).path("SubIssueList");
+        if (!children.isArray()) throw new CodingOpenApiException("无法完整核对 CODING 子事项范围，请稍后重试");
+        for (var child : children) verifyAllowedChild(child, allowedCodes);
+    }
+
+    private void verifyAllowedChild(JsonNode child, java.util.Set<Long> allowedCodes) {
+        long code = longValue(child, "Code", "IssueCode");
+        if (code <= 0 || !allowedCodes.contains(code)) throw new CodingOpenApiException(
+                "CODING 中仍有未纳入本次范围的子事项，请先关联到 Dev Hub 后重新确认");
+    }
+
+    @Override
+    public void deleteIssue(String token, String projectName, long issueCode) {
+        invoke(token, "DeleteIssue", Map.of("ProjectName", projectName, "IssueCode", issueCode));
     }
 
     private CodingOpenApiPort.Issue toIssue(JsonNode item) {

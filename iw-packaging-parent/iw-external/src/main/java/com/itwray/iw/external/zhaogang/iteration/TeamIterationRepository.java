@@ -112,6 +112,15 @@ interface TeamIterationRepository {
     IssueWorklogEntity markWorklogSyncFailed(long worklogId, IssueSyncStatus status, String errorCode,
                                               String message);
 
+    void replaceCodingWorklogs(long iterationId, long issueId,
+                              List<com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueWorklog> worklogs, Actor actor);
+
+    boolean claimWorklogDeletion(long worklogId);
+
+    void releaseWorklogDeletion(long worklogId);
+
+    void deleteWorklog(long iterationId, long issueId, long worklogId, Actor actor);
+
     void removeIssueTrees(long iterationId, List<Long> issueIds, Actor actor);
 
     Optional<ReleasePlanEntity> findReleasePlan(long iterationId, long projectId, long planId);
@@ -127,7 +136,9 @@ interface TeamIterationRepository {
                      CodingWorklogSummary worklogSummary) {
     }
 
-    record CodingWorklogSummary(BigDecimal recordedHours, int worklogCount) {
+    record CodingWorklogSummary(BigDecimal recordedHours, int worklogCount,
+                                List<com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueWorklog> worklogs) {
+        CodingWorklogSummary(BigDecimal recordedHours, int worklogCount) { this(recordedHours, worklogCount, List.of()); }
     }
 
     record IssueSnapshotFields(String title, String description, String developmentTeam, String definitionOfDone,

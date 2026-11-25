@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 
@@ -274,6 +275,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
             throw new TeamIterationException("该 CODING 事项已关联到当前迭代", error);
         }
         if (changed == 0) throw new TeamIterationException("事项的关联状态已变化，请刷新后重试");
+        if (link.worklogSummary() != null) replaceCodingWorklogs(iterationId, issueId, link.worklogSummary().worklogs(), actor);
         iterationMapper.touch(iterationId, actor.userId(), actor.userName());
         return findIssue(iterationId, issueId).orElseThrow(() -> new TeamIterationException("事项不存在"));
     }
@@ -480,6 +482,8 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         IssueWorklogEntity entity = new IssueWorklogEntity();
         entity.setIterationId(iterationId);
         entity.setIssueId(issueId);
+        entity.setSource("WORKBENCH");
+        entity.setCodingMissing(false);
         entity.setSpendHours(spendHours);
         entity.setRegisteredAt(registeredAt);
         entity.setSyncStatus(syncStatus.name());
@@ -495,6 +499,7 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
     public boolean claimWorklogSync(long worklogId) {
         return worklogMapper.update(null, new LambdaUpdateWrapper<IssueWorklogEntity>()
                 .eq(IssueWorklogEntity::getId, worklogId)
+                .isNull(IssueWorklogEntity::getDeleteStartedAt)
                 .in(IssueWorklogEntity::getSyncStatus, IssueSyncStatus.NOT_REQUIRED.name(),
                         IssueSyncStatus.PENDING.name(), IssueSyncStatus.FAILED.name())
                 .set(IssueWorklogEntity::getSyncStatus, IssueSyncStatus.SYNCING.name())
@@ -515,6 +520,10 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setCodingRequestId(StringUtils.trimToNull(codingRequestId));
         entity.setSyncedAt(LocalDateTime.now());
         worklogMapper.updateById(entity);
+        // Until readback resolves the new remote ID, retain the accepted-registration summary.
+        issueMapper.update(null, new LambdaUpdateWrapper<IssueEntity>()
+                .eq(IssueEntity::getIterationId, entity.getIterationId()).eq(IssueEntity::getId, entity.getIssueId())
+                .set(IssueEntity::getCodingWorklogsLoaded, false));
         return entity;
     }
 
@@ -529,6 +538,91 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
         entity.setSyncStartedAt(null);
         worklogMapper.updateById(entity);
         return entity;
+    }
+
+    @Override
+    @Transactional
+    public void replaceCodingWorklogs(long iterationId, long issueId,
+            List<com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueWorklog> worklogs, Actor actor) {
+        if (worklogMapper.lockIssue(iterationId, issueId) == null) throw new TeamIterationException("事项不存在");
+        List<IssueWorklogEntity> existing = worklogMapper.selectList(new LambdaQueryWrapper<IssueWorklogEntity>()
+                .eq(IssueWorklogEntity::getIterationId, iterationId).eq(IssueWorklogEntity::getIssueId, issueId));
+        Map<Long, String> memberNames = memberMapper.selectList(new LambdaQueryWrapper<MemberEntity>()
+                .eq(MemberEntity::getIterationId, iterationId)).stream()
+                .collect(java.util.stream.Collectors.toMap(MemberEntity::getCodingUserId, MemberEntity::getUserName, (a,b) -> a));
+        Set<Long> seen = new HashSet<>();
+        for (var remote : worklogs) {
+            if (remote.id() <= 0 || !seen.add(remote.id())) continue;
+            IssueWorklogEntity entry = existing.stream().filter(w -> java.util.Objects.equals(w.getCodingWorklogId(), remote.id()))
+                    .findFirst().orElse(null);
+            if (entry == null) {
+                // New registrations carry an exact marker. Legacy records are linked only on a unique match.
+                var exact = existing.stream().filter(w -> w.getCodingWorklogId() == null
+                        && ("Dev Hub 工时登记 #" + w.getId()).equals(remote.workingDesc())).toList();
+                if (exact.size() == 1) entry = exact.get(0);
+                else {
+                    var candidates = existing.stream().filter(w -> w.getCodingWorklogId() == null
+                            && ("SYNCED".equals(w.getSyncStatus()) || "UNKNOWN".equals(w.getSyncStatus()))
+                            && remote.userId() > 0 && java.util.Objects.equals(w.getCreatorUserId(), remote.userId())
+                            && w.getSpendHours().compareTo(remote.spendHours()) == 0
+                            && w.getRegisteredAt().equals(worklogTime(remote.startAt()))).toList();
+                    if (candidates.size() == 1 && worklogs.stream().filter(r -> r.userId() == remote.userId()
+                            && r.startAt() == remote.startAt() && r.spendHours().compareTo(remote.spendHours()) == 0)
+                            .map(com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueWorklog::id).distinct().count() == 1) entry = candidates.get(0);
+                }
+            }
+            if (entry == null) {
+                entry = new IssueWorklogEntity();
+                entry.setIterationId(iterationId); entry.setIssueId(issueId); entry.setSource("CODING");
+                entry.setSyncAttemptCount(0);
+            }
+            entry.setCodingWorklogId(remote.id()); entry.setSpendHours(remote.spendHours());
+            entry.setRegisteredAt(worklogTime(remote.startAt())); entry.setSyncStatus("SYNCED");
+            entry.setCodingMissing(false); entry.setSyncedAt(java.time.LocalDateTime.now());
+            entry.setCreatorUserId(remote.userId());
+            if (StringUtils.isNotBlank(remote.userName())) entry.setCreatorUserName(remote.userName());
+            else if (entry.getCreatorUserName() == null) entry.setCreatorUserName(memberNames.getOrDefault(remote.userId(),
+                    remote.userId() == actor.userId() ? actor.userName() : remote.userId() > 0 ? "用户 " + remote.userId() : "未知用户"));
+            if (entry.getId() == null) worklogMapper.insert(entry); else worklogMapper.updateById(entry);
+        }
+        issueMapper.update(null, new LambdaUpdateWrapper<IssueEntity>()
+                .eq(IssueEntity::getIterationId, iterationId).eq(IssueEntity::getId, issueId)
+                .set(IssueEntity::getCodingWorklogsLoaded, true));
+        for (var entry : existing) {
+            if (entry.getCodingWorklogId() != null && !seen.contains(entry.getCodingWorklogId())) {
+                worklogMapper.update(null, new LambdaUpdateWrapper<IssueWorklogEntity>()
+                        .eq(IssueWorklogEntity::getId, entry.getId()).set(IssueWorklogEntity::getCodingMissing, true));
+            }
+        }
+    }
+
+    private java.time.LocalDateTime worklogTime(long timestamp) {
+        return java.time.Instant.ofEpochMilli(timestamp).atZone(java.time.ZoneId.of("Asia/Shanghai")).toLocalDateTime().withNano(0);
+    }
+
+    @Override
+    public boolean claimWorklogDeletion(long worklogId) {
+        return worklogMapper.update(null, new LambdaUpdateWrapper<IssueWorklogEntity>()
+                .eq(IssueWorklogEntity::getId, worklogId).ne(IssueWorklogEntity::getSyncStatus, "SYNCING")
+                .and(q -> q.isNull(IssueWorklogEntity::getDeleteStartedAt)
+                        .or().lt(IssueWorklogEntity::getDeleteStartedAt, LocalDateTime.now().minusMinutes(2)))
+                .set(IssueWorklogEntity::getDeleteStartedAt, LocalDateTime.now())) > 0;
+    }
+
+    @Override
+    public void releaseWorklogDeletion(long worklogId) {
+        worklogMapper.update(null, new LambdaUpdateWrapper<IssueWorklogEntity>()
+                .eq(IssueWorklogEntity::getId, worklogId).set(IssueWorklogEntity::getDeleteStartedAt, null));
+    }
+
+    @Override
+    @Transactional
+    public void deleteWorklog(long iterationId, long issueId, long worklogId, Actor actor) {
+        if (worklogMapper.lockIssue(iterationId, issueId) == null) throw new TeamIterationException("事项不存在");
+        worklogMapper.delete(new LambdaQueryWrapper<IssueWorklogEntity>()
+                .eq(IssueWorklogEntity::getIterationId, iterationId).eq(IssueWorklogEntity::getIssueId, issueId)
+                .eq(IssueWorklogEntity::getId, worklogId));
+        iterationMapper.touch(iterationId, actor.userId(), actor.userName());
     }
 
     @Override
@@ -606,8 +700,13 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
                 .toList();
         List<IssueEntity> issues = issueMapper.selectList(new LambdaQueryWrapper<IssueEntity>()
                 .eq(IssueEntity::getIterationId, iteration.getId()).orderByAsc(IssueEntity::getId));
-        List<IssueWorklogEntity> worklogs = worklogMapper.selectList(new LambdaQueryWrapper<IssueWorklogEntity>()
-                .eq(IssueWorklogEntity::getIterationId, iteration.getId()).orderByAsc(IssueWorklogEntity::getId));
+        List<IssueWorklogEntity> worklogs = worklogMapper.visibleForIteration(iteration.getId());
+        for (var issue : issues) {
+            if (!Boolean.TRUE.equals(issue.getCodingWorklogsLoaded())) continue;
+            var recorded = worklogs.stream().filter(w -> w.getIssueId().equals(issue.getId()) && w.getCodingWorklogId() != null).toList();
+            issue.setCodingRecordedHours(recorded.stream().map(IssueWorklogEntity::getSpendHours).reduce(BigDecimal.ZERO, BigDecimal::add));
+            issue.setCodingWorklogCount(recorded.size());
+        }
         List<ReleasePlanEntity> releasePlans = releasePlanMapper.selectList(new LambdaQueryWrapper<ReleasePlanEntity>()
                 .eq(ReleasePlanEntity::getIterationId, iteration.getId()).orderByAsc(ReleasePlanEntity::getId));
         return new StoredIteration(iteration, members, issues, worklogs, releasePlans);
