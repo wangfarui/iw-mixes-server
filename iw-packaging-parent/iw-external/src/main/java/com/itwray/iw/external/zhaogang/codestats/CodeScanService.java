@@ -174,7 +174,7 @@ class CodeScanService implements CodeBackfillTrigger {
     }
 
     /** 活动任务结束或扫描线程空闲后，调度器继续处理暂缓的范围。 */
-    boolean scheduledSync(CodeStatsModule.ScopeInfo scope, LocalDateTime scheduledAt) {
+    boolean scheduledSync(CodeStatsModule.ScopeInfo scope, LocalDateTime scheduledAt, CodeRepositoryScanReads reads) {
         var actor = scope.members().stream().filter(scope::hasRepositoryToken).findFirst();
         if (actor.isEmpty()) return true;
         if (jobMapper.selectByActiveKey(activeKey(scope, "")) != null || !hasScheduledSyncCapacity()) return false;
@@ -184,7 +184,8 @@ class CodeScanService implements CodeBackfillTrigger {
                 && !"QUEUE_FULL".equals(latest.getErrorCode())) {
             return true;
         }
-        return createAndSubmit(scope, YearMonth.now(clock), "SYNC", "AUTO", actor.get().userId(), syncFrom(latest)) != null;
+        return createAndSubmit(scope, YearMonth.now(clock), "SYNC", "AUTO", actor.get().userId(),
+                syncFrom(latest), null, null, reads) != null;
     }
 
     ScanTrigger trigger(CodeStatsModule.ScopeInfo scope, ScanRequest request, CodeRange range, long requestedBy) {
@@ -267,7 +268,7 @@ class CodeScanService implements CodeBackfillTrigger {
                 || !job.getScopeType().equals(scope.scope().name()) || job.getScopeId() != scope.scopeId()) {
             throw new CodingOpenApiException("扫描任务不存在");
         }
-        List<RepoFailure> repoFailures = repoMapper.selectFailures(jobId).stream()
+        List<RepoFailure> repoFailures = repoMapper.selectIssues(jobId).stream()
                 .map(this::toRepoFailure).toList();
         boolean continuous = continuous(job);
         LocalDate fromDate = continuous ? job.getSyncFrom() : YearMonth.parse(job.getMonth()).atDay(1);
@@ -368,6 +369,12 @@ class CodeScanService implements CodeBackfillTrigger {
     private ScanJobEntity createAndSubmit(CodeStatsModule.ScopeInfo scope, YearMonth month, String mode,
                                          String requestedMode, long requestedBy, LocalDate syncFrom,
                                          DiffRetrySelection retry, CodeRange fileTypePriority) {
+        return createAndSubmit(scope, month, mode, requestedMode, requestedBy, syncFrom, retry, fileTypePriority, null);
+    }
+
+    private ScanJobEntity createAndSubmit(CodeStatsModule.ScopeInfo scope, YearMonth month, String mode,
+                                         String requestedMode, long requestedBy, LocalDate syncFrom,
+                                         DiffRetrySelection retry, CodeRange fileTypePriority, CodeRepositoryScanReads reads) {
         ScanJobEntity job = new ScanJobEntity();
         if ("SYNC".equals(mode)) {
             job.setSyncFrom(syncFrom == null ? java.time.LocalDate.parse(properties.getCodeSyncFrom()) : syncFrom);
@@ -407,7 +414,7 @@ class CodeScanService implements CodeBackfillTrigger {
         }
         cache.bumpScanVersion(cache.scopeKey(scope), month.toString());
         CodeScanWorker.ScanInput input = new CodeScanWorker.ScanInput(job, scope, month, mode, requestedBy,
-                java.util.Map.of(), "", retry == null ? List.of() : retry.commitIds(), fileTypePriority);
+                java.util.Map.of(), "", retry == null ? List.of() : retry.commitIds(), fileTypePriority, reads);
         try {
             executor.execute(() -> {
                 try {

@@ -3,6 +3,7 @@ package com.itwray.iw.external.zhaogang;
 import com.itwray.iw.common.GeneralResponse;
 import com.itwray.iw.external.zhaogang.iteration.TeamIterationException;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamException;
+import com.itwray.iw.external.zhaogang.statistics.StatisticsController;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsForbiddenException;
 import com.itwray.iw.external.zhaogang.calendar.WorkCalendarException;
 import com.itwray.iw.external.zhaogang.agent.ZhaogangAgentCodingCredentialException;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         ZhaogangAgentTokenController.class,
         ZhaogangAgentApiController.class,
         ZhaogangCodeStatsController.class,
+        StatisticsController.class,
         ZhaogangCalendarController.class,
         ZhaogangTeamController.class,
         ZhaogangProfileController.class,

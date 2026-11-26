@@ -19,7 +19,9 @@ class CodeContinuousSyncScheduler {
     private final CodeStatsScopeDirectory directory;
     private final CodeScanService scans;
     private final ZhaogangProperties properties;
-    private final Map<AutomaticSyncTarget, LocalDateTime> pending = new LinkedHashMap<>();
+    private record Round(LocalDateTime scheduledAt, CodeRepositoryScanReads reads) {}
+
+    private final Map<AutomaticSyncTarget, Round> pending = new LinkedHashMap<>();
 
     CodeContinuousSyncScheduler(CodeStatsScopeDirectory directory, CodeScanService scans, ZhaogangProperties properties) {
         this.directory = directory;
@@ -36,8 +38,8 @@ class CodeContinuousSyncScheduler {
     synchronized void synchronize() {
         if (!properties.isCodeSyncEnabled()) return;
         try {
-            LocalDateTime scheduledAt = LocalDateTime.now(CodeStatsSupport.CHINA_ZONE).withNano(0);
-            directory.automaticTargets().forEach(target -> pending.putIfAbsent(target, scheduledAt));
+            var round = new Round(LocalDateTime.now(CodeStatsSupport.CHINA_ZONE).withNano(0), new CodeRepositoryScanReads());
+            directory.automaticTargets().forEach(target -> pending.putIfAbsent(target, round));
         } catch (RuntimeException error) {
             log.warn("Could not discover automatic code sync targets, error={}", error.getClass().getSimpleName());
         }
@@ -54,7 +56,8 @@ class CodeContinuousSyncScheduler {
             var target = entry.getKey();
             try {
                 var scope = directory.resolveAutomatic(target);
-                if (scope.isPresent() && !scans.scheduledSync(scope.get(), entry.getValue())) continue;
+                var round = entry.getValue();
+                if (scope.isPresent() && !scans.scheduledSync(scope.get(), round.scheduledAt(), round.reads())) continue;
             } catch (RuntimeException error) {
                 log.warn("Automatic code sync deferred, scopeType={}, scopeId={}, error={}",
                         target.scope(), target.scopeId(), error.getClass().getSimpleName());

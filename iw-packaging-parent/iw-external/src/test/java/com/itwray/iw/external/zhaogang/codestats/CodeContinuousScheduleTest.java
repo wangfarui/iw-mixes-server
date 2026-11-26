@@ -14,6 +14,7 @@ import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncMember;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModels.CodeSyncTeam;
 import com.itwray.iw.external.zhaogang.team.WorkbenchTeamModule;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Clock;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -62,7 +64,7 @@ class CodeContinuousScheduleTest {
 
         verify(scans).scheduledSync(argThat(team -> team.members().size() == 2
                 && team.developmentMembers().stream().map(CodeStatsModule.MemberCredential::userId)
-                    .toList().equals(List.of(1L))), any());
+                    .toList().equals(List.of(1L))), any(), any());
     }
 
     @Test
@@ -77,16 +79,17 @@ class CodeContinuousScheduleTest {
         when(directory.resolveAutomatic(personal)).thenReturn(Optional.of(personalScope));
         when(directory.resolveAutomatic(team)).thenReturn(Optional.of(teamScope));
         when(scans.hasScheduledSyncCapacity()).thenReturn(true, false, true);
-        when(scans.scheduledSync(eq(personalScope), any())).thenReturn(true);
-        when(scans.scheduledSync(eq(teamScope), any())).thenReturn(true);
+        when(scans.scheduledSync(eq(personalScope), any(), any())).thenReturn(true);
+        when(scans.scheduledSync(eq(teamScope), any(), any())).thenReturn(true);
 
         var scheduler = new CodeContinuousSyncScheduler(directory, scans, new ZhaogangProperties());
         scheduler.resumeAfterStartup();
-        verify(scans).scheduledSync(eq(personalScope), any());
-        verify(scans, never()).scheduledSync(eq(teamScope), any());
+        var reads = ArgumentCaptor.forClass(CodeRepositoryScanReads.class);
+        verify(scans).scheduledSync(eq(personalScope), any(), reads.capture());
+        verify(scans, never()).scheduledSync(eq(teamScope), any(), any());
 
         scheduler.dispatchPending();
-        verify(scans).scheduledSync(eq(teamScope), any());
+        verify(scans).scheduledSync(eq(teamScope), any(), same(reads.getValue()));
     }
 
     @Test
@@ -103,14 +106,14 @@ class CodeContinuousScheduleTest {
         when(directory.resolveAutomatic(revoked)).thenReturn(Optional.empty());
         when(directory.resolveAutomatic(newTeam)).thenReturn(Optional.of(teamScope));
         when(scans.hasScheduledSyncCapacity()).thenReturn(true);
-        when(scans.scheduledSync(eq(teamScope), any())).thenReturn(false, true);
+        when(scans.scheduledSync(eq(teamScope), any(), any())).thenReturn(false, true);
 
         var scheduler = new CodeContinuousSyncScheduler(directory, scans, new ZhaogangProperties());
         scheduler.synchronize();
-        verify(scans).scheduledSync(eq(teamScope), any());
-        verify(scans, never()).scheduledSync(eq(scope(revoked.scope(), revoked.scopeId())), any());
+        verify(scans).scheduledSync(eq(teamScope), any(), any());
+        verify(scans, never()).scheduledSync(eq(scope(revoked.scope(), revoked.scopeId())), any(), any());
         scheduler.dispatchPending();
-        verify(scans, times(2)).scheduledSync(eq(teamScope), any());
+        verify(scans, times(2)).scheduledSync(eq(teamScope), any(), any());
     }
 
     @Test
@@ -172,11 +175,12 @@ class CodeContinuousScheduleTest {
             assertTrue(sync.enabled());
             assertEquals("NOT_STARTED", sync.status());
             assertEquals("2026-11-03T12:00:00+08:00", sync.nextSyncAt());
-            assertTrue(service.scheduledSync(team, LocalDateTime.now(clock)));
+            var reads = new CodeRepositoryScanReads();
+            assertTrue(service.scheduledSync(team, LocalDateTime.now(clock), reads));
             verify(jobs).insert(argThat((ScanJobEntity job) -> "AUTO".equals(job.getRequestedMode())
                     && "100:WORKBENCH_TEAM:8".equals(job.getActiveKey())
                     && LocalDate.parse("2026-01-01").equals(job.getSyncFrom())));
-            verify(worker, timeout(1000)).run(any());
+            verify(worker, timeout(1000)).run(argThat(input -> input.reads() == reads));
         } finally {
             service.shutdown();
         }
@@ -192,15 +196,16 @@ class CodeContinuousScheduleTest {
         var scheduledAt = LocalDateTime.now(clock).minusMinutes(1);
 
         var service = service(jobs, worker);
+        var reads = new CodeRepositoryScanReads();
         try {
-            assertFalse(service.scheduledSync(personal, scheduledAt));
+            assertFalse(service.scheduledSync(personal, scheduledAt, reads));
             verify(jobs, never()).insert(any(ScanJobEntity.class));
 
             active.setStatus("INTERRUPTED");
             active.setFinishedAt(LocalDateTime.now(clock));
             active.setSyncFrom(LocalDate.parse("2025-12-01"));
             when(jobs.selectLatestSync(100L, "SELF", 1L)).thenReturn(active);
-            assertTrue(service.scheduledSync(personal, scheduledAt));
+            assertTrue(service.scheduledSync(personal, scheduledAt, reads));
             verify(jobs).insert(argThat((ScanJobEntity job) -> active.getSyncFrom().equals(job.getSyncFrom())));
         } finally {
             service.shutdown();

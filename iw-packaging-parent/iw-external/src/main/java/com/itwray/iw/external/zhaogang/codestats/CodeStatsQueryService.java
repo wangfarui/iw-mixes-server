@@ -326,7 +326,7 @@ class CodeStatsQueryService {
             ScanJobEntity job = jobMapper.selectLatest(scope.codingTeamId(), scope.scope().name(),
                     scope.scopeId(), month.toString());
             if (job == null) continue;
-            for (ScanRepoEntity repo : repoMapper.selectFailures(job.getId())) {
+            for (ScanRepoEntity repo : repoMapper.selectIssues(job.getId())) {
                 String key = repo.getDepotId() + ":" + repo.getErrorCode();
                 if (!seen.add(key)) continue;
                 result.add(new RepoIssue(repo.getProjectName(), repo.getDepotName(),

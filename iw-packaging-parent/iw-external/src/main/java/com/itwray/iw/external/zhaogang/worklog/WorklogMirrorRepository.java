@@ -264,13 +264,20 @@ class WorklogMirrorRepository {
           if (!locked.state().equals("RUNNING") || !locked.leaseId().equals(lease))
             throw new IllegalStateException("Sync lease expired");
           if (reconcile) {
-            // Absence means unavailable from THIS source, never a permanent organization deletion.
-            jdbc.update(
-                """
-                        UPDATE external_zhaogang_worklog_entry SET missing=1 WHERE source_key=:key
-                        AND created_at>=:from AND created_at<=:through
-                        """,
-                Map.of("key", source.key(), "from", from, "through", through));
+            // Mark only entries absent from the published result. Toggling every row through
+            // missing would invalidate aggregate readers even when visibility did not change.
+            var seen = new HashSet<>(rows.stream().map(Worklog::id).toList());
+            var absent = jdbc.queryForList("""
+                SELECT worklog_id FROM external_zhaogang_worklog_entry
+                WHERE source_key=:key AND created_at>=:from AND created_at<=:through AND missing=0
+                """, Map.of("key", source.key(), "from", from, "through", through), Long.class)
+                .stream().filter(id -> !seen.contains(id)).toList();
+            for (int i = 0; i < absent.size(); i += 500) {
+              jdbc.update("""
+                  UPDATE external_zhaogang_worklog_entry SET missing=1
+                  WHERE source_key=:key AND worklog_id IN (:ids)
+                  """, Map.of("key", source.key(), "ids", absent.subList(i, Math.min(i + 500, absent.size()))));
+            }
           }
           List<MapSqlParameterSource> args = new ArrayList<>();
           for (var row : rows)
@@ -410,6 +417,21 @@ class WorklogMirrorRepository {
             "SELECT COUNT(DISTINCT e.project_name) " + visible(),
             Map.of("keys", keys, "from", from, "to", to),
             Integer.class);
+  }
+
+  Map<Long, Map<java.time.LocalDate, BigDecimal>> dailyHours(List<String> keys, long from, long to) {
+    Map<Long, Map<java.time.LocalDate, BigDecimal>> result = new HashMap<>();
+    if (keys.isEmpty()) return result;
+    jdbc.query("""
+        SELECT s.coding_user_id,
+          DATE_ADD('1970-01-01', INTERVAL FLOOR((e.start_at + 28800000) / 86400000) DAY) AS stat_date,
+          SUM(e.hours) AS hours
+        """ + visible() + " GROUP BY s.coding_user_id, stat_date",
+        Map.of("keys", keys, "from", from, "to", to), rs -> {
+          result.computeIfAbsent(rs.getLong("coding_user_id"), ignored -> new HashMap<>())
+              .put(rs.getObject("stat_date", java.time.LocalDate.class), rs.getBigDecimal("hours"));
+        });
+    return result;
   }
 
   private String visible() {

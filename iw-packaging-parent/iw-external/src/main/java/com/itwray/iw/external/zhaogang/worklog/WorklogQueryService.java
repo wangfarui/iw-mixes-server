@@ -562,15 +562,9 @@ class WorklogQueryService {
         for (DailyTotal item : dailyTotals) {
             BigDecimal hours = normalizeHours(item.hours());
             totalHours = totalHours.add(hours);
-            if (item.dayType() == DayType.WORKDAY) {
-                if (hours.compareTo(BigDecimal.valueOf(9)) >= 0) overtimeDays++;
-                if (hours.compareTo(BigDecimal.valueOf(8)) > 0) {
-                    overtimeHours = overtimeHours.add(hours.subtract(BigDecimal.valueOf(8)));
-                }
-            } else {
-                if (hours.compareTo(BigDecimal.valueOf(4)) >= 0) overtimeDays++;
-                overtimeHours = overtimeHours.add(hours);
-            }
+            var overtime = WorklogDayRules.overtime(hours, item.dayType());
+            overtimeHours = overtimeHours.add(overtime.hours());
+            overtimeDays += overtime.days();
         }
         BigDecimal averageHours = workdayCount == 0 ? BigDecimal.ZERO
                 : totalHours.divide(BigDecimal.valueOf(workdayCount), 2, java.math.RoundingMode.HALF_UP);
@@ -598,9 +592,7 @@ class WorklogQueryService {
     }
 
     private BigDecimal utilizationRate(BigDecimal totalHours, int workdayCount) {
-        return workdayCount == 0 ? null : totalHours.multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(workdayCount).multiply(BigDecimal.valueOf(8)),
-                        2, java.math.RoundingMode.HALF_UP);
+        return workdayCount == 0 ? null : WorklogDayRules.utilization(totalHours, workdayCount);
     }
 
     private int eligibleWorkdayCount(Schedule schedule, Set<LocalDate> leaveDates,

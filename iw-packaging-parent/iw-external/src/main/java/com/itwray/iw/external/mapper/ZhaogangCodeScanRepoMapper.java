@@ -33,10 +33,10 @@ public interface ZhaogangCodeScanRepoMapper extends BaseMapper<ScanRepoEntity> {
 
     @Select("""
             select * from external_zhaogang_code_scan_repo
-             where job_id = #{jobId} and status = 'FAILED'
+             where job_id = #{jobId} and (status = 'FAILED' or (status = 'SKIPPED' and error_code = 'BRANCH_CHANGED'))
              order by depot_id
             """)
-    List<ScanRepoEntity> selectFailures(@Param("jobId") long jobId);
+    List<ScanRepoEntity> selectIssues(@Param("jobId") long jobId);
 
     @Select("""
             select * from external_zhaogang_code_scan_repo

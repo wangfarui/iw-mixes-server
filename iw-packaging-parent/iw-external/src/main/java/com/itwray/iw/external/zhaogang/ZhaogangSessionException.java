@@ -2,7 +2,7 @@ package com.itwray.iw.external.zhaogang;
 
 public class ZhaogangSessionException extends RuntimeException {
 
-    ZhaogangSessionException(String message) {
+    public ZhaogangSessionException(String message) {
         super(message);
     }
 }

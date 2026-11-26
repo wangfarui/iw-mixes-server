@@ -64,6 +64,11 @@ class CodeContinuousWorkerTest {
 
     private ScanJobEntity run(long id, String today, CodeStatsModule.ScopeInfo target, CodeGitLineStats git,
                               String requestedMode, CodeRange fileTypePriority) {
+        return run(id, today, target, git, requestedMode, fileTypePriority, null);
+    }
+
+    private ScanJobEntity run(long id, String today, CodeStatsModule.ScopeInfo target, CodeGitLineStats git,
+                              String requestedMode, CodeRange fileTypePriority, CodeRepositoryScanReads reads) {
         Clock clock=Clock.fixed(LocalDate.parse(today).atStartOfDay(CodeStatsSupport.CHINA_ZONE).toInstant(),CodeStatsSupport.CHINA_ZONE);
         job=new ScanJobEntity();job.setId(id);job.setCodingTeamId(100L);job.setScopeType(target.scope().name());job.setScopeId(target.scopeId());
         job.setMonth(YearMonth.now(clock).toString());job.setScanMode("SYNC");job.setSyncFrom(LocalDate.parse("2026-01-01"));job.setSyncTo(LocalDate.parse(today));
@@ -72,7 +77,7 @@ class CodeContinuousWorkerTest {
         job.setTotalDiffs(0);job.setDoneDiffs(0);job.setFailedRepos(0);job.setFailedDiffs(0);job.setTruncated(false);
         new CodeScanWorker(coding,jobs,repos,commits,identities,cache,new ZhaogangProperties(),clock,git)
                 .run(new CodeScanWorker.ScanInput(job, target, YearMonth.now(clock), "SYNC", 1,
-                        Map.of(), "", List.of(), fileTypePriority));
+                        Map.of(), "", List.of(), fileTypePriority, reads));
         return job;
     }
 
@@ -160,6 +165,8 @@ class CodeContinuousWorkerTest {
         assertEquals(2,database.get(a).getBranchCount());
         assertEquals("COMPLETED",run(2,"2026-11-03").getStatus());
         verify(coding,times(1)).commits(anyString(),any());
+        // The initial scan verifies two branch listings. The unchanged follow-up needs only the first.
+        verify(coding, times(3)).branchHeads(anyString(), anyLong(), anyLong(), anyString());
         assertEquals(1,database.size());assertEquals(2L,database.get(a).getLastSeenScanId());
         verify(commits,times(22)).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
         assertEquals(Set.of(a),CodeSyncCheckpointCodec.decode(checkpoint).heads().get(a).matched());
@@ -168,8 +175,53 @@ class CodeContinuousWorkerTest {
         run(1,"2026-11-02");head=b;
         assertEquals("COMPLETED",run(2,"2026-11-03").getStatus());
         verify(coding,times(2)).commits(anyString(),any());
+        verify(coding, times(4)).branchHeads(anyString(), anyLong(), anyLong(), anyString());
         assertEquals(Set.of(a,b),database.keySet());
         assertTrue(database.values().stream().allMatch(v->v.getBranchCount()==2));
+    }
+
+    @Test
+    void automaticTeamScansShareRepositoryReadsButAttributeToTheirOwnMembers() {
+        var first = new CodeStatsModule.ScopeInfo(CodeStatsModels.Scope.WORKBENCH_TEAM, 9, 100, "team",
+                "https://example.com", "first",
+                List.of(new CodeStatsModule.MemberCredential(1, "one", "", "shared-token", CodingRole.BACKEND)), false);
+        var second = new CodeStatsModule.ScopeInfo(CodeStatsModels.Scope.WORKBENCH_TEAM, 10, 100, "team",
+                "https://example.com", "second",
+                List.of(new CodeStatsModule.MemberCredential(2, "two", "", "shared-token", CodingRole.BACKEND)), false);
+        var reads = new CodeRepositoryScanReads();
+        head = b;
+        when(identities.resolve(anyMap(), nullable(String.class), eq(CodeStatsSupport.nameKey("two"))))
+                .thenReturn(new CodeIdentityResolver.Resolved(2L, false));
+        doReturn(new CodingCommitPage(List.of(
+                new CodingCommit(b, "b", "two", "two@example.invalid", at, "two", List.of(a)),
+                new CodingCommit(a, "a", "one", "one@example.invalid", at, "one", List.of())), 2, 1, 100))
+                .when(coding).commits(anyString(), any());
+        var git = mock(CodeGitLineStats.class);
+
+        assertEquals("COMPLETED", run(1, "2026-11-03", first, git, "AUTO", null, reads).getStatus());
+        assertEquals(Set.of(a), database.keySet());
+        database.clear();
+        checkpoint = null;
+        assertEquals("COMPLETED", run(2, "2026-11-03", second, git, "AUTO", null, reads).getStatus());
+        assertEquals(Set.of(b), database.keySet());
+        verify(coding, times(2)).branchHeads("shared-token", 10, 1, "CODING");
+        verify(coding).commits(eq("shared-token"), any());
+    }
+
+    @Test
+    void sharedDiffDoesNotGiveAnotherCredentialRepositoryAccess() {
+        var reads = new CodeRepositoryScanReads();
+        var diff = new CodingCommitDiff(5, 2, 1);
+        when(coding.commitDiff("allowed", 10, 1, a)).thenReturn(diff);
+        when(coding.commitDiff("denied", 10, 1, a))
+                .thenThrow(new CodingOpenApiException("PERMISSION_DENIED", "fixture"));
+
+        assertEquals(diff, reads.diff(coding, 100, "allowed", 10, 1, a));
+        assertEquals(diff, reads.diff(coding, 100, "allowed", 10, 1, a));
+        assertThrows(CodingOpenApiException.class, () -> reads.diff(coding, 100, "denied", 10, 1, a));
+        assertEquals(diff, reads.diff(coding, 101, "allowed", 10, 1, a));
+        verify(coding, times(2)).commitDiff("allowed", 10, 1, a);
+        verify(coding).commitDiff("denied", 10, 1, a);
     }
     @Test void failedNewReadCannotAdvanceCheckpointOrDeleteExistingData() {
         run(1,"2026-11-02");String before=checkpoint;head=b;
@@ -201,14 +253,46 @@ class CodeContinuousWorkerTest {
             rows.add(new CodingCommit(a,"a","self","self@example.invalid",at,"old",List.of()));
             return new CodingCommitPage(rows,rows.size(),1,100);
         }).when(coding).commits(anyString(),any());
-        assertEquals("PARTIAL",run(1,"2026-11-02").getStatus());
-        verify(repos).updateState(eq(1L), eq(1L), eq("FAILED"), eq(2), anyInt(), eq("BRANCH_CHANGED"),
-                contains("有 1 个分支待复核"));
+        assertEquals("COMPLETED",run(1,"2026-11-02").getStatus());
+        assertEquals(0, job.getFailedRepos());
+        verify(repos).updateState(eq(1L), eq(1L), eq("SKIPPED"), eq(1), anyInt(), eq("BRANCH_CHANGED"),
+                contains("有 1 个分支待下轮复核"));
         assertEquals(Map.of("release",a),CodeSyncCheckpointCodec.decode(checkpoint).branches());
         verify(commits,never()).cleanupSyncRepo(anyLong(),anyString(),anyLong(),anyLong(),any(),any(),anyLong());
         assertEquals("COMPLETED",run(2,"2026-11-03").getStatus());
         verify(coding,times(2)).commits(anyString(),any());
         assertEquals(Set.of(a,b),database.keySet());
+    }
+
+    @Test
+    void doesNotPublishNewCommitsUniqueToADeferredBranch() {
+        var branchReads = new java.util.concurrent.atomic.AtomicInteger();
+        String newHead = "c".repeat(40);
+        when(coding.branchHeads(anyString(), anyLong(), anyLong(), anyString())).thenAnswer(ignored -> List.of(
+                new CodingBranchHead("main", branchReads.getAndIncrement() == 0 ? b : newHead, at),
+                new CodingBranchHead("release", a, at)));
+        doAnswer(invocation -> {
+            CodingCommitQuery query = invocation.getArgument(1);
+            var previous = new CodingCommit(a, "a", "self", "self@example.invalid", at, "old", List.of());
+            var added = new CodingCommit(b, "b", "self", "self@example.invalid", at, "new", List.of(a));
+            var page = query.ref().equals(b) ? List.of(added, previous) : List.of(previous);
+            return new CodingCommitPage(page, page.size(), 1, 100);
+        }).when(coding).commits(anyString(), any());
+
+        assertEquals("COMPLETED", run(1, "2026-11-02").getStatus());
+        assertEquals(Set.of(a), database.keySet());
+        assertEquals(1, database.get(a).getBranchCount());
+    }
+
+    @Test
+    void branchDisappearanceDuringScanStillRequiresCoverageVerification() {
+        var branchReads = new java.util.concurrent.atomic.AtomicInteger();
+        when(coding.branchHeads(anyString(), anyLong(), anyLong(), anyString())).thenAnswer(ignored ->
+                branchReads.getAndIncrement() == 0 ? List.of(new CodingBranchHead("main", a, at)) : List.of());
+
+        assertEquals("PARTIAL", run(1, "2026-11-02").getStatus());
+        assertEquals(1, job.getFailedRepos());
+        verify(commits, never()).cleanupFullScan(anyLong(), anyString(), anyLong(), anyString(), anyLong());
     }
 
     @Test void upstreamFileCountLimitIsClassifiedAsUnavailableLinesNotRepeatedTransportFailure() {

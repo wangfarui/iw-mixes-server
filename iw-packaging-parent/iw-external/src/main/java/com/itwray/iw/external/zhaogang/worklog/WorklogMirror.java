@@ -89,7 +89,7 @@ class WorklogMirror {
     return memberKey(context.codingTeamId(), member.userId());
   }
 
-  private String memberKey(long codingTeamId, long userId) {
+  static String memberKey(long codingTeamId, long userId) {
     return CodingCredentialService.fingerprint("MEMBER:" + codingTeamId + ":" + userId);
   }
 

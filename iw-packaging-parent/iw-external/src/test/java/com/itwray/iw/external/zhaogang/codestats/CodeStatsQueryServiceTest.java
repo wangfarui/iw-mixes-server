@@ -290,7 +290,7 @@ class CodeStatsQueryServiceTest {
         var failed = new com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.ScanRepoEntity();
         failed.setDepotId(2L); failed.setStatus("FAILED"); failed.setErrorCode("REQUEST_FAILED");
         when(repoMapper.selectByJob(9L)).thenReturn(List.of(good, failed));
-        when(repoMapper.selectFailures(9L)).thenReturn(List.of(failed));
+        when(repoMapper.selectIssues(9L)).thenReturn(List.of(failed));
         ScanMonth month = new ScanMonth("2026-10", 9L, "FULL", status, "COMMITS",
                 new ScanProgress(2, 2, 3, 3, 1, 1, 0, 0), null, null, null, null, 0, null);
         ScanState scan = new ScanState("SELF", null, range.view(), status, List.of(month), 0);

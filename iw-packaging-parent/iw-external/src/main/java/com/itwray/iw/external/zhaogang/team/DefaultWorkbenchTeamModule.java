@@ -498,7 +498,7 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         var stored = repository.managementTokenCredential(teamId);
         if (stored == null || StringUtils.isBlank(stored.ciphertext())) return Optional.empty();
         try {
-            String token = AESUtils.decryptAESGCM(managementTokenKey(), stored.ciphertext());
+            String token = decryptManagementToken(stored.ciphertext());
             return Optional.of(new ManagementCredential(stored.ownerUserId(), new TeamStatisticsCredential(token)));
         } catch (RuntimeException unreadable) {
             return Optional.empty();
@@ -506,6 +506,10 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
     }
 
     private record ManagementCredential(long ownerUserId, TeamStatisticsCredential value) {
+    }
+
+    String decryptManagementToken(String ciphertext) {
+        return AESUtils.decryptAESGCM(managementTokenKey(), ciphertext);
     }
 
     private SecretKey managementTokenKey() {

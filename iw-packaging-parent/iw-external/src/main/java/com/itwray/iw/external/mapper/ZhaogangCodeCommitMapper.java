@@ -219,6 +219,11 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
             delete from external_zhaogang_code_commit
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
                and month = #{month} and last_seen_scan_id <> #{jobId}
+               and not exists (
+                    select 1 from external_zhaogang_code_scan_repo r
+                     where r.job_id = #{jobId} and r.depot_id = external_zhaogang_code_commit.depot_id
+                       and r.status = 'SKIPPED' and r.error_code = 'BRANCH_CHANGED'
+               )
             """)
     int cleanupFullScan(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
                         @Param("scopeId") long scopeId, @Param("month") String month, @Param("jobId") long jobId);
