@@ -112,11 +112,6 @@ public interface CodingOpenApiPort {
     String createIssueWorkHours(String token, String projectName, long issueCode, BigDecimal spendHour,
                                 BigDecimal remainingHour, long startAt);
 
-    default String createIssueWorkHours(String token, String projectName, long issueCode, BigDecimal spendHour,
-                                        BigDecimal remainingHour, long startAt, String workingDesc) {
-        return createIssueWorkHours(token, projectName, issueCode, spendHour, remainingHour, startAt);
-    }
-
     default void deleteIssueWorkHours(String token, String projectName, long issueCode, long worklogId) {
         throw new UnsupportedOperationException("当前 CODING 适配器未实现工时删除");
     }
@@ -184,10 +179,10 @@ public interface CodingOpenApiPort {
     }
 
     record IssueWorklog(long id, BigDecimal spendHours, BigDecimal remainingHours, long startAt,
-                        long createdAt, long updatedAt, long userId, String userName, String workingDesc) {
+                        long createdAt, long updatedAt, long userId, String userName) {
         public IssueWorklog(long id, BigDecimal spendHours, BigDecimal remainingHours, long startAt,
                             long createdAt, long updatedAt) {
-            this(id, spendHours, remainingHours, startAt, createdAt, updatedAt, 0, "", "");
+            this(id, spendHours, remainingHours, startAt, createdAt, updatedAt, 0, "");
         }
     }
 

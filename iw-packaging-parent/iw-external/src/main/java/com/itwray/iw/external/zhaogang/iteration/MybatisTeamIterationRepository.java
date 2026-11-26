@@ -556,19 +556,17 @@ class MybatisTeamIterationRepository implements TeamIterationRepository {
             IssueWorklogEntity entry = existing.stream().filter(w -> java.util.Objects.equals(w.getCodingWorklogId(), remote.id()))
                     .findFirst().orElse(null);
             if (entry == null) {
-                // New registrations carry an exact marker. Legacy records are linked only on a unique match.
-                var exact = existing.stream().filter(w -> w.getCodingWorklogId() == null
-                        && ("Dev Hub 工时登记 #" + w.getId()).equals(remote.workingDesc())).toList();
-                if (exact.size() == 1) entry = exact.get(0);
-                else {
-                    var candidates = existing.stream().filter(w -> w.getCodingWorklogId() == null
-                            && ("SYNCED".equals(w.getSyncStatus()) || "UNKNOWN".equals(w.getSyncStatus()))
-                            && remote.userId() > 0 && java.util.Objects.equals(w.getCreatorUserId(), remote.userId())
-                            && w.getSpendHours().compareTo(remote.spendHours()) == 0
-                            && w.getRegisteredAt().equals(worklogTime(remote.startAt()))).toList();
-                    if (candidates.size() == 1 && worklogs.stream().filter(r -> r.userId() == remote.userId()
-                            && r.startAt() == remote.startAt() && r.spendHours().compareTo(remote.spendHours()) == 0)
-                            .map(com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueWorklog::id).distinct().count() == 1) entry = candidates.get(0);
+                LocalDateTime registeredAt = worklogTime(remote.startAt());
+                var candidates = existing.stream().filter(w -> w.getCodingWorklogId() == null
+                        && ("SYNCED".equals(w.getSyncStatus()) || "UNKNOWN".equals(w.getSyncStatus()))
+                        && remote.userId() > 0 && java.util.Objects.equals(w.getCreatorUserId(), remote.userId())
+                        && w.getSpendHours().compareTo(remote.spendHours()) == 0
+                        && w.getRegisteredAt().equals(registeredAt)).toList();
+                if (candidates.size() == 1 && worklogs.stream().filter(w -> w.id() > 0
+                        && w.userId() == remote.userId() && w.spendHours().compareTo(remote.spendHours()) == 0
+                        && worklogTime(w.startAt()).equals(registeredAt))
+                        .map(com.itwray.iw.external.zhaogang.CodingOpenApiPort.IssueWorklog::id).distinct().count() == 1) {
+                    entry = candidates.get(0);
                 }
             }
             if (entry == null) {

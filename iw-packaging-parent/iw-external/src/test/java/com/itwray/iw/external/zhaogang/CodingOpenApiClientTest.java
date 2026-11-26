@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodingOpenApiClientTest {
@@ -410,6 +411,7 @@ class CodingOpenApiClientTest {
             assertEquals("2.5", request.path("SpendHour").asText());
             assertEquals("5.5", request.path("RemainingHour").asText());
             assertEquals(1787711400000L, request.path("StartAt").asLong());
+            assertFalse(request.has("WorkingDesc"));
             respond(exchange, "{\"Response\":{\"RequestId\":\"worklog-1\"}}");
         });
 

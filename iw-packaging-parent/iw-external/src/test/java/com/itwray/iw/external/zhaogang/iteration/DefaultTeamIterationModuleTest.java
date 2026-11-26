@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +55,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1174,8 +1176,9 @@ class DefaultTeamIterationModuleTest {
         verify(repository).updateCodingWorklogSummary(1L, 2L, new BigDecimal("8"), 1, actor);
     }
 
-    @Test
-    void registeringWorklogOnLinkedSubTaskAutomaticallySyncsRemainingHours() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void registeringWorklogOnLinkedSubTaskKeepsSummaryUntilNewWorklogIsVisible(boolean newWorklogVisible) {
         TeamIterationRepository repository = mock(TeamIterationRepository.class);
         CodingOpenApiPort coding = mock(CodingOpenApiPort.class);
         IssueEntity subTask = linkedIssue(2L, CodingIssueType.SUB_TASK, 8001L, "实现接口");
@@ -1187,9 +1190,15 @@ class DefaultTeamIterationModuleTest {
         when(coding.issue("token", "project-a", 8001L)).thenReturn(new CodingOpenApiPort.Issue(8001L,
                 "SUB_TASK", "子工作项", 31L, "实现接口", "项目A", true, 18001L, "开发中",
                 "PROCESSING", new BigDecimal("8")));
-        when(coding.issueWorklogs("token", "project-a", 8001L)).thenReturn(List.of());
+        long startAt = pending.getRegisteredAt().atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
+        var existing = new CodingOpenApiPort.IssueWorklog(1001L, new BigDecimal("2.5"), new BigDecimal("8"),
+                startAt, startAt, startAt, actor.userId(), actor.userName());
+        var created = new CodingOpenApiPort.IssueWorklog(1002L, new BigDecimal("2.5"), new BigDecimal("5.5"),
+                startAt, startAt, startAt, actor.userId(), actor.userName());
+        List<CodingOpenApiPort.IssueWorklog> readback = newWorklogVisible ? List.of(existing, created) : List.of(existing);
+        when(coding.issueWorklogs("token", "project-a", 8001L)).thenReturn(List.of(existing), readback);
         when(coding.createIssueWorkHours(eq("token"), eq("project-a"), eq(8001L),
-                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong(), eq("Dev Hub 工时登记 #9"))).thenReturn("request-1");
+                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), eq(startAt))).thenReturn("request-1");
         IssueWorklogEntity synced = worklog(9L, IssueSyncStatus.SYNCED);
         when(repository.markWorklogSynced(9L, "request-1")).thenReturn(synced);
         DefaultTeamIterationModule module = new DefaultTeamIterationModule(repository, coding,
@@ -1199,9 +1208,14 @@ class DefaultTeamIterationModuleTest {
                 new RegisterWorklogCommand(new BigDecimal("2.5"), LocalDateTime.of(2026, 8, 26, 16, 30)));
 
         assertThat(result.syncStatus()).isEqualTo(IssueSyncStatus.SYNCED);
-        verify(coding).createIssueWorkHours(eq("token"), eq("project-a"), eq(8001L),
-                eq(new BigDecimal("2.5")), eq(new BigDecimal("5.5")), anyLong(), eq("Dev Hub 工时登记 #9"));
-        verify(repository).updateCodingWorklogSummary(1L, 2L, new BigDecimal("2.5"), 1, actor);
+        verify(coding).createIssueWorkHours("token", "project-a", 8001L,
+                new BigDecimal("2.5"), new BigDecimal("5.5"), startAt);
+        verify(repository, atLeastOnce()).updateCodingWorklogSummary(1L, 2L, new BigDecimal("5.0"), 2, actor);
+        if (newWorklogVisible) {
+            verify(repository).replaceCodingWorklogs(1L, 2L, readback, actor);
+        } else {
+            verify(repository, never()).replaceCodingWorklogs(anyLong(), anyLong(), any(), any());
+        }
     }
 
     @Test
@@ -1858,11 +1872,11 @@ class DefaultTeamIterationModuleTest {
         when(repository.claimWorklogDeletion(9L)).thenReturn(true);
         when(coding.issueWorklogs("token", "project-a", 7780L)).thenReturn(List.of(
                 new CodingOpenApiPort.IssueWorklog(1001L, new BigDecimal("2.5"), BigDecimal.ZERO, 1, 1, 1),
-                new CodingOpenApiPort.IssueWorklog(1002L, BigDecimal.ONE, BigDecimal.ZERO, 2, 2, 2)));
+                new CodingOpenApiPort.IssueWorklog(1002L, new BigDecimal("2.5"), BigDecimal.ZERO, 1, 1, 1)));
         var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
         module.deleteWorklog(actor, 1, 2, 9);
         verify(coding).deleteIssueWorkHours("token", "project-a", 7780, 1001);
-        verify(repository).updateCodingWorklogSummary(1, 2, BigDecimal.ONE, 1, actor);
+        verify(repository).updateCodingWorklogSummary(1, 2, new BigDecimal("2.5"), 1, actor);
         verify(repository).releaseWorklogDeletion(9);
     }
 
@@ -1885,16 +1899,20 @@ class DefaultTeamIterationModuleTest {
     }
 
     @Test
-    void deletingWorklogStillRequiresExplicitRemoteSuccessWhenListDoesNotContainIt() {
+    void deletingWorklogRequiresItsRemoteIdInTheCurrentIssueWorklogs() {
         var repository = mock(TeamIterationRepository.class); var coding = mock(CodingOpenApiPort.class);
         var entry = worklog(9L, IssueSyncStatus.SYNCED); entry.setCodingWorklogId(1001L);
         when(repository.findById(1L)).thenReturn(Optional.of(stored(selfMember(),
                 List.of(linkedIssue(2L, CodingIssueType.SUB_TASK, 7780L, "实现")), List.of(entry))));
         when(repository.claimWorklogDeletion(9L)).thenReturn(true);
-        when(coding.issueWorklogs(anyString(), anyString(), anyLong())).thenReturn(List.of());
-        new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser()).deleteWorklog(actor, 1, 2, 9);
-        verify(coding).deleteIssueWorkHours("token", "project-a", 7780, 1001);
-        verify(repository).updateCodingWorklogSummary(1, 2, BigDecimal.ZERO, 0, actor);
+        when(coding.issueWorklogs("token", "project-a", 7780L)).thenReturn(List.of(
+                new CodingOpenApiPort.IssueWorklog(1002L, new BigDecimal("2.5"), BigDecimal.ZERO, 1, 1, 1)));
+        var module = new DefaultTeamIterationModule(repository, coding, new CodingIssueUrlParser());
+        assertThatThrownBy(() -> module.deleteWorklog(actor, 1, 2, 9))
+                .isInstanceOf(TeamIterationException.class).hasMessageContaining("未找到这条记录");
+        verify(coding, never()).deleteIssueWorkHours(anyString(), anyString(), anyLong(), anyLong());
+        verify(repository, never()).replaceCodingWorklogs(anyLong(), anyLong(), any(), any());
+        verify(repository).releaseWorklogDeletion(9);
     }
 
     @Test

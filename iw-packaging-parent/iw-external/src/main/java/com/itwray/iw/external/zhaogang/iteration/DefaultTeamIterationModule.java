@@ -862,11 +862,14 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                 return;
             }
             try {
-                // The list supplies the refreshed snapshot. Only an explicit successful delete confirms deletion.
+                long codingWorklogId = entry.getCodingWorklogId();
                 List<CodingOpenApiPort.IssueWorklog> current = coding.issueWorklogs(actor.token(), issue.getProjectName(), issue.getIssueCode());
-                coding.deleteIssueWorkHours(actor.token(), issue.getProjectName(), issue.getIssueCode(), entry.getCodingWorklogId());
-                if (mutationJournal != null) mutationJournal.worklogDeleted(actor.codingTeamId(), actor.teamKey(), entry.getCodingWorklogId());
-                var remaining = current.stream().filter(w -> w.id() != entry.getCodingWorklogId()).toList();
+                if (current.stream().noneMatch(w -> w.id() == codingWorklogId)) {
+                    throw new TeamIterationException("该 CODING 事项的工时列表中未找到这条记录，请先同步 CODING 事项后重试");
+                }
+                coding.deleteIssueWorkHours(actor.token(), issue.getProjectName(), issue.getIssueCode(), codingWorklogId);
+                if (mutationJournal != null) mutationJournal.worklogDeleted(actor.codingTeamId(), actor.teamKey(), codingWorklogId);
+                var remaining = current.stream().filter(w -> w.id() != codingWorklogId).toList();
                 BigDecimal total = remaining.stream().map(CodingOpenApiPort.IssueWorklog::spendHours).reduce(BigDecimal.ZERO, BigDecimal::add);
                 repository.replaceCodingWorklogs(iterationId, issueId, remaining, actor);
                 repository.updateCodingWorklogSummary(iterationId, issueId, total, remaining.size(), actor);
@@ -1313,7 +1316,7 @@ class DefaultTeamIterationModule implements TeamIterationModule {
             BigDecimal remaining = currentRemaining.subtract(worklog.getSpendHours()).max(BigDecimal.ZERO);
             long startAt = worklog.getRegisteredAt().atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
             String requestId = coding.createIssueWorkHours(actor.token(), issue.getProjectName(), issue.getIssueCode(),
-                    worklog.getSpendHours(), remaining, startAt, "Dev Hub 工时登记 #" + worklog.getId());
+                    worklog.getSpendHours(), remaining, startAt);
             IssueWorklogEntity synced = repository.markWorklogSynced(worklog.getId(), requestId);
             BigDecimal recordedHours = codingWorklogs.stream().map(CodingOpenApiPort.IssueWorklog::spendHours)
                     .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -1324,7 +1327,12 @@ class DefaultTeamIterationModule implements TeamIterationModule {
                     new com.itwray.iw.external.zhaogang.worklog.WorklogRegistered(actor.codingTeamId(), actor.userId()));
             try {
                 var summary = codingWorklogSummary(actor, issue.getProjectName(), issue.getIssueCode());
-                if (summary.worklogs().stream().anyMatch(w -> ("Dev Hub 工时登记 #" + worklog.getId()).equals(w.workingDesc()))) {
+                Set<Long> previousWorklogIds = new HashSet<>();
+                codingWorklogs.forEach(record -> previousWorklogIds.add(record.id()));
+                // Keep the accepted-registration summary until CODING exposes a newly visible worklog.
+                if (summary.worklogs().stream().anyMatch(record -> record.id() > 0
+                        && !previousWorklogIds.contains(record.id()) && record.userId() == actor.userId()
+                        && record.startAt() == startAt && worklog.getSpendHours().compareTo(record.spendHours()) == 0)) {
                     applyCodingWorklogSummary(actor, issue.getIterationId(), issue, summary);
                 }
             } catch (RuntimeException readbackFailure) {

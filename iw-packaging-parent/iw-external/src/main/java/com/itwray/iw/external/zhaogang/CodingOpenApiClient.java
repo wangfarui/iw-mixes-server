@@ -496,7 +496,7 @@ class CodingOpenApiClient implements CodingOpenApiPort {
             result.add(new CodingOpenApiPort.IssueWorklog(longValue(item, "Id", "WorkLogId"),
                     decimal(item, "RecordHours", "SpendHour"), decimal(item, "RemainingHours", "RemainingHour"),
                     longValue(item, "StartAt"), longValue(item, "CreatedAt"), longValue(item, "UpdatedAt"),
-                    longValue(item, "UserId"), text(item.path("User"), "Name", "DisplayName"), text(item, "WorkingDesc")));
+                    longValue(item, "UserId"), text(item.path("User"), "Name", "DisplayName")));
         }
         return result;
     }
@@ -552,14 +552,6 @@ class CodingOpenApiClient implements CodingOpenApiPort {
                 "RemainingHour", remainingHour,
                 "StartAt", startAt));
         return text(response, "RequestId");
-    }
-
-    @Override
-    public String createIssueWorkHours(String token, String projectName, long issueCode, BigDecimal spendHour,
-                                       BigDecimal remainingHour, long startAt, String workingDesc) {
-        return text(invoke(token, "CreateIssueWorkHours", Map.of("ProjectName", projectName,
-                "IssueCode", issueCode, "SpendHour", spendHour, "RemainingHour", remainingHour,
-                "StartAt", startAt, "WorkingDesc", workingDesc)), "RequestId");
     }
 
     @Override

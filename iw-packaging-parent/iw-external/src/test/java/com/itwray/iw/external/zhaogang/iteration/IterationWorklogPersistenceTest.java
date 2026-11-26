@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder;
 import com.itwray.iw.external.mapper.*;
 import com.itwray.iw.external.zhaogang.CodingOpenApiPort;
+import com.itwray.iw.external.zhaogang.iteration.entity.TeamIterationEntities.IssueWorklogEntity;
 import com.itwray.iw.external.zhaogang.worklog.WorklogMutationJournal;
 import org.apache.ibatis.mapping.Environment;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -56,15 +57,15 @@ class IterationWorklogPersistenceTest {
                 session.getMapper(ZhaogangIterationIssueWorklogMapper.class),session.getMapper(ZhaogangIterationReleasePlanMapper.class));
     }
 
-    private CodingOpenApiPort.IssueWorklog remote(long id, long localId) {
+    private CodingOpenApiPort.IssueWorklog remote(long id) {
         long at = LocalDateTime.of(2026,11,25,10,30).atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
-        return new CodingOpenApiPort.IssueWorklog(id,new BigDecimal("2.5"),BigDecimal.ZERO,at,at,at,101,"","Dev Hub 工时登记 #"+localId);
+        return new CodingOpenApiPort.IssueWorklog(id, new BigDecimal("2.5"), BigDecimal.ZERO, at, at, at, 101, "");
     }
 
     @Test void registrationAndSnapshotAreDeduplicatedAndDeletionCannotResurrectAcrossIterations() {
         var local = repo.addWorklog(1,10,new BigDecimal("2.5"),LocalDateTime.of(2026,11,25,10,30),TeamIterationModels.IssueSyncStatus.PENDING,actor);
         repo.markWorklogSynced(local.getId(),"fixture-request");
-        var remote = remote(9001,local.getId());
+        var remote = remote(9001);
         tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(1,10,List.of(remote,remote),actor));
         tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(1,10,List.of(remote),actor));
         tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(2,20,List.of(remote),actor));
@@ -91,7 +92,7 @@ class IterationWorklogPersistenceTest {
     }
 
     @Test void syncDisappearanceKeepsAuditButHidesMissingRowsAndZeroesTotals() {
-        var remote = remote(9002,999);
+        var remote = remote(9002);
         tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(1,10,List.of(remote),actor));
         assertThat(repo.findById(1).orElseThrow().worklogs()).hasSize(1);
         tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(1,10,List.of(),actor));
@@ -99,5 +100,21 @@ class IterationWorklogPersistenceTest {
         assertThat(result.worklogs()).isEmpty();
         assertThat(result.issues().get(0).getCodingWorklogCount()).isZero();
         assertThat(jdbc.getJdbcTemplate().queryForObject("SELECT COUNT(*) FROM external_zhaogang_iteration_issue_worklog WHERE coding_worklog_id=9002",Integer.class)).isEqualTo(1);
+    }
+
+    @Test void ambiguousRegistrationKeepsLocalAuditAndBothRemoteWorklogIds() {
+        var local = repo.addWorklog(1, 10, new BigDecimal("2.5"), LocalDateTime.of(2026, 11, 25, 10, 30),
+                TeamIterationModels.IssueSyncStatus.PENDING, actor);
+        repo.markWorklogSynced(local.getId(), "fixture-request");
+        var remoteWorklogs = List.of(remote(9001), remote(9002));
+        tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(1, 10, remoteWorklogs, actor));
+        tx.executeWithoutResult(t -> repo.replaceCodingWorklogs(1, 10, remoteWorklogs, actor));
+
+        var stored = repo.findById(1).orElseThrow();
+        assertThat(stored.worklogs()).extracting(IssueWorklogEntity::getCodingWorklogId)
+                .containsExactlyInAnyOrder(null, 9001L, 9002L);
+        assertThat(stored.worklogs()).filteredOn(worklog -> worklog.getId().equals(local.getId()))
+                .singleElement().satisfies(worklog -> assertThat(worklog.getCodingWorklogId()).isNull());
+        assertThat(stored.issues().get(0).getCodingWorklogCount()).isEqualTo(2);
     }
 }
