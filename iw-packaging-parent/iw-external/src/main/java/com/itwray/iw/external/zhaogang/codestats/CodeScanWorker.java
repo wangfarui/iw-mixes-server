@@ -56,6 +56,7 @@ class CodeScanWorker {
     private final CodingOpenApiPort coding;
     private final ZhaogangCodeScanJobMapper jobMapper;
     private final ZhaogangCodeScanRepoMapper repoMapper;
+    private final CodeScanCheckpointStore checkpoints;
     private final ZhaogangCodeCommitMapper commitMapper;
     private final CodeIdentityResolver identities;
     private final CodeStatsViewCache cache;
@@ -88,6 +89,7 @@ class CodeScanWorker {
         this.coding = coding;
         this.jobMapper = jobMapper;
         this.repoMapper = repoMapper;
+        this.checkpoints = new CodeScanCheckpointStore(repoMapper);
         this.commitMapper = commitMapper;
         this.identities = identities;
         this.cache = cache;
@@ -330,13 +332,8 @@ class CodeScanWorker {
             Map<String, CommitEntity> existing = new HashMap<>();
             commitMapper.selectSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(), input.scope().scopeId(),
                     entry.getKey(), job.getSyncFrom(), job.getSyncTo()).forEach(row -> existing.put(row.getSha(), row));
-            CodeBranchSync.Checkpoint before = null;
-            ScanRepoEntity stored = repoMapper.selectSyncCheckpoint(input.scope().codingTeamId(), input.scope().scope().name(),
-                    input.scope().scopeId(), entry.getKey(), input.identitySignature(), job.getSyncFrom(), job.getId());
-            if (stored != null) {
-                try { before = CodeSyncCheckpointCodec.decode(stored.getSyncState()); }
-                catch (Exception invalid) { /* 无效游标安全回退，保留旧统计直到成功。 */ }
-            }
+            var previousCheckpoint = checkpoints.read(job, entry.getKey(), input.identitySignature());
+            var before = previousCheckpoint.checkpoint();
             Map<String,CodeCommitGraph.Node> graph=CodeCommitGraph.initialize(before);
             Map<String, String> nextBranches = new LinkedHashMap<>();
             Map<String, CodeBranchSync.Head> nextHeads = new LinkedHashMap<>();
@@ -417,6 +414,9 @@ class CodeScanWorker {
                     }
                 } catch (RuntimeException error) {
                     failed = true;
+                    if (error instanceof CodingOpenApiException api && api.isPermissionDenied()) {
+                        failureCode = "PERMISSION_DENIED";
+                    }
                     nextBranches.clear(); nextHeads.clear();
                 }
             }
@@ -430,17 +430,8 @@ class CodeScanWorker {
             job.setDoneCommits(job.getDoneCommits() + written);
             // 先保存幂等提交，再发布独立验证过的分支游标。即使其他分支失败，下一轮也只重试缺口。
             if (!nextBranches.isEmpty() || !failed || !graph.isEmpty()) {
-                try {
-                    String encoded;
-                    try { encoded=CodeSyncCheckpointCodec.encode(new CodeBranchSync.Checkpoint(nextBranches,nextHeads,graph)); }
-                    catch(java.io.IOException oversized) {
-                        // 大仓库降级到已验证头闭包；不因共享图过大丢失整个同步任务。
-                        encoded=CodeSyncCheckpointCodec.encode(new CodeBranchSync.Checkpoint(nextBranches,nextHeads));
-                    }
-                    repoMapper.saveSyncCheckpoint(job.getId(),entry.getKey(),encoded);
-                    repoMapper.retireOldCheckpoints(input.scope().codingTeamId(),input.scope().scope().name(),
-                            input.scope().scopeId(),entry.getKey(),job.getId());
-                } catch(java.io.IOException failure) { failed=true;failureCode="CHECKPOINT_TOO_LARGE"; }
+                checkpoints.save(job, entry.getKey(), new CodeBranchSync.Checkpoint(nextBranches, nextHeads, graph),
+                        previousCheckpoint);
             }
             if (failed) markRepoFailed(job, depot, failureCode,
                     "BRANCH_CHANGED".equals(failureCode)

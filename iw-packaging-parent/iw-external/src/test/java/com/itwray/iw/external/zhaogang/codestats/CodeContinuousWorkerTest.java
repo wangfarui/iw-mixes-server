@@ -6,6 +6,7 @@ import com.itwray.iw.external.zhaogang.CodingOpenApiPort.*;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.*;
 import com.itwray.iw.external.zhaogang.profile.WorkbenchProfile.CodingRole;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import java.time.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -79,6 +80,37 @@ class CodeContinuousWorkerTest {
                 .run(new CodeScanWorker.ScanInput(job, target, YearMonth.now(clock), "SYNC", 1,
                         Map.of(), "", List.of(), fileTypePriority, reads));
         return job;
+    }
+
+    @Test
+    void checkpointWriteFailureKeepsVerifiedResultsAndRetriesRepositoryNextRound() {
+        doThrow(new DataAccessResourceFailureException("fixture"))
+                .when(repos).saveSyncCheckpoint(eq(1L), eq(1L), startsWith("gz2:"));
+
+        assertEquals("COMPLETED", run(1L, "2026-11-02").getStatus());
+        assertEquals(0, job.getFailedRepos());
+        assertTrue(database.containsKey(a));
+        assertEquals("rescan2:CHECKPOINT_SAVE_FAILED", checkpoint);
+        verify(repos).updateState(1L, 1L, "COMPLETED", 2, 1, null, null);
+
+        clearInvocations(coding);
+        assertEquals("COMPLETED", run(2L, "2026-11-02").getStatus());
+        verify(coding).commits(eq("fixture-token"), any());
+        assertTrue(checkpoint.startsWith("gz2:"));
+    }
+
+    @Test
+    void checkpointWriteFailureDoesNotHideBranchVerificationPermissionFailure() {
+        when(coding.branchHeads(anyString(), anyLong(), anyLong(), anyString()))
+                .thenReturn(List.of(new CodingBranchHead("main", a, at)))
+                .thenThrow(new CodingOpenApiException("PERMISSION_DENIED", "fixture"));
+        doThrow(new DataAccessResourceFailureException("fixture"))
+                .when(repos).saveSyncCheckpoint(eq(1L), eq(1L), startsWith("gz2:"));
+
+        assertEquals("PARTIAL", run(1L, "2026-11-02").getStatus());
+        assertEquals(1, job.getFailedRepos());
+        verify(repos).updateState(eq(1L), eq(1L), eq("FAILED"), eq(1), eq(1), eq("PERMISSION_DENIED"), anyString());
+        verify(commits, never()).cleanupSyncRepo(anyLong(), anyString(), anyLong(), anyLong(), any(), any(), anyLong());
     }
 
     @Test
@@ -161,7 +193,7 @@ class CodeContinuousWorkerTest {
     }
     @Test void sameHeadIsCoalescedAndRestartedCrossDaySyncReadsZeroCommitPages() throws Exception {
         assertEquals("COMPLETED",run(1,"2026-11-02").getStatus());
-        assertNotNull(checkpoint);assertTrue(checkpoint.startsWith("gz1:"));
+        assertNotNull(checkpoint);assertTrue(checkpoint.startsWith("gz2:"));
         assertEquals(2,database.get(a).getBranchCount());
         assertEquals("COMPLETED",run(2,"2026-11-03").getStatus());
         verify(coding,times(1)).commits(anyString(),any());

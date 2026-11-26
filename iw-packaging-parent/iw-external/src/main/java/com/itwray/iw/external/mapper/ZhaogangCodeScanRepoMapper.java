@@ -77,6 +77,29 @@ public interface ZhaogangCodeScanRepoMapper extends BaseMapper<ScanRepoEntity> {
     int saveSyncCheckpoint(@Param("jobId") long jobId, @Param("depotId") long depotId,
                            @Param("state") String state);
 
+    @Insert("""
+            insert into external_zhaogang_code_checkpoint_part (job_id, depot_id, part_no, checkpoint_data)
+            values (#{jobId}, #{depotId}, #{part}, #{state})
+            on duplicate key update checkpoint_data=values(checkpoint_data)
+            """)
+    int saveCheckpointPart(@Param("jobId") long jobId, @Param("depotId") long depotId,
+                           @Param("part") int part, @Param("state") String state);
+
+    @Select("""
+            select checkpoint_data from external_zhaogang_code_checkpoint_part
+            where job_id=#{jobId} and depot_id=#{depotId} and part_no=#{part}
+            """)
+    String selectCheckpointPart(@Param("jobId") long jobId, @Param("depotId") long depotId, @Param("part") int part);
+
+    @Delete("""
+            delete p from external_zhaogang_code_checkpoint_part p
+              join external_zhaogang_code_scan_job j on j.id=p.job_id
+             where j.coding_team_id=#{codingTeamId} and j.scope_type=#{scopeType} and j.scope_id=#{scopeId}
+               and p.depot_id=#{depotId} and p.job_id < #{jobId}
+            """)
+    int deleteOldCheckpointParts(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
+                                 @Param("scopeId") long scopeId, @Param("depotId") long depotId, @Param("jobId") long jobId);
+
     @Update("""
             update external_zhaogang_code_scan_repo r
               join external_zhaogang_code_scan_job j on j.id=r.job_id
