@@ -263,7 +263,11 @@ journalctl -u iw-external --since "1 hour ago" --no-pager
 journalctl -u iw-external -p err -n 100 --no-pager
 ```
 
-代码统计的 Git 补算需要支持 `GIT_CONFIG_COUNT`、`cat-file --batch-all-objects` 和 `--unordered` 的 Git。若系统 Git 版本较旧，可在 `iw-external.env` 中将 `IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE` 配置为兼容 Git 的绝对路径。
+升级自动补算前，在 `iw-external` 使用的 MySQL 库执行 [迁移 SQL](../iw-packaging-parent/iw-external/scripts/iw-external-migrate-20261126-code-auto-diff-retry.sql)。迁移保留现有提交和行数，可重复执行。旧应用可以继续使用新增列。
+
+在实际运行 `iw-external` 的主机准备兼容的 Git。系统 Git 版本较旧时，在 `iw-external.env` 中通过 `IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE` 指定主机上已安装的 Git 绝对路径。外部服务发布脚本会在切换 JAR 前验证配置的 Git 是否支持 `GIT_CONFIG_COUNT`、`cat-file --batch-all-objects --unordered` 和 HTTPS。运行中 Git 缺失会记录 `Automatic code diff Git recovery paused`，临时接口失败仍可重试。
+
+自动补算默认开启。设 `IW_ZHAOGANG_CODE_AUTO_DIFF_RETRY_ENABLED=false` 可暂停后台补算，手动补算仍可使用。每分钟检查空闲扫描线程，同一进程最多运行一批，每批最多五笔。失败记录可在「代码 → 数据同步 → 扫描范围与失败明细」查看。
 
 ## Nginx 日志
 

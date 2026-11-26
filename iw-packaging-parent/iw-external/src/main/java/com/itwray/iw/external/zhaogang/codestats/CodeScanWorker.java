@@ -150,6 +150,10 @@ class CodeScanWorker {
         }
     }
 
+    boolean gitRetryAvailable() {
+        return properties.isCodeGitLineStatsEnabled() && gitLineStats.executableAvailable();
+    }
+
     private Map<Long, DepotPlan> discover(ScanInput input, ScanJobEntity job) {
         Map<String, MemberToken> uniqueTokens = new LinkedHashMap<>();
         for (CodeStatsModule.MemberCredential member : input.scope().members()) {
@@ -816,9 +820,16 @@ class CodeScanWorker {
 
         List<CommitEntity> pending = new ArrayList<>();
         boolean retryOnly = DIFF_RETRY.equals(input.mode());
+        boolean automatic = "AUTO".equals(job.getRequestedMode());
+        boolean automaticRetry = retryOnly && automatic;
         CodeGitLineStats.Batch gitBatch = retryOnly && properties.isCodeGitLineStatsEnabled()
                 ? gitLineStats.batch(input.scope()) : null;
-        if (retryOnly) {
+        if (automaticRetry) {
+            commitMapper.selectBatchIds(input.retryCommitIds()).stream()
+                    .filter(row -> CodeDiffFailure.isFailure(row.getDiffStatus()))
+                    .filter(row -> !Boolean.TRUE.equals(row.getIsMerge()))
+                    .forEach(pending::add);
+        } else if (retryOnly) {
             Set<Long> selected = Set.copyOf(input.retryCommitIds());
             commitMapper.selectDiffFailures(input.scope().codingTeamId(), input.scope().scope().name(),
                     input.scope().scopeId(), job.getSyncFrom(), job.getSyncTo()).stream()
@@ -827,8 +838,10 @@ class CodeScanWorker {
             for (String month : touchedMonths) {
                 commitMapper.applyCommitCountOnlyPolicy(input.scope().codingTeamId(), input.scope().scope().name(),
                         input.scope().scopeId(), month, CodeLinePolicy.COMMIT_COUNT_ONLY_DEPOT);
-                pending.addAll(commitMapper.selectPendingDiffs(input.scope().codingTeamId(),
-                        input.scope().scope().name(), input.scope().scopeId(), month));
+                var scope = input.scope();
+                pending.addAll(automatic && properties.isCodeAutoDiffRetryEnabled()
+                        ? commitMapper.selectNewDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), month)
+                        : commitMapper.selectPendingDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), month));
             }
         }
         job.setTotalDiffs(pending.size());
@@ -846,13 +859,13 @@ class CodeScanWorker {
                 commitMapper.updateDiff(commit.getId(), null, null, null, CodeLinePolicy.SKIPPED_REPOSITORY, null);
             } else if (resolved.memberId() == null || !memberIds.contains(resolved.memberId())) {
                 if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
-                else commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
+                if (!retryOnly || automaticRetry) commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
             } else {
                 List<String> candidates = diffTokens(memberTokens.get(resolved.memberId()),
                         depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens));
                 if (candidates.isEmpty()) {
                     if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
-                    else commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
+                    if (!retryOnly || automaticRetry) commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
                 } else {
                     fetchDiff(input, commit, candidates, gitBatch);
                 }
@@ -1021,11 +1034,29 @@ class CodeScanWorker {
         CodeDiffFailure failure = failures.stream().map(DiffAttempt::reason)
                 .min(java.util.Comparator.comparingInt(CodeScanWorker::diffFailurePriority))
                 .orElse(CodeDiffFailure.REQUEST_FAILED);
-        commitMapper.updateDiff(commit.getId(), null, null, null, failure.status(), null);
+        storeDiffFailure(input, commit, failure, gitFailure);
         log.info("zhaogang code diff failed, jobId={}, projectId={}, depotId={}, sha={}, reason={}, gitFallback={}, attempts={}",
                 job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
                 failure.name(), gitFailure, failures.stream().limit(8).toList());
         job.setFailedDiffs(job.getFailedDiffs() + 1);
+    }
+
+    private void storeDiffFailure(ScanInput input, CommitEntity commit, CodeDiffFailure failure, CodeGitLineStats.Failure gitFailure) {
+        CodeDiffRetryPolicy.State state = null;
+        if (properties.isCodeAutoDiffRetryEnabled()) {
+            boolean automaticRetry = DIFF_RETRY.equals(input.mode()) && "AUTO".equals(input.job().getRequestedMode());
+            int attempts = commit.getDiffRetryAttempts() == null ? 0 : commit.getDiffRetryAttempts();
+            String credentials = failure == CodeDiffFailure.PERMISSION_DENIED || gitFailure == CodeGitLineStats.Failure.PERMISSION_DENIED
+                    ? CodeDiffRetryPolicy.credentialSignature(input.scope()) : null;
+            state = CodeDiffRetryPolicy.afterFailure(failure, gitFailure, automaticRetry, attempts,
+                    LocalDateTime.now(clock), credentials);
+        }
+        if (state == null) {
+            commitMapper.updateDiff(commit.getId(), null, null, null, failure.status(), null);
+        } else {
+            commitMapper.updateFailedDiffWithRetryState(commit.getId(), failure.status(), state.attempts(), state.retryAfter(),
+                    state.credentialSignature(), state.error());
+        }
     }
 
     private void storeDiff(CommitEntity commit, CodingCommitDiff diff) {

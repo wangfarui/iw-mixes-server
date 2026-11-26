@@ -56,6 +56,13 @@ class CodeGitLineStats {
         return new Batch(scope);
     }
 
+    boolean executableAvailable() {
+        String executable = properties.getCodeGitLineStatsExecutable();
+        if (executable == null || !executable.startsWith("/") || executable.indexOf(0) >= 0) return false;
+        Path path = Path.of(executable);
+        return Files.isRegularFile(path) && Files.isExecutable(path);
+    }
+
     final class Batch {
         private final CodeStatsModule.ScopeInfo scope;
         private final Map<String, Optional<String>> usernames = new HashMap<>();

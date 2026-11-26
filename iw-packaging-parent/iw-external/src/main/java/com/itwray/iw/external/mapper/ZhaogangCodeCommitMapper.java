@@ -87,6 +87,48 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
     @Select("""
             select * from external_zhaogang_code_commit
              where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
+               and month = #{month} and is_merge = 0 and diff_status = 'PENDING'
+             order by id
+            """)
+    List<CommitEntity> selectNewDiffs(@Param("codingTeamId") long codingTeamId, @Param("scopeType") String scopeType,
+                                     @Param("scopeId") long scopeId, @Param("month") String month);
+
+    @Select("""
+            select id, commit_date from external_zhaogang_code_commit
+             where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
+               and commit_date between #{from} and #{to} and is_merge = 0
+               and binary depot_name <> 'online.base.apijar.service'
+               and (diff_status in ('FAILED', 'DIFF_RATE_LIMITED', 'DIFF_TIMEOUT', 'DIFF_UNAVAILABLE',
+                                    'DIFF_INVALID_RESPONSE', 'DIFF_REQUEST_FAILED', 'DIFF_PERMISSION_DENIED')
+                    or (#{gitAvailable} and diff_status in
+                        ('TOO_LARGE', 'DIFF_UPSTREAM_LIMIT', 'DIFF_RESPONSE_LIMIT', 'DIFF_INVALID_ARGUMENT')))
+               and diff_retry_attempts < #{maxAttempts}
+               and (diff_retry_after is null or diff_retry_after <= #{now})
+               and (diff_retry_credential_signature is null or diff_retry_credential_signature <> #{credentialSignature})
+               and (#{gitAvailable} or diff_retry_error is null or diff_retry_error <> 'EXECUTABLE_UNAVAILABLE')
+             order by (commit_date >= #{to} - interval 30 day) desc, diff_retry_attempts, commit_date desc, id desc
+             limit #{batchSize}
+            """)
+    List<CommitEntity> selectAutomaticDiffRetries(@Param("codingTeamId") long codingTeamId,
+            @Param("scopeType") String scopeType, @Param("scopeId") long scopeId, @Param("from") LocalDate from,
+            @Param("to") LocalDate to, @Param("now") LocalDateTime now, @Param("credentialSignature") String credentialSignature,
+            @Param("gitAvailable") boolean gitAvailable, @Param("maxAttempts") int maxAttempts, @Param("batchSize") int batchSize);
+
+    @Update("""
+            update external_zhaogang_code_commit
+               set additions = null, deletions = null, files_changed = null, file_type_stats = null,
+                   diff_status = #{diffStatus}, diff_retry_attempts = #{attempts}, diff_retry_after = #{retryAfter},
+                   diff_retry_credential_signature = #{credentialSignature}, diff_retry_error = #{retryError},
+                   update_time = current_timestamp
+             where id = #{id}
+            """)
+    int updateFailedDiffWithRetryState(@Param("id") long id, @Param("diffStatus") String diffStatus,
+                                       @Param("attempts") int attempts, @Param("retryAfter") LocalDateTime retryAfter,
+                                       @Param("credentialSignature") String credentialSignature, @Param("retryError") String retryError);
+
+    @Select("""
+            select * from external_zhaogang_code_commit
+             where coding_team_id = #{codingTeamId} and scope_type = #{scopeType} and scope_id = #{scopeId}
                and month = #{month}
             """)
     List<CommitEntity> selectByMonth(@Param("codingTeamId") long codingTeamId,
@@ -105,6 +147,10 @@ public interface ZhaogangCodeCommitMapper extends BaseMapper<CommitEntity> {
             update external_zhaogang_code_commit
                set additions = #{additions}, deletions = #{deletions}, files_changed = #{filesChanged},
                    file_type_stats = #{fileTypeStats},
+                   diff_retry_attempts = if(#{diffStatus} = 'OK' or diff_status <> #{diffStatus}, 0, diff_retry_attempts),
+                   diff_retry_after = if(#{diffStatus} = 'OK' or diff_status <> #{diffStatus}, null, diff_retry_after),
+                   diff_retry_credential_signature = if(#{diffStatus} = 'OK' or diff_status <> #{diffStatus}, null, diff_retry_credential_signature),
+                   diff_retry_error = if(#{diffStatus} = 'OK' or diff_status <> #{diffStatus}, null, diff_retry_error),
                    diff_status = #{diffStatus}, update_time = current_timestamp
              where id = #{id}
             """)

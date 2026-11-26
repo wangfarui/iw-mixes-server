@@ -22,6 +22,8 @@ class CodeContinuousSyncScheduler {
     private record Round(LocalDateTime scheduledAt, CodeRepositoryScanReads reads) {}
 
     private final Map<AutomaticSyncTarget, Round> pending = new LinkedHashMap<>();
+    private int nextDiffTarget;
+    private boolean gitUnavailableReported;
 
     CodeContinuousSyncScheduler(CodeStatsScopeDirectory directory, CodeScanService scans, ZhaogangProperties properties) {
         this.directory = directory;
@@ -63,6 +65,28 @@ class CodeContinuousSyncScheduler {
                         target.scope(), target.scopeId(), error.getClass().getSimpleName());
             }
             iterator.remove();
+        }
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    synchronized void retryFailedDiffs() {
+        if (!properties.isCodeSyncEnabled() || !properties.isCodeAutoDiffRetryEnabled()
+                || !pending.isEmpty() || !scans.hasAutomaticDiffCapacity()) return;
+        boolean gitAvailable = scans.gitRetryAvailable();
+        if (properties.isCodeGitLineStatsEnabled() && !gitAvailable && !gitUnavailableReported) {
+            log.warn("Automatic code diff Git recovery paused: configured Git executable is unavailable");
+        }
+        gitUnavailableReported = !gitAvailable;
+        try {
+            var targets = directory.automaticTargets();
+            for (int checked = 0; checked < targets.size(); checked++) {
+                int index = nextDiffTarget % targets.size();
+                nextDiffTarget = (index + 1) % targets.size();
+                var scope = directory.resolveAutomatic(targets.get(index));
+                if (scope.isPresent() && scans.scheduledDiffRetry(scope.get(), gitAvailable)) break;
+            }
+        } catch (RuntimeException error) {
+            log.warn("Automatic code diff retry deferred, error={}", error.getClass().getSimpleName());
         }
     }
 }

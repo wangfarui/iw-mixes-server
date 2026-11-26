@@ -38,6 +38,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -64,6 +65,7 @@ class CodeScanService implements CodeBackfillTrigger {
     private final ZhaogangProperties properties;
     private final Clock clock;
     private final ThreadPoolExecutor executor;
+    private final AtomicBoolean automaticDiffRunning = new AtomicBoolean();
 
     @Autowired
     CodeScanService(ZhaogangCodeScanJobMapper jobMapper, ZhaogangCodeScanRepoMapper repoMapper,
@@ -171,6 +173,40 @@ class CodeScanService implements CodeBackfillTrigger {
 
     boolean hasScheduledSyncCapacity() {
         return executor.getActiveCount() < executor.getMaximumPoolSize() && executor.getQueue().isEmpty();
+    }
+
+    boolean hasAutomaticDiffCapacity() {
+        return !automaticDiffRunning.get() && hasScheduledSyncCapacity();
+    }
+
+    boolean gitRetryAvailable() {
+        return worker.gitRetryAvailable();
+    }
+
+    boolean scheduledDiffRetry(CodeStatsModule.ScopeInfo scope, boolean gitAvailable) {
+        if (!hasAutomaticDiffCapacity() || !scope.automaticSyncEligible()) return false;
+        var actor = scope.members().stream().filter(scope::hasRepositoryToken).findFirst();
+        if (actor.isEmpty() || jobMapper.selectByActiveKey(activeKey(scope, "")) != null) return false;
+        var latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
+        if (latest == null || latest.getFinishedAt() == null || latest.getSyncTo() == null
+                || (!STATUS_COMPLETED.equals(latest.getStatus()) && !STATUS_PARTIAL.equals(latest.getStatus()))) return false;
+
+        var now = LocalDateTime.now(clock);
+        LocalDate retentionStart = YearMonth.from(now)
+                .minusMonths(Math.max(1, properties.getCodeStatsRetentionMonths()) - 1L).atDay(1);
+        var rows = commitMapper.selectAutomaticDiffRetries(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
+                retentionStart, latest.getSyncTo(), now, CodeDiffRetryPolicy.credentialSignature(scope), gitAvailable,
+                CodeDiffRetryPolicy.MAX_ATTEMPTS, CodeDiffRetryPolicy.BATCH_SIZE);
+        if (rows.isEmpty() || !automaticDiffRunning.compareAndSet(false, true)) return false;
+        boolean submitted = false;
+        try {
+            var retry = diffRetrySelection(rows);
+            submitted = createAndSubmit(scope, YearMonth.from(retry.to()), CodeScanWorker.DIFF_RETRY, "AUTO",
+                    actor.get().userId(), null, retry, null) != null;
+            return submitted;
+        } finally {
+            if (!submitted) automaticDiffRunning.set(false);
+        }
     }
 
     /** 活动任务结束或扫描线程空闲后，调度器继续处理暂缓的范围。 */
@@ -293,7 +329,8 @@ class CodeScanService implements CodeBackfillTrigger {
         String reasonCode = failure != null ? failure.name() : legacyLimit ? "TOO_LARGE" : "REQUEST_FAILED";
         String reason = failure != null ? failure.reason : legacyLimit ? "diff 超过保护上限" : "diff 读取失败";
         return new CodeStatsModels.DiffFailure(row.getProjectName(), row.getDepotName(), row.getSha(),
-                row.getAuthorName(), reasonCode, reason + "，未统计行数", CodeStatsSupport.format(row.getCommitAt()), row.getDepotId());
+                row.getAuthorName(), reasonCode, reason + CodeDiffRetryPolicy.gitFailureMessage(row.getDiffRetryError()) + "，未统计行数",
+                CodeStatsSupport.format(row.getCommitAt()), row.getDepotId());
     }
 
     CodeStatsModels.DiffRetryJob retryDiffs(CodeStatsModule.ScopeInfo scope, ScanJobEntity source,
@@ -323,10 +360,8 @@ class CodeScanService implements CodeBackfillTrigger {
         if (matches.isEmpty() || matches.size() != targets.size()) {
             throw new CodingOpenApiException("所选失败记录已变化，请刷新明细后重试");
         }
-        LocalDate first = matches.stream().map(CommitEntity::getCommitDate).min(LocalDate::compareTo).orElseThrow();
-        LocalDate last = matches.stream().map(CommitEntity::getCommitDate).max(LocalDate::compareTo).orElseThrow();
-        var selection = new DiffRetrySelection(first, last, matches.stream().map(CommitEntity::getId).toList());
-        ScanJobEntity job = createAndSubmit(scope, YearMonth.from(last), CodeScanWorker.DIFF_RETRY, "MANUAL",
+        var selection = diffRetrySelection(matches);
+        ScanJobEntity job = createAndSubmit(scope, YearMonth.from(selection.to()), CodeScanWorker.DIFF_RETRY, "MANUAL",
                 requestedBy, null, selection, null);
         if (job == null) throw new CodingOpenApiException("当前范围有任务正在处理或队列已满，请稍后重试");
         cache.markUserCooldown(scopeKey, requestedBy, DIFF_RETRY_COOLDOWN);
@@ -342,6 +377,12 @@ class CodeScanService implements CodeBackfillTrigger {
     }
 
     private record DiffRetrySelection(LocalDate from, LocalDate to, List<Long> commitIds) {
+    }
+
+    private static DiffRetrySelection diffRetrySelection(List<CommitEntity> rows) {
+        LocalDate first = rows.stream().map(CommitEntity::getCommitDate).min(LocalDate::compareTo).orElseThrow();
+        LocalDate last = rows.stream().map(CommitEntity::getCommitDate).max(LocalDate::compareTo).orElseThrow();
+        return new DiffRetrySelection(first, last, rows.stream().map(CommitEntity::getId).toList());
     }
 
     @Override
@@ -420,6 +461,7 @@ class CodeScanService implements CodeBackfillTrigger {
                 try {
                     worker.run(input);
                 } finally {
+                    if (retry != null && "AUTO".equals(requestedMode)) automaticDiffRunning.set(false);
                     afterJobFinished(scope, month);
                 }
             });

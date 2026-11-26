@@ -28,6 +28,46 @@ if [ ! -f "$JAR_SOURCE" ]; then
   exit 1
 fi
 
+read_external_setting() {
+  local key="$1" file="/etc/iw-mixes/iw-external.env" value
+  if [ ! -r "$file" ]; then return 0; fi
+  value="$(awk -v key="$key" '$0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+    sub(/^[^=]*=[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); value=$0
+  } END {print value}' "$file")"
+  case "$value" in
+    \"*\") value="${value:1:${#value}-2}" ;;
+    \'*\') value="${value:1:${#value}-2}" ;;
+  esac
+  printf '%s' "$value"
+}
+
+verify_external_git() (
+  local enabled executable fixture
+  enabled="$(read_external_setting IW_ZHAOGANG_CODE_AUTO_DIFF_RETRY_ENABLED)"
+  if [ "${enabled:-true}" = false ]; then return; fi
+  enabled="$(read_external_setting IW_ZHAOGANG_CODE_GIT_LINE_STATS_ENABLED)"
+  if [ "${enabled:-true}" = false ]; then return; fi
+  executable="$(read_external_setting IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE)"
+  executable="${executable:-/usr/bin/git}"
+  if [[ "$executable" != /* || ! -x "$executable" ]]; then
+    echo "Dev Hub Git executable is missing or not executable: $executable" >&2
+    return 1
+  fi
+  fixture="$(mktemp -d)"
+  trap 'rm -rf -- "$fixture"' EXIT
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+  if ! GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.sslVerify GIT_CONFIG_VALUE_0=true \
+        "$executable" config --get http.sslVerify | grep -qx true \
+      || ! "$executable" init --bare --template= --quiet "$fixture" \
+      || ! "$executable" -C "$fixture" cat-file --batch-all-objects '--batch-check=%(objectsize)' --unordered >/dev/null \
+      || [ ! -x "$("$executable" --exec-path)/git-remote-https" ]; then
+    echo "Dev Hub Git lacks required configuration, object scanning or HTTPS support: $executable" >&2
+    return 1
+  fi
+)
+
+if [ "$SERVICE_NAME" = iw-external ]; then verify_external_git; fi
+
 APP_ROOT="${IW_APP_ROOT:-/opt/iw-mixes-server}"
 SERVICE_DIR="${APP_ROOT}/${SERVICE_NAME}"
 RELEASE_DIR="${APP_ROOT}/releases/${SERVICE_NAME}"

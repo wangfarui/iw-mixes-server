@@ -108,6 +108,10 @@ public final class CodeStatsEntities {
         private Integer filesChanged;
         private String fileTypeStats;
         private String diffStatus;
+        private Integer diffRetryAttempts;
+        private LocalDateTime diffRetryAfter;
+        private String diffRetryCredentialSignature;
+        private String diffRetryError;
         private Boolean isMerge;
         private String commitUrl;
         private Long lastSeenScanId;

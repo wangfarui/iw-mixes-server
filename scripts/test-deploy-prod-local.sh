@@ -45,4 +45,26 @@ mkdir -p "$ROOT_DIR/.mvn"
 printf '%s\n' '-Dmaven.repo.local=/tmp/wrong-repository' > "$ROOT_DIR/.mvn/maven.config"
 if (build_modules core) >/dev/null 2>&1; then echo 'FAIL: conflicting project repository accepted'; exit 1; fi
 [ -z "$MAVEN_SETTINGS_FILE" ] || rm -f "$MAVEN_SETTINGS_FILE"
-echo 'PASS: ambiguous/missing artifacts rejected, exact artifact selected, clean build with neutral settings, repository conflicts rejected; no SSH or production writes'
+
+awk '$0 == "verify_external_git() (" { selected=1 } selected { print } selected && /^\)$/ { exit }' \
+  "$SCRIPT_DIR/../deploy/scripts/deploy-jar.sh" > "$FIXTURE/git-preflight.sh"
+source "$FIXTURE/git-preflight.sh"
+git_executable="$FIXTURE/missing-git"
+git_enabled=true
+read_external_setting() {
+  case "$1" in
+    IW_ZHAOGANG_CODE_AUTO_DIFF_RETRY_ENABLED) echo "$git_enabled" ;;
+    IW_ZHAOGANG_CODE_GIT_LINE_STATS_EXECUTABLE) echo "$git_executable" ;;
+  esac
+}
+if (verify_external_git) >"$FIXTURE/git-output" 2>"$FIXTURE/git-error"; then
+  echo 'FAIL: unavailable Git was accepted with automatic recovery enabled'
+  exit 1
+fi
+grep -F 'Dev Hub Git executable is missing' "$FIXTURE/git-error" >/dev/null
+git_enabled=false
+verify_external_git
+git_enabled=true
+git_executable="$(command -v git)"
+verify_external_git
+echo 'PASS: build artifact and repository checks, Git capability validation, disabled recovery can deploy without Git'

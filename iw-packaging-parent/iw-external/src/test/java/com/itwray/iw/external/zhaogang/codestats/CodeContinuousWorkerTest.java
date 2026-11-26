@@ -329,7 +329,7 @@ class CodeContinuousWorkerTest {
 
     @Test void upstreamFileCountLimitIsClassifiedAsUnavailableLinesNotRepeatedTransportFailure() {
         var pending=new CommitEntity();pending.setId(77L);pending.setDepotId(1L);pending.setProjectId(10L);pending.setSha(a);pending.setDepotName("repo");
-        when(commits.selectPendingDiffs(anyLong(),anyString(),anyLong(),eq("2026-10"))).thenReturn(List.of(pending));
+        when(commits.selectNewDiffs(anyLong(),anyString(),anyLong(),eq("2026-10"))).thenReturn(List.of(pending));
         doThrow(new CodingOpenApiException("FailedOperation","diff 修改文件过多，不宜在网页展示"))
                 .when(coding).commitDiff(anyString(),anyLong(),anyLong(),anyString());
         assertEquals("PARTIAL",run(1,"2026-11-03").getStatus());
@@ -403,7 +403,8 @@ class CodeContinuousWorkerTest {
         verify(commits).updateDiff(77L, 1L, 0L, 1, "OK", null);
         verify(commits).updateDiff(78L, 0L, 23954L, 1, "OK", null);
         verify(commits).updateDiff(79L, null, null, null, "DIFF_UPSTREAM_LIMIT", null);
-        verify(commits).updateDiff(80L, null, null, null, "DIFF_PERMISSION_DENIED", null);
+        verify(commits).updateFailedDiffWithRetryState(80L, "DIFF_PERMISSION_DENIED", 0, null,
+                CodeDiffRetryPolicy.credentialSignature(scope), null);
         verify(batch, never()).count(eq(forbidden), anyString());
     }
 

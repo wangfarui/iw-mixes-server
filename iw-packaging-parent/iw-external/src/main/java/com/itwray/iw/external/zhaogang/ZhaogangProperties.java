@@ -92,6 +92,8 @@ public class ZhaogangProperties {
     /** 允许通过只读 HTTPS Git 定向补算行数，以及在团队同步中补齐文件类型。 */
     private boolean codeGitLineStatsEnabled = true;
 
+    private boolean codeAutoDiffRetryEnabled = true;
+
     /** 支持运行时 Git 配置及对象大小检查的 Git 可执行文件绝对路径。 */
     private String codeGitLineStatsExecutable = "/usr/bin/git";
 
