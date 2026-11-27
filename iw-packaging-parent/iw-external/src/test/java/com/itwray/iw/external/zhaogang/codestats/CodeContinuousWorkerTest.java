@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -80,6 +83,58 @@ class CodeContinuousWorkerTest {
                 .run(new CodeScanWorker.ScanInput(job, target, YearMonth.now(clock), "SYNC", 1,
                         Map.of(), "", List.of(), fileTypePriority, reads));
         return job;
+    }
+
+    @Test
+    void teamScansFetchInParallelAndWaitForTheActiveCommitWrite() throws Exception {
+        var second = new CodeContinuousWorkerTest();
+        var firstWriting = new CountDownLatch(1);
+        var releaseFirstWrite = new CountDownLatch(1);
+        var secondFetched = new CountDownLatch(1);
+        var secondWriting = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            firstWriting.countDown();
+            assertTrue(releaseFirstWrite.await(5, TimeUnit.SECONDS));
+            throw new DataAccessResourceFailureException("fixture");
+        }).when(commits).upsertBatch(anyList());
+        doAnswer(invocation -> {
+            secondFetched.countDown();
+            return new CodingCommitPage(List.of(
+                    new CodingCommit(a, "a", "self", "self@example.invalid", at, "fixture", List.of())), 1, 1, 100);
+        }).when(second.coding).commits(anyString(), any());
+        doAnswer(invocation -> {
+            secondWriting.countDown();
+            List<CommitEntity> rows = invocation.getArgument(0);
+            rows.forEach(row -> second.database.put(row.getSha(), row));
+            return rows.size();
+        }).when(second.commits).upsertBatch(anyList());
+
+        var workers = Executors.newFixedThreadPool(2);
+        try {
+            var firstResult = workers.submit(() -> run(1L, "2026-11-02", teamScope(9), mock(CodeGitLineStats.class)));
+            assertTrue(firstWriting.await(5, TimeUnit.SECONDS));
+            var secondResult = workers.submit(() -> second.run(2L, "2026-11-02", teamScope(10), mock(CodeGitLineStats.class)));
+            assertTrue(secondFetched.await(5, TimeUnit.SECONDS));
+            assertFalse(secondWriting.await(250, TimeUnit.MILLISECONDS));
+            releaseFirstWrite.countDown();
+
+            assertEquals("FAILED", firstResult.get(5, TimeUnit.SECONDS).getStatus());
+            assertEquals("COMPLETED", secondResult.get(5, TimeUnit.SECONDS).getStatus());
+            assertNull(checkpoint);
+            assertNotNull(second.checkpoint);
+            assertEquals(Set.of(a), second.database.keySet());
+            verify(commits).upsertBatch(anyList());
+            verify(second.commits).upsertBatch(anyList());
+        } finally {
+            releaseFirstWrite.countDown();
+            workers.shutdownNow();
+        }
+    }
+
+    private CodeStatsModule.ScopeInfo teamScope(long id) {
+        return new CodeStatsModule.ScopeInfo(CodeStatsModels.Scope.WORKBENCH_TEAM, id, 100, "team",
+                "https://example.com", "team",
+                List.of(new CodeStatsModule.MemberCredential(1, "self", "", "fixture-token", CodingRole.BACKEND)), false);
     }
 
     @Test

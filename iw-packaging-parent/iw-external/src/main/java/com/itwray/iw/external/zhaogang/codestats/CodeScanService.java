@@ -511,7 +511,9 @@ class CodeScanService implements CodeBackfillTrigger {
             }
             String commitCutoff = YearMonth.now(clock)
                     .minusMonths(Math.max(1, properties.getCodeStatsRetentionMonths())).toString();
-            commitMapper.deleteBeforeMonth(commitCutoff);
+            CodeCommitWriteLock.run(() -> commitMapper.deleteBeforeMonth(commitCutoff));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         } catch (RuntimeException e) {
             log.warn("zhaogang code stats cleanup failed: {}", e.getClass().getSimpleName());
         }

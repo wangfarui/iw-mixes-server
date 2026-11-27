@@ -446,8 +446,8 @@ class CodeScanWorker {
                 repoMapper.updateState(job.getId(), depot.depot().id(), "SKIPPED", nextBranches.size(), written,
                         "BRANCH_CHANGED", "有 " + changedBranches + " 个分支待下轮复核，已保留稳定分支进度和成功数据");
             } else {
-                commitMapper.cleanupSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(), input.scope().scopeId(),
-                        entry.getKey(), job.getSyncFrom(), job.getSyncTo(), job.getId());
+                writeCommit(() -> commitMapper.cleanupSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(),
+                        input.scope().scopeId(), entry.getKey(), job.getSyncFrom(), job.getSyncTo(), job.getId()));
                 markRepoCompleted(job, depot, entry.getValue().size(), written);
             }
             log.info("zhaogang continuous repo, jobId={}, depotId={}, stableBranches={}, commitPageCalls={}, partial={}",
@@ -770,8 +770,9 @@ class CodeScanWorker {
                         row.getAuthorEmailHash(), row.getAuthorNameKey())))
                 .map(CommitEntity::getId).toList();
         for (int i = 0; i < remove.size(); i += 200) {
-            commitMapper.deleteUnmatchedRows(input.scope().codingTeamId(), input.scope().scope().name(),
-                    input.scope().scopeId(), input.month().toString(), remove.subList(i, Math.min(remove.size(), i + 200)));
+            List<Long> batch = remove.subList(i, Math.min(remove.size(), i + 200));
+            writeCommit(() -> commitMapper.deleteUnmatchedRows(input.scope().codingTeamId(), input.scope().scope().name(),
+                    input.scope().scopeId(), input.month().toString(), batch));
         }
     }
 
@@ -786,16 +787,25 @@ class CodeScanWorker {
         for (CommitAccumulator accumulator : accumulators) {
             batch.add(accumulator.toEntity());
             if (batch.size() >= 200) {
-                commitMapper.upsertBatch(batch);
+                writeCommit(() -> commitMapper.upsertBatch(batch));
                 written += batch.size();
                 batch.clear();
             }
         }
         if (!batch.isEmpty()) {
-            commitMapper.upsertBatch(batch);
+            writeCommit(() -> commitMapper.upsertBatch(batch));
             written += batch.size();
         }
         return written;
+    }
+
+    private void writeCommit(Runnable write) {
+        try {
+            CodeCommitWriteLock.run(write);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new ScanCancelledException();
+        }
     }
 
     private void fetchDiffs(ScanInput input, ScanJobEntity job, Map<Long, DepotPlan> depots,
@@ -836,9 +846,9 @@ class CodeScanWorker {
                     .filter(row -> selected.contains(row.getId())).forEach(pending::add);
         } else {
             for (String month : touchedMonths) {
-                commitMapper.applyCommitCountOnlyPolicy(input.scope().codingTeamId(), input.scope().scope().name(),
-                        input.scope().scopeId(), month, CodeLinePolicy.COMMIT_COUNT_ONLY_DEPOT);
                 var scope = input.scope();
+                writeCommit(() -> commitMapper.applyCommitCountOnlyPolicy(scope.codingTeamId(), scope.scope().name(),
+                        scope.scopeId(), month, CodeLinePolicy.COMMIT_COUNT_ONLY_DEPOT));
                 pending.addAll(automatic && properties.isCodeAutoDiffRetryEnabled()
                         ? commitMapper.selectNewDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), month)
                         : commitMapper.selectPendingDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), month));
@@ -856,16 +866,21 @@ class CodeScanWorker {
             CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex,
                     commit.getAuthorEmailHash(), commit.getAuthorNameKey());
             if (CodeLinePolicy.commitCountOnly(commit.getDepotName())) {
-                commitMapper.updateDiff(commit.getId(), null, null, null, CodeLinePolicy.SKIPPED_REPOSITORY, null);
+                writeCommit(() -> commitMapper.updateDiff(commit.getId(), null, null, null,
+                        CodeLinePolicy.SKIPPED_REPOSITORY, null));
             } else if (resolved.memberId() == null || !memberIds.contains(resolved.memberId())) {
                 if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
-                if (!retryOnly || automaticRetry) commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
+                if (!retryOnly || automaticRetry) {
+                    writeCommit(() -> commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED"));
+                }
             } else {
                 List<String> candidates = diffTokens(memberTokens.get(resolved.memberId()),
                         depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens));
                 if (candidates.isEmpty()) {
                     if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
-                    if (!retryOnly || automaticRetry) commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED");
+                    if (!retryOnly || automaticRetry) {
+                        writeCommit(() -> commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED"));
+                    }
                 } else {
                     fetchDiff(input, commit, candidates, gitBatch);
                 }
@@ -919,13 +934,11 @@ class CodeScanWorker {
                 if (System.nanoTime() - started >= FILE_TYPES_BACKFILL_BUDGET) return;
                 var owner = identities.resolve(mappingIndex, commit.getAuthorEmailHash(), commit.getAuthorNameKey());
                 List<String> repositoryTokens = depotTokens.get(commit.getDepotId());
-                String stats = null;
-                if (!owner.ignored() && developerIds.contains(owner.memberId()) && repositoryTokens != null) {
-                    List<String> tokens = diffTokens(memberTokens.get(owner.memberId()), repositoryTokens);
-                    stats = readHistoricalFileTypes(input, commit, tokens, gitBatch);
-                }
-                commitMapper.updateFileTypesBackfill(commit.getId(), commit.getAdditions(), commit.getDeletions(),
-                        commit.getFileTypeStats(), stats);
+                String stats = !owner.ignored() && developerIds.contains(owner.memberId()) && repositoryTokens != null
+                        ? readHistoricalFileTypes(input, commit, diffTokens(memberTokens.get(owner.memberId()), repositoryTokens), gitBatch)
+                        : null;
+                writeCommit(() -> commitMapper.updateFileTypesBackfill(commit.getId(), commit.getAdditions(),
+                        commit.getDeletions(), commit.getFileTypeStats(), stats));
                 save(job);
             }
             if (historical.size() < batchSize || System.nanoTime() - started >= FILE_TYPES_BACKFILL_BUDGET) return;
@@ -1042,7 +1055,7 @@ class CodeScanWorker {
     }
 
     private void storeDiffFailure(ScanInput input, CommitEntity commit, CodeDiffFailure failure, CodeGitLineStats.Failure gitFailure) {
-        CodeDiffRetryPolicy.State state = null;
+        CodeDiffRetryPolicy.State state;
         if (properties.isCodeAutoDiffRetryEnabled()) {
             boolean automaticRetry = DIFF_RETRY.equals(input.mode()) && "AUTO".equals(input.job().getRequestedMode());
             int attempts = commit.getDiffRetryAttempts() == null ? 0 : commit.getDiffRetryAttempts();
@@ -1050,18 +1063,21 @@ class CodeScanWorker {
                     ? CodeDiffRetryPolicy.credentialSignature(input.scope()) : null;
             state = CodeDiffRetryPolicy.afterFailure(failure, gitFailure, automaticRetry, attempts,
                     LocalDateTime.now(clock), credentials);
+        } else {
+            state = null;
         }
         if (state == null) {
-            commitMapper.updateDiff(commit.getId(), null, null, null, failure.status(), null);
+            writeCommit(() -> commitMapper.updateDiff(commit.getId(), null, null, null, failure.status(), null));
         } else {
-            commitMapper.updateFailedDiffWithRetryState(commit.getId(), failure.status(), state.attempts(), state.retryAfter(),
-                    state.credentialSignature(), state.error());
+            writeCommit(() -> commitMapper.updateFailedDiffWithRetryState(commit.getId(), failure.status(),
+                    state.attempts(), state.retryAfter(), state.credentialSignature(), state.error()));
         }
     }
 
     private void storeDiff(CommitEntity commit, CodingCommitDiff diff) {
-        commitMapper.updateDiff(commit.getId(), (long) diff.additions(), (long) diff.deletions(), diff.filesChanged(),
-                "OK", diff.fileTypes().isEmpty() ? null : CodeFileTypes.encode(diff.fileTypes()));
+        String fileTypes = diff.fileTypes().isEmpty() ? null : CodeFileTypes.encode(diff.fileTypes());
+        writeCommit(() -> commitMapper.updateDiff(commit.getId(), (long) diff.additions(), (long) diff.deletions(),
+                diff.filesChanged(), "OK", fileTypes));
     }
 
     private static boolean isGitFallbackCandidate(CodeDiffFailure reason, Integer httpStatus) {
@@ -1095,8 +1111,9 @@ class CodeScanWorker {
             YearMonth first="SYNC".equals(input.mode()) ? YearMonth.from(job.getSyncFrom()) : input.month();
             YearMonth last="SYNC".equals(input.mode()) ? YearMonth.from(job.getSyncTo()) : input.month();
             for(YearMonth month=first;!month.isAfter(last);month=month.plusMonths(1)) {
-                commitMapper.cleanupFullScan(input.scope().codingTeamId(), input.scope().scope().name(),
-                        input.scope().scopeId(), month.toString(), job.getId());
+                String statMonth = month.toString();
+                writeCommit(() -> commitMapper.cleanupFullScan(input.scope().codingTeamId(), input.scope().scope().name(),
+                        input.scope().scopeId(), statMonth, job.getId()));
             }
         }
         boolean partial = job.isCoverageIncomplete() || (job.getFailedRepos() != null && job.getFailedRepos() > 0)
