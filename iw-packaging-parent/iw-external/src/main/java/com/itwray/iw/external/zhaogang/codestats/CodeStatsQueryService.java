@@ -54,6 +54,26 @@ class CodeStatsQueryService {
     private final ZhaogangCodeScanRepoMapper repoMapper;
     private final CodeIdentityResolver identities;
     private final WorkCalendarResolver calendar;
+    private CodeRepositoryAccess access;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void useRepositoryAccess(CodeRepositoryAccess access) {
+        this.access = access;
+    }
+
+    private Map<String, IdentityEntity> authors(CodeStatsModule.ScopeInfo scope) {
+        return identities.mappingIndex(access == null ? identities.mappings(scope)
+                : identities.organizationMappings(scope.codingTeamId()));
+    }
+
+    private List<CommitEntity> visibleCommits(CodeStatsModule.ScopeInfo scope, CodeRange range, boolean merge) {
+        if (access == null) {
+            return merge ? commitMapper.selectMerges(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), range.from(), range.to())
+                    : commitMapper.selectForRange(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), range.from(), range.to());
+        }
+        Set<Long> depots = access.visible(scope).depots();
+        return depots.isEmpty() ? List.of() : commitMapper.selectVisible(scope.codingTeamId(), depots, range.from(), range.to(), merge);
+    }
 
     CodeStatsQueryService(ZhaogangCodeCommitMapper commitMapper, ZhaogangCodeScanJobMapper jobMapper,
                           ZhaogangCodeScanRepoMapper repoMapper, CodeIdentityResolver identities,
@@ -65,21 +85,20 @@ class CodeStatsQueryService {
         this.calendar = calendar;
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     TeamStatistics teamStatistics(CodeStatsModule.ScopeInfo scope, CodeRange range, ScanState scan,
                                   boolean refreshing, boolean dataReady) {
         List<CommitEntity> commits = commits(scope, range);
-        Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
+        Map<String, IdentityEntity> mappingIndex = authors(scope);
         Map<Long, MemberAccumulator> acc = new LinkedHashMap<>();
         scope.developmentMembers().forEach(member -> acc.put(member.userId(), new MemberAccumulator(member)));
         Set<Long> memberIds = acc.keySet();
-        long excludedMerges = commitMapper.selectMerges(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
-                range.from(), range.to()).stream().filter(row -> {
-                    var owner = identities.resolve(mappingIndex, row.getAuthorEmailHash(), row.getAuthorNameKey());
+        long excludedMerges = visibleCommits(scope, range, true).stream().filter(row -> {
+                    var owner = resolve(mappingIndex, row);
                     return !owner.ignored() && owner.memberId() != null && memberIds.contains(owner.memberId());
                 }).count();
         for (CommitEntity commit : commits) {
-            CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex, commit.getAuthorEmailHash(),
-                    commit.getAuthorNameKey());
+            CodeIdentityResolver.Resolved resolved = resolve(mappingIndex, commit);
             if (resolved.ignored()) continue;
             MemberAccumulator member = resolved.memberId() == null ? null : acc.get(resolved.memberId());
             if (member != null) member.add(commit);
@@ -93,40 +112,39 @@ class CodeStatsQueryService {
                 range.view(), scan, coverage, members);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     SelfStatistics selfStatistics(CodeStatsModule.ScopeInfo scope, CodeRange range, ScanState scan,
                                   boolean refreshing, boolean dataReady) {
         List<CommitEntity> commits = commits(scope, range);
-        Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
+        Map<String, IdentityEntity> mappingIndex = authors(scope);
         Set<Long> memberIds = Set.of(scope.scopeId());
         List<CommitEntity> mine = new ArrayList<>();
         for (CommitEntity commit : commits) {
-            CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex, commit.getAuthorEmailHash(),
-                    commit.getAuthorNameKey());
+            CodeIdentityResolver.Resolved resolved = resolve(mappingIndex, commit);
             if (resolved.ignored()) continue;
             if (resolved.memberId() != null && memberIds.contains(resolved.memberId())) {
                 mine.add(commit);
             }
         }
-        long excludedMerges = commitMapper.selectMerges(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
-                range.from(), range.to()).stream().filter(row -> {
-                    var owner = identities.resolve(mappingIndex, row.getAuthorEmailHash(), row.getAuthorNameKey());
+        long excludedMerges = visibleCommits(scope, range, true).stream().filter(row -> {
+                    var owner = resolve(mappingIndex, row);
                     return !owner.ignored() && owner.memberId() != null && memberIds.contains(owner.memberId());
                 }).count();
         Coverage coverage = coverage(scope, range, scan, mine, mappingIndex, memberIds, excludedMerges);
         SelfSummary summary = summary(mine);
-        return new SelfStatistics(dataReady || !commits.isEmpty() || excludedMerges > 0, refreshing, range.view(), scan, coverage, summary, daily(range, mine, scope.codingTeamId()),
+        return new SelfStatistics(dataReady || !mine.isEmpty() || excludedMerges > 0, refreshing, range.view(), scan, coverage, summary, daily(range, mine, scope.codingTeamId()),
                 hourly(mine), repositories(mine), branches(mine));
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     MemberStatistics memberStatistics(CodeStatsModule.ScopeInfo scope, CodeRange range, long memberUserId) {
         CodeStatsModule.MemberCredential member = scope.developmentMembers().stream()
                 .filter(item -> item.userId() == memberUserId).findFirst()
                 .orElseThrow(() -> new CodingOpenApiException("指定成员不在当前团队代码统计范围内"));
-        Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
+        Map<String, IdentityEntity> mappingIndex = authors(scope);
         List<CommitEntity> mine = commits(scope, range).stream()
                 .filter(commit -> {
-                    CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex,
-                            commit.getAuthorEmailHash(), commit.getAuthorNameKey());
+                    CodeIdentityResolver.Resolved resolved = resolve(mappingIndex, commit);
                     return !resolved.ignored() && resolved.memberId() != null && resolved.memberId() == memberUserId;
                 }).toList();
         Map<String, CodeFileTypes.Lines> fileTypes = new LinkedHashMap<>();
@@ -167,16 +185,16 @@ class CodeStatsQueryService {
         return memberUserId;
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     EntryPage entries(CodeStatsModule.ScopeInfo scope, CodeRange range, Long memberUserId, Long depotId,
                       String keyword, int pageNumber, int pageSize, CodeStatsModels.EntrySort sortBy,
                       CodeStatsModels.SortDirection sortOrder) {
         long targetMemberId = entryMemberId(scope, memberUserId);
-        Map<String, IdentityEntity> mappingIndex = identities.mappingIndex(identities.mappings(scope));
+        Map<String, IdentityEntity> mappingIndex = authors(scope);
         String normalizedKeyword = StringUtils.trimToEmpty(keyword).toLowerCase(Locale.ROOT);
         List<CommitEntity> mine = commits(scope, range).stream()
                 .filter(commit -> {
-                    CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex,
-                            commit.getAuthorEmailHash(), commit.getAuthorNameKey());
+                    CodeIdentityResolver.Resolved resolved = resolve(mappingIndex, commit);
                     return !resolved.ignored() && resolved.memberId() != null
                             && resolved.memberId() == targetMemberId;
                 }).toList();
@@ -212,9 +230,13 @@ class CodeStatsQueryService {
                 .thenComparingLong(Entry::depotId).thenComparing(Entry::sha);
     }
 
+    private CodeIdentityResolver.Resolved resolve(Map<String, IdentityEntity> index, CommitEntity commit) {
+        return Boolean.TRUE.equals(commit.getAuthorConflict()) ? CodeIdentityResolver.Resolved.UNMAPPED
+                : identities.resolve(index, commit.getAuthorEmailHash(), commit.getAuthorNameKey());
+    }
+
     private List<CommitEntity> commits(CodeStatsModule.ScopeInfo scope, CodeRange range) {
-        return commitMapper.selectForRange(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
-                range.from(), range.to()).stream()
+        return visibleCommits(scope, range, false).stream()
                 .peek(CodeLinePolicy::apply)
                 .sorted(Comparator.comparing(CommitEntity::getCommitAt).reversed())
                 .toList();
@@ -229,8 +251,7 @@ class CodeStatsQueryService {
         long failed = 0;
         long pending = 0;
         for (CommitEntity commit : scopedCommits) {
-            CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex, commit.getAuthorEmailHash(),
-                    commit.getAuthorNameKey());
+            CodeIdentityResolver.Resolved resolved = resolve(mappingIndex, commit);
             boolean owned = !resolved.ignored() && resolved.memberId() != null
                     && memberIds.contains(resolved.memberId());
             if (!owned) continue;
@@ -240,9 +261,9 @@ class CodeStatsQueryService {
             if ("OK".equals(commit.getDiffStatus())) ok++;
             if (CodeDiffFailure.isFailure(commit.getDiffStatus())) failed++;
         }
-        Set<Long> scannedRepos = scannedRepos(scope, range);
+        Set<Long> scannedRepos = access == null ? scannedRepos(scope, range) : access.visible(scope).depots();
         if (!scannedRepos.isEmpty()) depots = scannedRepos;
-        int scannedBranches = scannedBranchCount(scope, range);
+        int scannedBranches = access == null ? scannedBranchCount(scope, range) : 0;
         int branchCount = scannedBranches > 0 ? scannedBranches : branches.size();
         int pats = (int) scope.members().stream().filter(scope::hasRepositoryToken).count();
         List<MemberIssue> memberIssues = scope.scope() == Scope.WORKBENCH_TEAM
@@ -322,11 +343,13 @@ class CodeStatsQueryService {
     private List<RepoIssue> repoIssues(CodeStatsModule.ScopeInfo scope, CodeRange range) {
         List<RepoIssue> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        Set<Long> visible = access == null ? null : access.visible(scope).depots();
         for (YearMonth month : range.months()) {
             ScanJobEntity job = jobMapper.selectLatest(scope.codingTeamId(), scope.scope().name(),
                     scope.scopeId(), month.toString());
             if (job == null) continue;
             for (ScanRepoEntity repo : repoMapper.selectIssues(job.getId())) {
+                if (visible != null && !visible.contains(repo.getDepotId())) continue;
                 String key = repo.getDepotId() + ":" + repo.getErrorCode();
                 if (!seen.add(key)) continue;
                 result.add(new RepoIssue(repo.getProjectName(), repo.getDepotName(),

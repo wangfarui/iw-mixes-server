@@ -1,0 +1,79 @@
+{
+  "worklogPersonal": [
+    "RootWebArea \"Dev Hub · CODING 助手\" url=\"http://127.0.0.1:5197/zhaogang/worklogs\"",
+    "    button \"打开更新日志，当前版本 v2.4.4，有新版本更新\"",
+    "    button \"工时\" focusable focused",
+    "    heading \"工时统计\" level=\"3\"",
+    "    \"总计工时 12h · 加班天数 1天 · 加班工时 4h · 平均工时 0.63h\"",
+    "    \"同步时间：2026-11-27 11:48:07\"",
+    "    button \"刷新当前工时数据\"",
+    "    radio \"我的工时\" checked",
+    "    \"我的工时\"",
+    "    radio \"团队工时\"",
+    "    \"团队工时\"",
+    "    image \"2026-11-01 至 2026-11-30每日工时趋势\"",
+    "    heading \"工时记录\" level=\"3\"",
+    "    button \"本月\"",
+    "    button \"上月\"",
+    "    \"我的工时 · 12h\"",
+    "    generic \"工时记录\"",
+    "      link \"11/26 00:00 4h TASK #93 合成事项 fixture-added 合成工时 93\" url=\"https://fixture.coding.net/p/fixture-added/all/issues\"",
+    "      link \"11/26 00:00 4h TASK #92 合成事项 fixture-private 合成工时 92\" url=\"https://fixture.coding.net/p/fixture-private/all/issues\"",
+    "      link \"11/26 00:00 4h TASK #91 合成事项 fixture-project 合成工时 91\" url=\"https://fixture.coding.net/p/fixture-project/all/issues\""
+  ],
+  "worklogTeam": [
+    "RootWebArea \"Dev Hub · CODING 助手\" url=\"http://127.0.0.1:5197/zhaogang/worklogs\"",
+    "\"总计工时 16h · 2 人 · 加班天数 1天 · 加班工时 4h · 平均工时 2.00h\"",
+    "\"同步时间：2026-11-27 11:48:07\"",
+    "combobox \"筛选团队成员\" expandable haspopup=\"listbox\""
+  ],
+  "statsRefresh": [
+    "\"工时更新 11/27 11:48\"",
+    "\"代码更新 11/27 11:48\"",
+    "button \"刷新\" disableable disabled",
+    "\"统计更新中 · 正在显示上次报表\"",
+    "\"生成于 11/27 11:53\""
+  ],
+  "statsRequests": [
+    {
+      "path": "/external-service/api/zhaogang/statistics/report",
+      "refresh": null,
+      "success": true
+    },
+    {
+      "path": "/external-service/api/zhaogang/statistics/report",
+      "refresh": null,
+      "success": true
+    },
+    {
+      "path": "/external-service/api/zhaogang/statistics/report",
+      "refresh": null,
+      "success": true
+    },
+    {
+      "path": "/external-service/api/zhaogang/statistics/report",
+      "refresh": "true",
+      "success": true
+    },
+    {
+      "path": "/external-service/api/zhaogang/statistics/report",
+      "refresh": null,
+      "success": true
+    },
+    {
+      "path": "/external-service/api/zhaogang/statistics/report",
+      "refresh": null,
+      "success": true
+    }
+  ],
+  "upstreamAcquisitionBefore": {
+    "DescribeAllProjectsIssueWorkLogList": 72,
+    "DescribeGitCommitsInPage": 5,
+    "DescribeGitCommitDiff": 10
+  },
+  "upstreamAcquisitionAfter": {
+    "DescribeAllProjectsIssueWorkLogList": 72,
+    "DescribeGitCommitsInPage": 5,
+    "DescribeGitCommitDiff": 10
+  }
+}

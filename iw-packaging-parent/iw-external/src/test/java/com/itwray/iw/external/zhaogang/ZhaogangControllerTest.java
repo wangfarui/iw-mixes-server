@@ -31,7 +31,7 @@ class ZhaogangControllerTest {
         var controller = new ZhaogangController(sessions, mock(ZhaogangWorkbenchService.class),
                 mock(ZhaogangCatalogService.class), properties, worklogs, mock(K8sTokenService.class));
         var session = new ZhaogangSession("fixture-token", 100L, "测试成员", "", "fixture", 10L);
-        when(sessions.resolve(any(), any())).thenReturn(session);
+        when(sessions.resolveStatistics(any(), any())).thenReturn(session);
         var context = new WorklogModule.Context("fixture-token", 100L, "测试成员", "", 10L,
                 "fixture", properties.configuredTeamHost());
         var report = new RangeReport(

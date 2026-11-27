@@ -40,7 +40,7 @@ public class WorklogStatisticsSource {
         });
         long validUntil = Long.MAX_VALUE;
         long syncedAt = 0;
-        var keys = new java.util.ArrayList<String>();
+        Map<String,String> keys = new HashMap<>();
         LocalDate from = month.atDay(1);
         LocalDate end = month.plusMonths(1).atDay(1);
         for (var source : repository.sources(idsByKey.keySet().stream().toList())) {
@@ -52,9 +52,9 @@ public class WorklogStatisticsSource {
                 continue;
             }
             var problem = mirror.problem(source, from, end);
+            if (!source.blocked()) keys.put(source.key(), choice.fingerprint());
             if (problem == null) {
                 reasons.remove(id);
-                keys.add(source.key());
                 validUntil = Math.min(validUntil, source.incrementAt() + Duration.ofMinutes(30).toMillis() + 1);
             } else {
                 reasons.put(id, problem.code);

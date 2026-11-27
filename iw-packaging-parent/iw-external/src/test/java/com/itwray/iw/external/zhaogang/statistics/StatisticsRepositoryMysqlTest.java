@@ -35,7 +35,7 @@ class StatisticsRepositoryMysqlTest {
 
     @BeforeEach
     void setup() {
-        var dataSource = new DriverManagerDataSource(System.getenv("IW_STATISTICS_TEST_JDBC_URL"), "root", "");
+        var dataSource = new DriverManagerDataSource(System.getenv("IW_STATISTICS_TEST_JDBC_URL"), "root", System.getenv().getOrDefault("IW_SHARED_MYSQL_TEST_PASSWORD", ""));
         var manager = new DataSourceTransactionManager(dataSource);
         jdbc = new JdbcTemplate(dataSource);
         tx = new TransactionTemplate(manager);

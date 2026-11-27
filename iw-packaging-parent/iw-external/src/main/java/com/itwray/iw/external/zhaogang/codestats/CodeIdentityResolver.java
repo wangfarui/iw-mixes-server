@@ -35,6 +35,16 @@ class CodeIdentityResolver {
                 mapper.selectByScope(scope.codingTeamId(), SELF, member.userId()).stream()).toList();
     }
 
+    List<IdentityEntity> organizationMappings(long org) {
+        return mapper.selectOrganizationIdentities(org);
+    }
+
+    Resolved resolve(Map<String, IdentityEntity> mappings,
+                     com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.CommitEntity commit) {
+        return Boolean.TRUE.equals(commit.getAuthorConflict()) ? Resolved.UNMAPPED
+                : resolve(mappings, commit.getAuthorEmailHash(), commit.getAuthorNameKey());
+    }
+
     String signature(CodeStatsModule.ScopeInfo scope) {
         return signature(mappings(scope));
     }

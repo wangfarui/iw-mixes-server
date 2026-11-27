@@ -10,6 +10,20 @@ import java.util.List;
 
 public interface ZhaogangCodeIdentityMapper extends BaseMapper<IdentityEntity> {
 
+    @Select("""
+            SELECT * FROM external_zhaogang_code_identity
+            WHERE coding_team_id=#{org} AND scope_type IN ('SELF','WORKBENCH_TEAM')
+              AND (scope_type='SELF' OR EXISTS (
+                SELECT 1 FROM external_zhaogang_workbench_team t
+                JOIN external_zhaogang_workbench_team_member m ON m.team_id=t.id
+                WHERE t.coding_team_id=#{org} AND t.id=external_zhaogang_code_identity.scope_id
+                  AND (external_zhaogang_code_identity.coding_user_id IS NULL
+                    OR m.coding_user_id=external_zhaogang_code_identity.coding_user_id)
+              ))
+            """)
+    List<IdentityEntity> selectOrganizationIdentities(@Param("org") long org);
+
+
     @Insert("""
             insert ignore into external_zhaogang_code_identity
               (coding_team_id, scope_type, scope_id, identity_type, identity_key, coding_user_id,

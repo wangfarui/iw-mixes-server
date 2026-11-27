@@ -58,6 +58,14 @@ import java.util.stream.Collectors;
 @Service
 class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
 
+    private org.springframework.context.ApplicationEventPublisher events;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void useStatisticsEvents(org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
+    }
+
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
     private static final int MAX_ADD_MEMBERS = 100;
@@ -161,8 +169,11 @@ class DefaultWorkbenchTeamModule implements WorkbenchTeamModule {
         var status = new ManagementTokenStatus(true, owner.id(),
                 StringUtils.left(StringUtils.defaultIfBlank(owner.name(), Long.toString(owner.id())), 128),
                 LocalDateTime.now(ZONE));
-        return toDetail(actor, repository.saveManagementToken(teamId, actor, command.versionNo(),
+        var detail = toDetail(actor, repository.saveManagementToken(teamId, actor, command.versionNo(),
                 AESUtils.encryptAESGCM(managementTokenKey(), token), status));
+        if (events != null) events.publishEvent(new com.itwray.iw.external.zhaogang.credential.StatisticsCredentialChanged(
+                actor.codingTeamId(), owner.id(), teamId));
+        return detail;
     }
 
     private void verifyStatisticsAccess(String token, StoredTeam stored, long ownerId) {

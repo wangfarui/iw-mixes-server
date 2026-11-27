@@ -1,0 +1,33 @@
+{
+    "teamId": 1,
+    "secondTeamId": 2,
+    "worklogTotalBeforeNarrow": 14,
+    "worklogTotalAfterNarrow": 7,
+    "codeRepositoriesBeforeNarrow": [
+        91,
+        92
+    ],
+    "codeRepositoriesAfterNarrow": [
+        91
+    ],
+    "remoteOnPersonalBind": 0,
+    "overlappingNewCommitPages": 1,
+    "overlappingNewDiffCalls": 1,
+    "refreshRemoteAcquisition": 0,
+    "ongoingRefreshPreservedData": true,
+    "organizationPopulation": {
+        "total": 2,
+        "participating": 2,
+        "excluded": 0,
+        "developers": 1
+    },
+    "newOrChangedDepotsOnExpansion": [
+        92,
+        93
+    ],
+    "directedDiffRetryCalls": 1,
+    "worklogHoursAfterRetry": 21,
+    "failedWorklogPreservedHistoryAndTime": true,
+    "organizationRoleAndIgnoreChecks": true,
+    "fullyCoveredSelfZero": true
+}

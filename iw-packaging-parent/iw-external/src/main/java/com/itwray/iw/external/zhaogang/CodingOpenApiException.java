@@ -18,6 +18,8 @@ public class CodingOpenApiException extends RuntimeException {
             Map.entry("DescribeMyDepots", List.of("代码仓库（只读）")),
             Map.entry("DescribeGitCommitsInPage", List.of("代码仓库（只读）")),
             Map.entry("DescribeGitCommitDiff", List.of("代码仓库（只读）")),
+            Map.entry("DescribeGitCommitInfo", List.of("代码仓库（只读）")),
+            Map.entry("DescribeChangeBetween2Commit", List.of("代码仓库（只读）")),
             Map.entry("TriggerCodingCIBuild", List.of("持续集成构建（读写）")),
             Map.entry("DescribeAllProjectsIssueWorkLogList", List.of("项目协同（读写）")),
             Map.entry("DescribeIssue", List.of("项目协同（读写）")),

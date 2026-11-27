@@ -3,7 +3,7 @@ package com.itwray.iw.external.zhaogang.codestats;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder;
 import com.itwray.iw.external.mapper.ZhaogangCodeCommitMapper;
-import com.itwray.iw.external.mapper.ZhaogangCodeIdentityMapper;
+import java.util.Set;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanRepoMapper;
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
@@ -45,10 +45,12 @@ class CodeAutomaticDiffRetryMysqlTest {
     private static final long ORG = 97829001L;
     private static final long TEAM = 97829002L;
     private static final long USER = 42L;
+    private static final String FINGERPRINT = CodeStatsSupport.sha256("fixture-token");
+    private static final String OTHER_FINGERPRINT = CodeStatsSupport.sha256("fixture-other");
     private static final LocalDate DAY = LocalDate.of(2026, 11, 26);
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-26T02:00:00Z"), CodeStatsSupport.CHINA_ZONE);
     private final DriverManagerDataSource dataSource = new DriverManagerDataSource(
-            System.getenv("IW_STATISTICS_TEST_JDBC_URL"), "root", "");
+            System.getenv("IW_STATISTICS_TEST_JDBC_URL"), "root", System.getenv().getOrDefault("IW_SHARED_MYSQL_TEST_PASSWORD", ""));
     private final JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 
     @Test
@@ -69,6 +71,7 @@ class CodeAutomaticDiffRetryMysqlTest {
         var identities = mock(CodeIdentityResolver.class);
         var cache = mock(CodeStatsViewCache.class);
         var properties = new ZhaogangProperties();
+        properties.setCodeGitLineStatsEnabled(false);
         var target = new CodeStatsModels.AutomaticSyncTarget(CodeStatsModels.Scope.WORKBENCH_TEAM, ORG, TEAM);
         var scope = new CodeStatsModule.ScopeInfo(target.scope(), TEAM, ORG, "fixture", "https://example.invalid",
                 "fixture", List.of(new CodeStatsModule.MemberCredential(USER, "fixture", "", "fixture-token")), false);
@@ -86,8 +89,10 @@ class CodeAutomaticDiffRetryMysqlTest {
                 new CodingOpenApiException("DescribeGitCommitDiff", "FailedOperation", "diff 修改文件过多", 200, null));
         when(coding.commitDiff("fixture-token", 1L, 1L, sha("b"))).thenThrow(
                 new CodingOpenApiException("DescribeGitCommitDiff", "FailedOperation", "参数异常", 200, null));
-        when(batch.count(argThat(row -> row != null && sha("a").equals(row.getSha())), eq("fixture-token")))
-                .thenReturn(CodeGitLineStats.Result.ok(new CodingOpenApiPort.CodingCommitDiff(5279, 5, 7)));
+        when(coding.commitParents("fixture-token", 1L, sha("a"))).thenReturn(List.of(sha("f")));
+        when(coding.compareCommitLines("fixture-token", 1L, sha("a"), sha("f")))
+                .thenReturn(new CodingOpenApiPort.CodingCommitDiff(5279, 5, 7));
+        when(coding.commitParents("fixture-token", 1L, sha("b"))).thenReturn(List.of());
         when(batch.count(argThat(row -> row != null && sha("b").equals(row.getSha())), eq("fixture-token")))
                 .thenReturn(CodeGitLineStats.Result.ok(new CodingOpenApiPort.CodingCommitDiff(937, 0, 14)));
         when(coding.commitDiff("fixture-token", 1L, 1L, sha("c"))).thenThrow(
@@ -95,11 +100,26 @@ class CodeAutomaticDiffRetryMysqlTest {
 
         var worker = new CodeScanWorker(coding, jobs, repos, commits, identities, cache, properties, CLOCK, git);
         var service = new CodeScanService(jobs, repos, commits, cache, worker, properties, identities, CLOCK);
-        var reportSource = new CodeStatisticsSource(new NamedParameterJdbcTemplate(dataSource),
-                mock(ZhaogangCodeIdentityMapper.class), identities);
+        var access = mock(CodeRepositoryAccess.class);
+        var catalog = new CodeRepositoryAccess.Catalog(Set.of(1L), true, 0);
+        when(access.visible(scope)).thenReturn(catalog);
+        when(access.visible(ORG, Set.of("fingerprint"))).thenReturn(catalog);
+        when(access.coverage(eq(ORG), org.mockito.ArgumentMatchers.any(), eq(DAY.withDayOfMonth(1)), eq(DAY)))
+                .thenReturn(new CodeRepositoryAccess.Coverage(true, false, DAY.atStartOfDay()));
+        when(access.lockRepository(ORG, 1L)).thenReturn(() -> {});
+        when(access.canRead(ORG, 1L, "fixture-token")).thenReturn(true);
+        when(identities.resolve(eq(identityIndex), org.mockito.ArgumentMatchers.any(com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.CommitEntity.class)))
+                .thenReturn(new CodeIdentityResolver.Resolved(USER, false));
+        worker.useRepositoryAccess(access);
+        var reportSource = new CodeStatisticsSource(commits, identities, access);
         var upstreamDate = new CodeStatisticsSource.Key(USER, DAY.minusDays(7));
         var invalidDate = new CodeStatisticsSource.Key(USER, DAY.minusDays(13));
         try {
+            jdbc.update("""
+                    INSERT INTO external_zhaogang_code_access
+                        (coding_team_id,credential_fingerprint,depot_ids,checked_at,complete)
+                    VALUES (?, ?, JSON_ARRAY(1), 0, 1), (?, ?, JSON_ARRAY(1), 0, 1)
+                    """, ORG, FINGERPRINT, ORG, OTHER_FINGERPRINT);
             jdbc.update("""
                     INSERT INTO external_zhaogang_code_scan_job
                         (coding_team_id,scope_type,scope_id,month,scan_mode,status,stage,requested_by,requested_mode,
@@ -107,66 +127,113 @@ class CodeAutomaticDiffRetryMysqlTest {
                     VALUES (?, 'WORKBENCH_TEAM', ?, '2026-11', 'SYNC_V2', 'COMPLETED', 'DONE', ?, 'AUTO', 1,
                             '2026-01-01', '2026-11-26', '2026-11-26 09:55:00', '2026-11-26 09:56:00')
                     """, ORG, TEAM, USER);
-            insert("a", "DIFF_UPSTREAM_LIMIT", "repo", DAY.minusDays(7), TEAM);
-            insert("b", "DIFF_INVALID_ARGUMENT", "repo", DAY.minusDays(13), TEAM);
-            insert("c", "DIFF_RATE_LIMITED", "repo", DAY.minusDays(4), TEAM);
-            insert("d", "DIFF_PERMISSION_DENIED", "repo", DAY.minusDays(3), TEAM);
-            insert("e", "DIFF_RESPONSE_LIMIT", "online.base.apijar.service", DAY.minusDays(3), TEAM);
-            insert("f", "DIFF_UPSTREAM_LIMIT", "repo", DAY.minusDays(3), TEAM + 1);
-            jdbc.update("UPDATE external_zhaogang_code_commit SET diff_retry_credential_signature=? WHERE coding_team_id=? AND sha=?",
+            insert("a", "DIFF_UPSTREAM_LIMIT", "repo", DAY.minusDays(7));
+            insert("b", "DIFF_INVALID_ARGUMENT", "repo", DAY.minusDays(13));
+            insert("c", "DIFF_RATE_LIMITED", "repo", DAY.minusDays(4));
+            insert("d", "DIFF_PERMISSION_DENIED", "repo", DAY.minusDays(3));
+            insert("e", "DIFF_RESPONSE_LIMIT", "online.base.apijar.service", DAY.minusDays(3));
+            // The other scope uses the same organization-wide record. It does not create another copy.
+            jdbc.update("UPDATE external_zhaogang_shared_code_commit SET diff_retry_credential_signature=? WHERE coding_team_id=? AND sha=?",
                     credentials, ORG, sha("d"));
 
-            assertThat(due(commits, credentials, false)).containsExactly(sha("c"));
-            assertThat(due(commits, credentials, true)).containsExactly(sha("c"), sha("a"), sha("b"));
+            for (char hash : "ghijk".toCharArray()) {
+                insert(String.valueOf(hash), "DIFF_UPSTREAM_LIMIT", "repo", DAY);
+                jdbc.update("UPDATE external_zhaogang_shared_code_commit SET depot_id=2 WHERE coding_team_id=? AND sha=?",
+                        ORG, sha(String.valueOf(hash)));
+            }
+            jdbc.update("""
+                    UPDATE external_zhaogang_shared_code_commit
+                       SET diff_retry_attempts=4, diff_retry_credential_signature=?, diff_retry_error='PERMISSION_DENIED'
+                     WHERE coding_team_id=? AND sha=?
+                    """, credentials, ORG, sha("a"));
+            assertThat(due(commits, credentials, false)).containsExactly(sha("c"), sha("b"), sha("a"));
+            assertThat(due(commits, credentials, true)).containsExactly(sha("c"), sha("b"), sha("a"));
             assertThat(reportData(reportSource).get(upstreamDate).linesIncomplete()).isTrue();
             assertThat(reportData(reportSource).get(invalidDate).linesIncomplete()).isTrue();
             var scheduler = new CodeContinuousSyncScheduler(directory, service, properties);
             scheduler.retryFailedDiffs();
             verify(cache, timeout(5000)).bumpScanVersion(ORG + ":WORKBENCH_TEAM:" + TEAM, "diff-retry");
 
-            var repaired = reportData(reportSource);
-            assertThat(repaired.get(upstreamDate)).isEqualTo(new CodeStatisticsSource.Totals(1, 5279, 5, false));
-            assertThat(repaired.get(invalidDate)).isEqualTo(new CodeStatisticsSource.Totals(1, 937, 0, false));
+            var compared = reportData(reportSource);
+            assertThat(compared.get(upstreamDate)).isEqualTo(new CodeStatisticsSource.Totals(1, 5279, 5, false));
+            assertThat(compared.get(invalidDate).linesIncomplete()).isTrue();
+            assertThat(due(commits, credentials, false)).isEmpty();
+            assertThat(due(commits, credentials, true)).isEmpty();
+            // Simulate the first backoff interval elapsing before Git becomes available.
+            jdbc.update("""
+                    UPDATE external_zhaogang_shared_code_commit SET diff_retry_after=?
+                     WHERE coding_team_id=? AND sha=?
+                    """, LocalDateTime.now(CLOCK), ORG, sha("b"));
+            assertThat(due(commits, credentials, false)).isEmpty();
+            assertThat(due(commits, credentials, true)).containsExactly(sha("b"));
+            assertThat(jdbc.queryForObject("""
+                    SELECT file_type_stats IS NULL AND file_types_checked_at IS NOT NULL
+                      FROM external_zhaogang_shared_code_commit WHERE coding_team_id=? AND sha=?
+                    """, Boolean.class, ORG, sha("a"))).isTrue();
+
+            properties.setCodeGitLineStatsEnabled(true);
+            scheduler.retryFailedDiffs();
+            verify(cache, timeout(5000).times(2)).bumpScanVersion(ORG + ":WORKBENCH_TEAM:" + TEAM, "diff-retry");
+            assertThat(reportData(reportSource).get(invalidDate)).isEqualTo(new CodeStatisticsSource.Totals(1, 937, 0, false));
             assertThat(jdbc.queryForObject("""
                     SELECT update_time IS NOT NULL AND diff_retry_attempts=1
                               AND diff_retry_after='2026-11-26 10:05:00'
-                      FROM external_zhaogang_code_commit WHERE coding_team_id=? AND sha=?
+                      FROM external_zhaogang_shared_code_commit WHERE coding_team_id=? AND sha=?
                     """, Boolean.class, ORG, sha("c"))).isTrue();
             assertThat(due(commits, credentials, true)).isEmpty();
-            assertThat(due(commits, "new-fingerprint", true)).containsExactly(sha("d"));
+            assertThat(due(commits, "new-signature", true)).containsExactly(sha("d"));
+            long deniedCommit = jdbc.queryForObject(
+                    "SELECT id FROM external_zhaogang_shared_code_commit WHERE coding_team_id=? AND sha=?",
+                    Long.class, ORG, sha("d"));
+            var denial = new ZhaogangCodeCommitMapper.DiffReadAttempt(FINGERPRINT, "DIFF", "PERMISSION_DENIED", true);
+            commits.recordDiffReadAttempts(deniedCommit, List.of(denial));
+            assertThat(commits.selectDiffReadAttempts(deniedCommit)).containsExactly(denial);
+            assertThat(due(commits, "new-signature", true)).isEmpty();
+            assertThat(due(commits, Set.of(OTHER_FINGERPRINT), "new-signature", true)).containsExactly(sha("d"));
+            verify(batch, never()).count(argThat(row -> row != null && sha("a").equals(row.getSha())), eq("fixture-token"));
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM external_zhaogang_code_diff_attempt a
+                    JOIN external_zhaogang_shared_code_commit c ON c.id=a.commit_id
+                    WHERE c.coding_team_id=? AND c.sha=? AND a.read_method='DIFF' AND a.failure_reason='RATE_LIMITED'
+                    """, Integer.class, ORG, sha("c"))).isEqualTo(1);
             assertThat(jdbc.queryForObject("""
                     SELECT count(*) FROM external_zhaogang_code_scan_job
                      WHERE coding_team_id=? AND scan_mode='DIFF_RETRY' AND requested_mode='AUTO'
-                       AND status='PARTIAL' AND total_diffs=3 AND done_diffs=3 AND failed_diffs=1
+                       AND status='PARTIAL' AND total_diffs=3 AND done_diffs=3 AND failed_diffs=2
                     """, Integer.class, ORG)).isEqualTo(1);
             verify(coding, never()).commitDiff(anyString(), eq(1L), eq(1L), eq(sha("d")));
         } finally {
             service.shutdown();
-            jdbc.update("DELETE FROM external_zhaogang_code_commit WHERE coding_team_id=?", ORG);
+            jdbc.update("DELETE FROM external_zhaogang_shared_code_commit WHERE coding_team_id=?", ORG);
             jdbc.update("DELETE FROM external_zhaogang_code_scan_job WHERE coding_team_id=?", ORG);
+            jdbc.update("DELETE FROM external_zhaogang_code_access WHERE coding_team_id=?", ORG);
             jdbc.update("DELETE FROM external_zhaogang_statistics_revision WHERE coding_team_id=?", ORG);
         }
     }
 
     private Map<CodeStatisticsSource.Key, CodeStatisticsSource.Totals> reportData(CodeStatisticsSource source) {
         var member = new Membership(TEAM, USER, "fixture", null, "BACKEND", false, false, "fingerprint", null);
-        return source.read(ORG, YearMonth.from(DAY), DAY, DAY.minusYears(1), 0, List.of(member)).data();
+        return source.read(ORG, YearMonth.from(DAY), DAY, DAY.minusYears(1), List.of(member)).data();
     }
 
     private List<String> due(ZhaogangCodeCommitMapper mapper, String credentials, boolean gitAvailable) {
-        return mapper.selectAutomaticDiffRetries(ORG, "WORKBENCH_TEAM", TEAM, DAY.minusYears(1), DAY,
+        return due(mapper, Set.of(FINGERPRINT), credentials, gitAvailable);
+    }
+
+    private List<String> due(ZhaogangCodeCommitMapper mapper, Set<String> fingerprints, String credentials, boolean gitAvailable) {
+        return mapper.selectAutomaticDiffRetries(ORG, fingerprints, DAY.minusYears(1), DAY,
                         LocalDateTime.now(CLOCK), credentials, gitAvailable, CodeDiffRetryPolicy.MAX_ATTEMPTS, 5)
-                .stream().map(row -> jdbc.queryForObject("SELECT sha FROM external_zhaogang_code_commit WHERE id=?",
+                .stream().map(row -> jdbc.queryForObject("SELECT sha FROM external_zhaogang_shared_code_commit WHERE id=?",
                         String.class, row.getId())).toList();
     }
 
-    private void insert(String hash, String status, String repo, LocalDate date, long team) {
+    private void insert(String hash, String status, String repo, LocalDate date) {
         jdbc.update("""
-                INSERT INTO external_zhaogang_code_commit
+                INSERT INTO external_zhaogang_shared_code_commit
                     (coding_team_id,scope_type,scope_id,month,project_id,project_name,depot_id,depot_name,sha,
                      short_sha,commit_at,commit_date,diff_status)
-                VALUES (?, 'WORKBENCH_TEAM', ?, '2026-11', 1, 'fixture', 1, ?, ?, ?, ?, ?, ?)
-                """, ORG, team, repo, sha(hash), hash.repeat(8), date.atStartOfDay(), date, status);
+                VALUES (?, 'SHARED', 0, '2026-11', 1, 'fixture', 1, ?, ?, ?, ?, ?, ?)
+                """, ORG, repo, sha(hash), hash.repeat(8), date.atStartOfDay(), date, status);
     }
 
     private static String sha(String value) {

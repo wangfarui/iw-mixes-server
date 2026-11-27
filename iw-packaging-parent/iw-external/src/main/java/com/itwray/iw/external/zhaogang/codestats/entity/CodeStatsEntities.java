@@ -79,7 +79,7 @@ public final class CodeStatsEntities {
     }
 
     @Data
-    @TableName("external_zhaogang_code_commit")
+    @TableName("external_zhaogang_shared_code_commit")
     public static class CommitEntity {
         @TableId(value = "id", type = IdType.AUTO)
         private Long id;
@@ -97,6 +97,7 @@ public final class CodeStatsEntities {
         private String authorName;
         private String authorEmailHash;
         private String authorNameKey;
+        private Boolean authorConflict;
         private LocalDateTime commitAt;
         private LocalDate commitDate;
         private String message;

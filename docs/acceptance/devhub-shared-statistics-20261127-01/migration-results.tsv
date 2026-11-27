@@ -1,0 +1,16 @@
+missing_shared_commits
+0
+VERSION()	DATABASE()
+8.0.46	iw_shared_migration_261127
+legacy_commits
+5
+shared_commits
+3
+coding_team_id	depot_id	LEFT(sha,2)	branch_names	branch_count	author_conflict	additions	deletions	diff_status
+910001	91	aa	["main", "release"]	2	1	12	3	OK
+910001	92	aa	["main"]	1	0	NULL	NULL	PENDING
+910002	91	aa	["main"]	1	0	5	1	OK
+coding_team_id	coding_user_id	worklog_id	hours	synced_through	history_before
+910001	101	99901	4.0000	1795000000000	1767196800000
+duplicate_keys
+0

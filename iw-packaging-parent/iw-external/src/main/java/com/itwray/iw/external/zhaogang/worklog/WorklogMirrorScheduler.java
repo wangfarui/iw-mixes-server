@@ -49,6 +49,11 @@ class WorklogMirrorScheduler {
     this.clock = clock;
   }
 
+  @org.springframework.transaction.event.TransactionalEventListener(fallbackExecution = true)
+  void credentialChanged(com.itwray.iw.external.zhaogang.credential.StatisticsCredentialChanged event) {
+    mirror.verifyCredential(event.organization(), event.userId(), event.workbenchTeamId());
+  }
+
   @EventListener(ApplicationReadyEvent.class)
   void startup() {
     incremental();

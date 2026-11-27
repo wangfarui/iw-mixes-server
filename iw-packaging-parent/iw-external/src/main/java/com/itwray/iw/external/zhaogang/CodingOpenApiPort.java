@@ -60,6 +60,14 @@ public interface CodingOpenApiPort {
         throw new UnsupportedOperationException("当前 CODING 适配器未实现 diff 读取");
     }
 
+    default List<String> commitParents(String token, long depotId, String sha) {
+        throw new CodingOpenApiException("UnsupportedOperation", "当前 CODING 适配器未实现提交详情读取");
+    }
+
+    default CodingCommitDiff compareCommitLines(String token, long depotId, String sha, String parentSha) {
+        throw new CodingOpenApiException("UnsupportedOperation", "当前 CODING 适配器未实现提交行数比较");
+    }
+
     List<CodingPlan> plans(String token, long projectId);
 
     CodingPlan plan(String token, long projectId, long jobId);

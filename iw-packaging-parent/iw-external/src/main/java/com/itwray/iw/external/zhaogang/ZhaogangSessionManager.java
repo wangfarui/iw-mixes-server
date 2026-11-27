@@ -34,9 +34,27 @@ public class ZhaogangSessionManager {
 
     private final ObjectMapper objectMapper;
 
-    public ZhaogangSessionManager(ZhaogangProperties properties, ObjectMapper objectMapper) {
+    private final com.itwray.iw.external.zhaogang.credential.CodingCredentialService credentials;
+
+    ZhaogangSessionManager(ZhaogangProperties properties, ObjectMapper objectMapper) {
+        this(properties, objectMapper, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ZhaogangSessionManager(ZhaogangProperties properties, ObjectMapper objectMapper,
+                                  com.itwray.iw.external.zhaogang.credential.CodingCredentialService credentials) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.credentials = credentials;
+    }
+
+    ZhaogangSession resolveStatistics(HttpServletRequest request, HttpServletResponse response) {
+        ZhaogangSession session = resolve(request, response);
+        if (session.teamId() == null || credentials.token(session.teamId(), session.userId())
+                .filter(session.token()::equals).isEmpty()) {
+            throw new ZhaogangSessionException("CODING 凭证已变更，请重新绑定个人令牌");
+        }
+        return session;
     }
 
     public ZhaogangSession resolve(HttpServletRequest request, HttpServletResponse response) {

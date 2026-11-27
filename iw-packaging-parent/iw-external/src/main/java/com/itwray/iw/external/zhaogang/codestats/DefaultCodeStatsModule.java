@@ -14,9 +14,7 @@ import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanRequest;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanState;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.ScanTrigger;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.Scope;
-import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.SelfStatistics;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.TeamOption;
-import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.TeamStatistics;
 import com.itwray.iw.external.zhaogang.codestats.CodeStatsModels.UpdateIdentityRequest;
 import com.itwray.iw.external.zhaogang.codestats.entity.CodeStatsEntities.ScanJobEntity;
 import org.apache.commons.lang3.StringUtils;
@@ -31,7 +29,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,26 +38,24 @@ class DefaultCodeStatsModule implements CodeStatsModule {
     private final CodeScanService scanService;
     private final CodeStatsQueryService queryService;
     private final CodeIdentityService identityService;
-    private final CodeStatsViewCache cache;
     private final ZhaogangProperties properties;
     private final Clock clock;
 
     @Autowired
     DefaultCodeStatsModule(CodeStatsScopeDirectory directory, CodeScanService scanService,
                            CodeStatsQueryService queryService, CodeIdentityService identityService,
-                           CodeStatsViewCache cache, ZhaogangProperties properties) {
-        this(directory, scanService, queryService, identityService, cache, properties,
+                           ZhaogangProperties properties) {
+        this(directory, scanService, queryService, identityService, properties,
                 Clock.system(CodeStatsSupport.CHINA_ZONE));
     }
 
     DefaultCodeStatsModule(CodeStatsScopeDirectory directory, CodeScanService scanService,
                            CodeStatsQueryService queryService, CodeIdentityService identityService,
-                           CodeStatsViewCache cache, ZhaogangProperties properties, Clock clock) {
+                           ZhaogangProperties properties, Clock clock) {
         this.directory = directory;
         this.scanService = scanService;
         this.queryService = queryService;
         this.identityService = identityService;
-        this.cache = cache;
         this.properties = properties;
         this.clock = clock;
     }
@@ -97,21 +92,9 @@ class DefaultCodeStatsModule implements CodeStatsModule {
                     ? queryService.selfStatistics(info, range, scan, refreshing, dataReady)
                     : queryService.teamStatistics(info, range, scan, refreshing, dataReady);
         }
-        String key = statisticsKey(info, range);
-        if (!refresh) {
-            if (scope == Scope.SELF) {
-                Optional<SelfStatistics> cached = cache.get(key, SelfStatistics.class);
-                if (cached.isPresent()) return cached.get();
-            } else {
-                Optional<TeamStatistics> cached = cache.get(key, TeamStatistics.class);
-                if (cached.isPresent()) return cached.get();
-            }
-        }
-        Object result = scope == Scope.SELF
+        return scope == Scope.SELF
                 ? queryService.selfStatistics(info, range, scan, refreshing, true)
                 : queryService.teamStatistics(info, range, scan, refreshing, true);
-        cache.put(key, result);
-        return result;
     }
 
     @Override
@@ -119,13 +102,7 @@ class DefaultCodeStatsModule implements CodeStatsModule {
                                              long memberUserId) {
         ScopeInfo info = directory.resolve(context, Scope.WORKBENCH_TEAM, workbenchTeamId);
         CodeRange range = CodeRange.parse(from, to, properties.getCodeStatsRetentionMonths(), clock);
-        String key = "member-v2:" + cache.scopeKey(info) + ":" + memberUserId + ":" + range.from() + ":" + range.to()
-                + ":" + versions(info, range);
-        Optional<MemberStatistics> cached = cache.get(key, MemberStatistics.class);
-        if (cached.isPresent()) return cached.get();
-        MemberStatistics result = queryService.memberStatistics(info, range, memberUserId);
-        cache.put(key, result);
-        return result;
+        return queryService.memberStatistics(info, range, memberUserId);
     }
 
     @Override
@@ -138,20 +115,8 @@ class DefaultCodeStatsModule implements CodeStatsModule {
         String safeKeyword = CodeStatsSupport.truncate(StringUtils.trimToEmpty(keyword), 100);
         int safePage = Math.max(1, pageNumber);
         int safeSize = Math.max(1, Math.min(100, pageSize));
-        String key = "entries-v2:" + cache.scopeKey(info) + ":" + targetMemberId + ":"
-                + range.from() + ":" + range.to() + ":" + sortBy + ":" + sortOrder + ":"
-                + (depotId == null ? "" : depotId) + ":" + safeKeyword + ":" + safePage + ":" + safeSize + ":"
-                + versions(info, range);
-        ScanState scan = scanService.scanState(info, range);
-        boolean stable = scanService.dataReady(scan) && scan.months().stream().noneMatch(month ->
-                "RUNNING".equals(month.status()) || "QUEUED".equals(month.status()));
-        if (!refresh && stable) {
-            Optional<EntryPage> cached = cache.get(key, EntryPage.class);
-            if (cached.isPresent()) return cached.get();
-        }
-        EntryPage result = queryService.entries(info, range, targetMemberId, depotId, safeKeyword, safePage, safeSize, sortBy, sortOrder);
-        if (stable) cache.put(key, result);
-        return result;
+        return queryService.entries(info, range, targetMemberId, depotId, safeKeyword, safePage, safeSize,
+                sortBy, sortOrder);
     }
 
     @Override
@@ -244,31 +209,6 @@ class DefaultCodeStatsModule implements CodeStatsModule {
         LocalDate today = LocalDate.now(clock);
         LocalDate to = yearMonth.atEndOfMonth().isAfter(today) ? today : yearMonth.atEndOfMonth();
         return new CodeRange(yearMonth.atDay(1), to, List.of(yearMonth));
-    }
-
-    private String statisticsKey(ScopeInfo info, CodeRange range) {
-        String prefix = info.scope() == Scope.WORKBENCH_TEAM ? "team-member-statistics:" : "statistics:";
-        return prefix + cache.scopeKey(info) + ":" + range.from() + ":" + range.to() + ":"
-                + versions(info, range);
-    }
-
-    private String versions(ScopeInfo info, CodeRange range) {
-        String scopeKey = cache.scopeKey(info);
-        StringBuilder builder = new StringBuilder("range-status-v3-" + CodeLinePolicy.CACHE_VERSION).append('-')
-                .append(identityService.signature(info)).append('-')
-                .append(cache.identityVersion(scopeKey)).append('-').append(cache.scanVersion(scopeKey, "diff-retry"));
-        for (YearMonth month : range.months()) {
-            builder.append('-').append(cache.scanVersion(scopeKey, month.toString()));
-        }
-        ScanJobEntity sync = scanService.jobMapper().selectLatestSync(info.codingTeamId(), info.scope().name(), info.scopeId());
-        if (sync != null) builder.append("-sync-").append(sync.getId()).append('-').append(sync.getStatus());
-        builder.append("-members-").append(info.members().stream().map(member -> String.valueOf(member.userId()))
-                .sorted().reduce((left, right) -> left + "," + right).orElse(""));
-        if (info.scope() == Scope.WORKBENCH_TEAM) {
-            builder.append("-developers-").append(info.developmentMembers().stream()
-                    .map(member -> String.valueOf(member.userId())).sorted().collect(Collectors.joining(",")));
-        }
-        return builder.toString();
     }
 
     private Scope parseScope(String value) {

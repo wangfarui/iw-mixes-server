@@ -1,0 +1,25 @@
+database_name	mysql_version
+iw_shared_statistics_261127	8.0.46
+backend_connection
+iw_shared_runner iw_shared_statistics_261127
+depot_id	commits	successful_diffs
+91	3	3
+92	3	3
+93	3	3
+duplicate_repo_sha
+0
+coding_user_id	project_name	synced_through	history_before
+101	fixture-project	1795751273339	1767196800000
+202	fixture-added	1795751287460	1767196800000
+202	fixture-private	1795751287460	1767196800000
+202	fixture-project	1795751287460	1767196800000
+id	scope_type	status	depot_id	shared_checkpoint	retained_checkpoint
+1	WORKBENCH_TEAM	COMPLETED	91	1	0
+1	WORKBENCH_TEAM	COMPLETED	92	1	0
+2	WORKBENCH_TEAM	COMPLETED	91	1	0
+2	WORKBENCH_TEAM	COMPLETED	92	1	0
+3	SELF	COMPLETED	91	1	0
+4	WORKBENCH_TEAM	COMPLETED	91	1	0
+5	SELF	PARTIAL	91	1	1
+5	SELF	PARTIAL	92	1	1
+5	SELF	PARTIAL	93	1	1

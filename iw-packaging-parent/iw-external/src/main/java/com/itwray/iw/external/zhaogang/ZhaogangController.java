@@ -223,7 +223,7 @@ public class ZhaogangController {
     @GetMapping("/worklog-options")
     @Operation(summary = "查询工时可选的 Dev Hub 团队")
     public GeneralResponse<Options> worklogOptions(HttpServletRequest request, HttpServletResponse response) {
-        return GeneralResponse.success(worklogModule.options(worklogContext(sessionManager.resolve(request, response))));
+        return GeneralResponse.success(worklogModule.options(worklogContext(sessionManager.resolveStatistics(request, response))));
     }
 
     @GetMapping("/worklogs/report")
@@ -233,7 +233,7 @@ public class ZhaogangController {
             @RequestParam @NotBlank String scope, @RequestParam(required = false) Long workbenchTeamId,
             @RequestParam(defaultValue = "false") boolean refresh,
             HttpServletRequest request, HttpServletResponse response) {
-        return GeneralResponse.success(worklogModule.report(worklogContext(sessionManager.resolve(request, response)),
+        return GeneralResponse.success(worklogModule.report(worklogContext(sessionManager.resolveStatistics(request, response)),
                 from, to, scope, workbenchTeamId, refresh));
     }
 
@@ -243,7 +243,7 @@ public class ZhaogangController {
             @RequestParam @NotBlank String scope, @RequestParam(required=false) Long workbenchTeamId,
             HttpServletRequest request, HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        return GeneralResponse.success(worklogModule.sync(worklogContext(sessionManager.resolve(request,response)),scope,workbenchTeamId,false));
+        return GeneralResponse.success(worklogModule.sync(worklogContext(sessionManager.resolveStatistics(request,response)),scope,workbenchTeamId,false));
     }
 
     @PostMapping("/worklogs/sync")
@@ -252,7 +252,7 @@ public class ZhaogangController {
             @RequestParam @NotBlank String scope, @RequestParam(required=false) Long workbenchTeamId,
             HttpServletRequest request, HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        return GeneralResponse.success(worklogModule.sync(worklogContext(sessionManager.resolve(request,response)),scope,workbenchTeamId,true));
+        return GeneralResponse.success(worklogModule.sync(worklogContext(sessionManager.resolveStatistics(request,response)),scope,workbenchTeamId,true));
     }
 
     @GetMapping("/worklogs/statistics")
@@ -262,7 +262,7 @@ public class ZhaogangController {
                                                           @RequestParam(required = false) Long workbenchTeamId,
                                                           @RequestParam(defaultValue = "false") boolean refresh,
                                                           HttpServletRequest request, HttpServletResponse response) {
-        return GeneralResponse.success(worklogModule.statistics(worklogContext(sessionManager.resolve(request, response)),
+        return GeneralResponse.success(worklogModule.statistics(worklogContext(sessionManager.resolveStatistics(request, response)),
                 month, scope, workbenchTeamId, refresh));
     }
 
@@ -274,7 +274,7 @@ public class ZhaogangController {
                                                     @RequestParam(required = false) Long workbenchTeamId,
                                                     @RequestParam(defaultValue = "false") boolean refresh,
                                                     HttpServletRequest request, HttpServletResponse response) {
-        return GeneralResponse.success(worklogModule.entries(worklogContext(sessionManager.resolve(request, response)),
+        return GeneralResponse.success(worklogModule.entries(worklogContext(sessionManager.resolveStatistics(request, response)),
                 from, to, scope, workbenchTeamId, refresh));
     }
 
@@ -288,7 +288,7 @@ public class ZhaogangController {
                                                           @RequestParam(required = false) String cursor,
                                                           @RequestParam(defaultValue = "false") boolean refresh,
                                                           HttpServletRequest request, HttpServletResponse response) {
-        return GeneralResponse.success(worklogModule.entriesPage(worklogContext(sessionManager.resolve(request, response)),
+        return GeneralResponse.success(worklogModule.entriesPage(worklogContext(sessionManager.resolveStatistics(request, response)),
                 from, to, scope, workbenchTeamId, memberUserId, cursor, refresh));
     }
 
@@ -299,7 +299,7 @@ public class ZhaogangController {
                                                      @RequestParam(required = false) Long workbenchTeamId,
                                                      @RequestParam(defaultValue = "false") boolean refresh,
                                                      HttpServletRequest request, HttpServletResponse response) {
-        return GeneralResponse.success(worklogModule.absences(worklogContext(sessionManager.resolve(request, response)),
+        return GeneralResponse.success(worklogModule.absences(worklogContext(sessionManager.resolveStatistics(request, response)),
                 month, scope, workbenchTeamId, refresh));
     }
 
@@ -311,7 +311,7 @@ public class ZhaogangController {
             @RequestParam @NotBlank String checkId,
             HttpServletRequest request, HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        return GeneralResponse.success(worklogModule.issueCheck(worklogContext(sessionManager.resolve(request, response)),
+        return GeneralResponse.success(worklogModule.issueCheck(worklogContext(sessionManager.resolveStatistics(request, response)),
                 scope, workbenchTeamId, checkId));
     }
 

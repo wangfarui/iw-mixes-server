@@ -26,14 +26,20 @@ final class CodeScanCheckpointStore {
 
     private final ZhaogangCodeScanRepoMapper repos;
     private final int partLimit;
+    private final boolean shared;
 
     CodeScanCheckpointStore(ZhaogangCodeScanRepoMapper repos) {
         this(repos, CodeSyncCheckpointCodec.MAX_COMPRESSED_BYTES);
     }
 
     CodeScanCheckpointStore(ZhaogangCodeScanRepoMapper repos, int partLimit) {
+        this(repos, partLimit, false);
+    }
+
+    CodeScanCheckpointStore(ZhaogangCodeScanRepoMapper repos, int partLimit, boolean shared) {
         this.repos = repos;
         this.partLimit = partLimit;
+        this.shared = shared;
     }
 
     record Previous(Checkpoint checkpoint, boolean partitioned) {}
@@ -41,13 +47,25 @@ final class CodeScanCheckpointStore {
     Previous read(ScanJobEntity job, long depotId, String signature) {
         String state = null;
         try {
-            var stored = repos.selectSyncCheckpoint(job.getCodingTeamId(), job.getScopeType(), job.getScopeId(),
+            var stored = shared ? repos.selectRepositoryCheckpoint(job.getCodingTeamId(), depotId,
+                    job.getSyncFrom(), job.getSyncTo(), job.getId(), true)
+                    : repos.selectSyncCheckpoint(job.getCodingTeamId(), job.getScopeType(), job.getScopeId(),
                     depotId, signature, job.getSyncFrom(), job.getId());
+            boolean legacy = shared && stored == null;
+            if (legacy) stored = repos.selectRepositoryCheckpoint(job.getCodingTeamId(), depotId,
+                    job.getSyncFrom(), job.getSyncTo(), job.getId(), false);
             if (stored == null) return new Previous(null, false);
             state = stored.getSyncState();
             if (state == null || state.startsWith(RESCAN)) return new Previous(null, false);
-            if (!state.startsWith(PARTS)) return new Previous(CodeSyncCheckpointCodec.decode(state), false);
-            return new Previous(readParts(job, depotId, stored), true);
+            boolean partitioned = state.startsWith(PARTS);
+            Checkpoint checkpoint = partitioned ? readParts(job, depotId, stored) : CodeSyncCheckpointCodec.decode(state);
+            // Scoped scanners discarded unowned commit metadata. Only an explicit, fully represented
+            // graph can prove that the old checkpoint covers the same data as the shared scan.
+            if (legacy && (checkpoint == null || checkpoint.graph().isEmpty()
+                    || checkpoint.graph().values().stream().anyMatch(node -> !node.matched() && !node.boundary()))) {
+                checkpoint = null;
+            }
+            return new Previous(checkpoint, partitioned);
         } catch (IOException | RuntimeException invalid) {
             log.warn("zhaogang code checkpoint unavailable, jobId={}, depotId={}, error={}",
                     job.getId(), depotId, invalid.getClass().getSimpleName());
@@ -102,6 +120,17 @@ final class CodeScanCheckpointStore {
                 log.warn("zhaogang code checkpoint rescan marker not stored, jobId={}, depotId={}, error={}",
                         job.getId(), depotId, unavailable.getClass().getSimpleName());
             }
+        }
+    }
+
+    void retireSuperseded(ScanJobEntity job, long depot) {
+        if (!shared || Boolean.TRUE.equals(job.getTruncated())) return;
+        try {
+            repos.retireSupersededRepositoryCheckpoints(job.getCodingTeamId(), depot, job.getSyncFrom(), job.getSyncTo(), job.getId());
+            repos.deleteSupersededRepositoryParts(job.getCodingTeamId(), depot, job.getSyncFrom(), job.getSyncTo(), job.getId());
+        } catch (RuntimeException failure) {
+            log.warn("zhaogang repository checkpoint retirement failed, jobId={}, depotId={}, error={}",
+                    job.getId(), depot, failure.getClass().getSimpleName());
         }
     }
 
@@ -169,9 +198,10 @@ final class CodeScanCheckpointStore {
     }
 
     private void publish(ScanJobEntity job, long depotId, String state, Previous previous) {
-        if (repos.saveSyncCheckpoint(job.getId(), depotId, state) == 0) {
-            throw new IllegalStateException("Checkpoint repository row no longer exists");
-        }
+        int written = shared ? repos.saveRepositoryCheckpoint(job.getId(), depotId, state)
+                : repos.saveSyncCheckpoint(job.getId(), depotId, state);
+        if (written == 0) throw new IllegalStateException("Checkpoint repository row no longer exists");
+        if (shared) return;
         try {
             if (previous.partitioned()) {
                 repos.deleteOldCheckpointParts(job.getCodingTeamId(), job.getScopeType(), job.getScopeId(), depotId, job.getId());

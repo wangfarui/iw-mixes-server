@@ -98,8 +98,11 @@ class CodeScanService implements CodeBackfillTrigger {
 
     ScanState scanState(CodeStatsModule.ScopeInfo scope, CodeRange range) {
         List<ScanMonth> months = new ArrayList<>();
+        var access = worker.repositoryAccess();
+        var catalog = access == null ? null : access.visible(scope);
         for (YearMonth month : range.months()) {
-            months.add(scanMonth(scope, month, range));
+            var scoped = scanMonth(scope, month, range);
+            months.add(catalog == null ? scoped : sharedMonth(scope, range, month, scoped, access, catalog));
         }
         boolean anyAvailable = months.stream().anyMatch(month -> month.retryAfterSeconds() == 0
                 && !STATUS_RUNNING.equals(month.status()) && !STATUS_QUEUED.equals(month.status()));
@@ -109,24 +112,64 @@ class CodeScanService implements CodeBackfillTrigger {
                 range.view(), aggregateStatus(months), months, retryAfter, syncInfo(scope));
     }
 
+    private ScanMonth sharedMonth(CodeStatsModule.ScopeInfo scope, CodeRange range, YearMonth month,
+                                  ScanMonth task, CodeRepositoryAccess access, CodeRepositoryAccess.Catalog catalog) {
+        LocalDate from = range.from().isAfter(month.atDay(1)) ? range.from() : month.atDay(1);
+        LocalDate to = range.to().isBefore(month.atEndOfMonth()) ? range.to() : month.atEndOfMonth();
+        LocalDate today = LocalDate.now(clock);
+        if (to.isAfter(today)) to = today;
+        var coverage = access.coverage(scope.codingTeamId(), catalog, from, to);
+        boolean active = STATUS_RUNNING.equals(task.status()) || STATUS_QUEUED.equals(task.status());
+        var syncedAt = CodeStatsSupport.format(coverage.syncedAt());
+        boolean ready = coverage.ready();
+        long gaps = incompleteDiffs(scope, from, to);
+        String status = active ? task.status() : ready
+                ? coverage.partial() || gaps > 0 ? STATUS_PARTIAL : STATUS_COMPLETED
+                : STATUS_FAILED.equals(task.status()) ? STATUS_FAILED : STATUS_NOT_STARTED;
+        String message = gaps > 0 ? "当前查询范围有 " + gaps + " 条提交的代码行未完整统计"
+                : coverage.partial() && ready ? "部分仓库或日期尚未完成同步" : task.error();
+        return new ScanMonth(task.month(), task.jobId(), task.mode(), status, task.stage(), task.progress(),
+                task.startedAt(), task.finishedAt(), syncedAt, task.cooldownUntil(), task.retryAfterSeconds(), message);
+    }
+
+    private java.util.function.Predicate<CommitEntity> visibleDiffs(CodeStatsModule.ScopeInfo scope, boolean repositoryOnly) {
+        var access = worker.repositoryAccess();
+        if (access == null) return row -> true;
+        var depotIds = access.visible(scope).depots();
+        if (repositoryOnly) return row -> depotIds.contains(row.getDepotId());
+        var index = identities.mappingIndex(identities.organizationMappings(scope.codingTeamId()));
+        var members = scope.scope() == Scope.SELF ? Set.of(scope.scopeId())
+                : scope.developmentMembers().stream().map(CodeStatsModule.MemberCredential::userId)
+                    .collect(java.util.stream.Collectors.toSet());
+        return row -> {
+            if (!depotIds.contains(row.getDepotId())) return false;
+            var owner = identities.resolve(index, row);
+            return owner.memberId() != null && members.contains(owner.memberId());
+        };
+    }
+
     private CodeStatsModels.SyncInfo syncInfo(CodeStatsModule.ScopeInfo scope) {
         ScanJobEntity latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
         boolean enabled = properties.isCodeSyncEnabled() && scope.automaticSyncEligible() && hasToken(scope);
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime next = now.toLocalDate().atStartOfDay().plusHours((now.getHour() / 3 + 1) * 3L);
         String nextSyncAt = enabled ? CodeStatsSupport.format(next) : null;
+        var access = worker.repositoryAccess();
+        String lastSuccess = access == null ? latest == null ? null : CodeStatsSupport.format(latest.getFinishedAt())
+                : CodeStatsSupport.format(access.coverage(scope.codingTeamId(), access.visible(scope),
+                    LocalDate.parse(properties.getCodeSyncFrom()), now.toLocalDate()).syncedAt());
         if (latest == null) {
-            return new CodeStatsModels.SyncInfo(enabled, properties.getCodeSyncFrom(), null, null, nextSyncAt, "NOT_STARTED", 0);
+            return new CodeStatsModels.SyncInfo(enabled, properties.getCodeSyncFrom(), null, lastSuccess, nextSyncAt, "NOT_STARTED", 0);
         }
         return new CodeStatsModels.SyncInfo(enabled, latest.getSyncFrom().toString(),
-                latest.getSyncTo().toString(), CodeStatsSupport.format(latest.getFinishedAt()),
+                latest.getSyncTo().toString(), lastSuccess,
                 nextSyncAt, latest.getStatus(), manualSyncRetryAfter(latest, now), latest.getId(),
                 value(latest.getFailedRepos()), incompleteDiffs(scope, latest.getSyncFrom(), latest.getSyncTo()));
     }
 
     boolean dataReady(ScanState scan) {
         return !scan.months().isEmpty()
-                && scan.months().stream().allMatch(month -> month.lastSuccessfulAt() != null);
+                && scan.months().stream().allMatch(month -> month.lastSuccessfulAt() != null || STATUS_COMPLETED.equals(month.status()));
     }
 
     boolean refreshing(ScanState scan) {
@@ -194,7 +237,9 @@ class CodeScanService implements CodeBackfillTrigger {
         var now = LocalDateTime.now(clock);
         LocalDate retentionStart = YearMonth.from(now)
                 .minusMonths(Math.max(1, properties.getCodeStatsRetentionMonths()) - 1L).atDay(1);
-        var rows = commitMapper.selectAutomaticDiffRetries(scope.codingTeamId(), scope.scope().name(), scope.scopeId(),
+        var fingerprints = CodeRepositoryAccess.fingerprints(scope);
+        if (fingerprints.isEmpty()) return false;
+        var rows = commitMapper.selectAutomaticDiffRetries(scope.codingTeamId(), fingerprints,
                 retentionStart, latest.getSyncTo(), now, CodeDiffRetryPolicy.credentialSignature(scope), gitAvailable,
                 CodeDiffRetryPolicy.MAX_ATTEMPTS, CodeDiffRetryPolicy.BATCH_SIZE);
         if (rows.isEmpty() || !automaticDiffRunning.compareAndSet(false, true)) return false;
@@ -304,13 +349,16 @@ class CodeScanService implements CodeBackfillTrigger {
                 || !job.getScopeType().equals(scope.scope().name()) || job.getScopeId() != scope.scopeId()) {
             throw new CodingOpenApiException("扫描任务不存在");
         }
+        var access = worker.repositoryAccess();
+        var depots = access == null ? null : access.visible(scope).depots();
         List<RepoFailure> repoFailures = repoMapper.selectIssues(jobId).stream()
+                .filter(repo -> depots == null || depots.contains(repo.getDepotId()))
                 .map(this::toRepoFailure).toList();
         boolean continuous = continuous(job);
         LocalDate fromDate = continuous ? job.getSyncFrom() : YearMonth.parse(job.getMonth()).atDay(1);
         LocalDate toDate = continuous ? job.getSyncTo() : YearMonth.parse(job.getMonth()).atEndOfMonth();
         List<CommitEntity> diffRows = commitMapper.selectDiffFailures(scope.codingTeamId(), scope.scope().name(),
-                scope.scopeId(), fromDate, toDate);
+                scope.scopeId(), fromDate, toDate).stream().filter(visibleDiffs(scope, false)).toList();
         int safeSize = Math.max(1, Math.min(100, pageSize));
         int safePage = Math.max(1, pageNumber);
         int from = Math.min(diffRows.size(), (safePage - 1) * safeSize);
@@ -329,7 +377,7 @@ class CodeScanService implements CodeBackfillTrigger {
         String reasonCode = failure != null ? failure.name() : legacyLimit ? "TOO_LARGE" : "REQUEST_FAILED";
         String reason = failure != null ? failure.reason : legacyLimit ? "diff 超过保护上限" : "diff 读取失败";
         return new CodeStatsModels.DiffFailure(row.getProjectName(), row.getDepotName(), row.getSha(),
-                row.getAuthorName(), reasonCode, reason + CodeDiffRetryPolicy.gitFailureMessage(row.getDiffRetryError()) + "，未统计行数",
+                row.getAuthorName(), reasonCode, reason + CodeDiffRetryPolicy.failureDetail(row.getDiffRetryError()) + "，未统计行数",
                 CodeStatsSupport.format(row.getCommitAt()), row.getDepotId());
     }
 
@@ -355,6 +403,7 @@ class CodeScanService implements CodeBackfillTrigger {
         Set<CodeStatsModels.DiffRetryTarget> targets = Set.copyOf(request.targets());
         List<CommitEntity> matches = commitMapper.selectDiffFailures(scope.codingTeamId(), scope.scope().name(),
                 scope.scopeId(), from, to).stream()
+                .filter(visibleDiffs(scope, false))
                 .filter(row -> targets.contains(new CodeStatsModels.DiffRetryTarget(row.getDepotId(), row.getSha())))
                 .toList();
         if (matches.isEmpty() || matches.size() != targets.size()) {
@@ -560,7 +609,16 @@ class CodeScanService implements CodeBackfillTrigger {
 
     private long incompleteDiffs(CodeStatsModule.ScopeInfo scope, LocalDate from, LocalDate to) {
         if (from == null || to == null) return 0;
-        return commitMapper.countIncompleteDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), from, to);
+        var access = worker.repositoryAccess();
+        if (access == null) {
+            return commitMapper.countIncompleteDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), from, to);
+        }
+        var depots = access.visible(scope).depots();
+        if (depots.isEmpty()) return 0;
+        return commitMapper.selectVisible(scope.codingTeamId(), depots, from, to, false).stream()
+                .filter(row -> "PENDING".equals(row.getDiffStatus()) || CodeDiffFailure.isFailure(row.getDiffStatus()))
+                .filter(row -> !CodeLinePolicy.commitCountOnly(row.getDepotName()))
+                .filter(visibleDiffs(scope, false)).count();
     }
 
     private ScanProgress progress(ScanJobEntity job) {

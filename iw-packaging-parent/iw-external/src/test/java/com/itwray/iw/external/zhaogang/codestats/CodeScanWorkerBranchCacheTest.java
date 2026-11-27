@@ -215,7 +215,7 @@ class CodeScanWorkerBranchCacheTest {
     }
 
     @Test
-    void dropsUnmatchedMetadataBeforeDatabaseAndSnapshotWrites() {
+    void retainsUnassignedMetadataForOtherViewsAndLaterIdentityMapping() {
         when(identities.resolve(anyMap(), nullable(String.class), nullable(String.class)))
                 .thenAnswer(call -> "owned".equals(call.getArgument(1))
                         ? new CodeIdentityResolver.Resolved(1L, false)
@@ -230,10 +230,10 @@ class CodeScanWorkerBranchCacheTest {
         when(identities.resolve(anyMap(), eq(CodeStatsSupport.emailHash("mine@example.com")), nullable(String.class)))
                 .thenReturn(new CodeIdentityResolver.Resolved(1L, false));
         run(1, "2026-10");
-        assertEquals(1, saved.size());
-        assertEquals("mine", saved.get(0).getSha());
-        assertTrue(snapshots.values().stream().flatMap(v -> v.commits().stream())
-                .allMatch(row -> "mine".equals(row.getSha())));
+        assertEquals(java.util.Set.of("mine", "other"), saved.stream().map(CommitEntity::getSha)
+                .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(java.util.Set.of("mine", "other"), snapshots.values().stream().flatMap(v -> v.commits().stream())
+                .map(CommitEntity::getSha).collect(java.util.stream.Collectors.toSet()));
     }
 
     @Test

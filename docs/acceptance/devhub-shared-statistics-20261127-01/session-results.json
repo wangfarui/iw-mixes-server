@@ -1,0 +1,17 @@
+{
+    "previousCredentialRejected": {
+        "worklog": true,
+        "code": true,
+        "report": true
+    },
+    "currentSession": {
+        "worklogHours": 21,
+        "codeDepots": [
+            91,
+            92,
+            93
+        ],
+        "reportHasData": true,
+        "reportMembers": 2
+    }
+}

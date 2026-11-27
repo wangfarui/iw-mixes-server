@@ -1,6 +1,7 @@
 package com.itwray.iw.external.zhaogang.codestats;
 
 import com.itwray.iw.external.mapper.ZhaogangCodeCommitMapper;
+import com.itwray.iw.external.mapper.ZhaogangCodeCommitMapper.DiffReadAttempt;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanJobMapper;
 import com.itwray.iw.external.mapper.ZhaogangCodeScanRepoMapper;
 import com.itwray.iw.external.zhaogang.CodingOpenApiException;
@@ -56,14 +57,25 @@ class CodeScanWorker {
     private final CodingOpenApiPort coding;
     private final ZhaogangCodeScanJobMapper jobMapper;
     private final ZhaogangCodeScanRepoMapper repoMapper;
-    private final CodeScanCheckpointStore checkpoints;
+    private CodeScanCheckpointStore checkpoints;
     private final ZhaogangCodeCommitMapper commitMapper;
     private final CodeIdentityResolver identities;
     private final CodeStatsViewCache cache;
     private final ZhaogangProperties properties;
     private final Clock clock;
     private final CodeGitLineStats gitLineStats;
-    private long nextDbCancelCheckMillis;
+    private final ThreadLocal<Long> nextDbCancelCheckMillis = ThreadLocal.withInitial(() -> 0L);
+    private CodeRepositoryAccess access;
+
+    @Autowired
+    void useRepositoryAccess(CodeRepositoryAccess access) {
+        this.access = access;
+        this.checkpoints = new CodeScanCheckpointStore(repoMapper, CodeSyncCheckpointCodec.MAX_COMPRESSED_BYTES, true);
+    }
+
+    CodeRepositoryAccess repositoryAccess() {
+        return access;
+    }
 
     @Autowired
     CodeScanWorker(CodingOpenApiPort coding, ZhaogangCodeScanJobMapper jobMapper,
@@ -119,7 +131,6 @@ class CodeScanWorker {
                     identities.mappingIndex(selection), identities.signature(selection), input.retryCommitIds(),
                     input.fileTypePriority(), input.reads());
             job.setIdentitySignature(input.identitySignature());
-            if (!retryOnly && !"SYNC".equals(input.mode())) pruneUnmatched(input);
             save(job);
             Map<Long, DepotPlan> depots = Map.of();
             Map<Long, List<String>> depotTokens = Map.of();
@@ -131,10 +142,9 @@ class CodeScanWorker {
             }
             if (!retryOnly && !"DIFF_BACKFILL".equals(input.mode())) {
                 depots = discover(input, job);
-                Map<Long, List<BranchPlan>> branches = discoverBranches(input, job, depots);
                 touchedMonths.addAll("SYNC".equals(input.mode())
-                        ? collectContinuous(input, job, depots, branches)
-                        : collectCommits(input, job, depots, branches));
+                        ? collectContinuous(input, job, depots)
+                        : collectCommits(input, job, depots, discoverBranches(input, job, depots)));
             }
             fetchDiffs(input, job, depots, touchedMonths);
             aggregate(input, job);
@@ -147,6 +157,8 @@ class CodeScanWorker {
         } catch (RuntimeException e) {
             log.warn("zhaogang code scan failed, jobId={}, error={}", job.getId(), e.getClass().getSimpleName());
             finish(job, "FAILED", "SCAN_FAILED", "代码扫描失败，请稍后重试");
+        } finally {
+            nextDbCancelCheckMillis.remove();
         }
     }
 
@@ -175,7 +187,7 @@ class CodeScanWorker {
             for (int offset=0; offset<tokens.size(); offset+=reads.width()) {
                 List<MemberToken> batch=tokens.subList(offset, Math.min(tokens.size(), offset+reads.width()));
                 var pending=reads.submit(batch.stream().<java.util.concurrent.Callable<MemberDiscovery>>map(token ->
-                        () -> discoverMember(token)).toList());
+                        () -> discoverMember(input.scope().codingTeamId(), token)).toList());
                 for (int index=0; index<batch.size(); index++) {
                     if (cancelled(job)) throw new ScanCancelledException();
                     MemberDiscovery result;
@@ -217,7 +229,11 @@ class CodeScanWorker {
         return depots;
     }
 
-    private MemberDiscovery discoverMember(MemberToken token) {
+    private MemberDiscovery discoverMember(long org, MemberToken token) {
+        if (access != null) {
+            var result = access.discover(org, token.token());
+            return new MemberDiscovery(result.depots(), result.error());
+        }
         List<CodingDepot> result=new ArrayList<>();
         try {
             int seen=0;
@@ -289,6 +305,9 @@ class CodeScanWorker {
                     break;
                 } catch (RuntimeException e) {
                     lastError = e;
+                    if (access != null && e instanceof CodingOpenApiException denied && denied.isPermissionDenied()) {
+                        access.revoke(input.scope().codingTeamId(), token.token(), plan.depot().id());
+                    }
                 }
             }
             if (branches == null) {
@@ -323,140 +342,150 @@ class CodeScanWorker {
                 : input.reads().branches(coding, input.scope().codingTeamId(), token, projectId, depotId, verification);
     }
 
-    private Set<String> collectContinuous(ScanInput input, ScanJobEntity job, Map<Long, DepotPlan> depots,
-                                          Map<Long, List<BranchPlan>> branches) {
+    private Set<String> collectContinuous(ScanInput input, ScanJobEntity job, Map<Long, DepotPlan> depots) {
         Set<String> touched = new LinkedHashSet<>();
 
         int skipped = 0;
         java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
-        for (var entry : branches.entrySet()) {
+        for (DepotPlan depot : depots.values()) {
             if (cancelled(job)) throw new ScanCancelledException();
-            DepotPlan depot = depots.get(entry.getKey());
-            int callsBefore=calls.get();
-            Map<String, CommitEntity> existing = new HashMap<>();
-            commitMapper.selectSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(), input.scope().scopeId(),
-                    entry.getKey(), job.getSyncFrom(), job.getSyncTo()).forEach(row -> existing.put(row.getSha(), row));
-            var previousCheckpoint = checkpoints.read(job, entry.getKey(), input.identitySignature());
-            var before = previousCheckpoint.checkpoint();
-            Map<String,CodeCommitGraph.Node> graph=CodeCommitGraph.initialize(before);
-            Map<String, String> nextBranches = new LinkedHashMap<>();
-            Map<String, CodeBranchSync.Head> nextHeads = new LinkedHashMap<>();
-            Map<String, CommitAccumulator> commits = new LinkedHashMap<>();
-            boolean failed = false;
-            boolean reusedAll = true;
-            String failureCode = "REQUEST_FAILED";
-            Map<String, List<BranchPlan>> groups = new LinkedHashMap<>();
-            for (BranchPlan branch : entry.getValue()) groups.computeIfAbsent(
-                    StringUtils.defaultIfBlank(branch.headSha(), "ref:"+branch.branch()), ignored -> new ArrayList<>()).add(branch);
-            List<List<BranchPlan>> allGroups = new ArrayList<>(groups.values());
-            try (CodeScanReadAhead<ContinuousRead> reads = new CodeScanReadAhead<>(properties.getCodingConcurrencyPerToken())) {
-                for (int offset=0; offset<allGroups.size(); offset+=reads.width()) {
-                    List<List<BranchPlan>> batch = allGroups.subList(offset, Math.min(allGroups.size(), offset+reads.width()));
-                    CodeBranchSync.Checkpoint checkpoint = before;
-                    Map<String,CodeCommitGraph.Node> knownGraph=Map.copyOf(graph);
-                    Set<String> available=new HashSet<>(existing.keySet());available.addAll(commits.keySet());
-                    var pending = reads.submit(batch.stream().<java.util.concurrent.Callable<ContinuousRead>>map(group ->
-                            () -> readContinuousHead(input, job, group.get(0), checkpoint, existing, calls, knownGraph, available)).toList());
-                    for (int i=0; i<batch.size(); i++) {
-                        List<BranchPlan> group = batch.get(i);
-                        try {
-                            ContinuousRead result = awaitContinuous(pending.get(i), job);
-                            result.learned().forEach((sha,node)->graph.merge(sha,node,(old,value)->old.boundary()?value:value.boundary()?old:value));
-                            if (!result.result().complete()) {
+            long depotId = depot.depot().id();
+            try (var reservation = lockRepository(input.scope().codingTeamId(), depotId)) {
+                save(job);
+                var branches = discoverBranches(input, job, Map.of(depotId, depot)).get(depotId);
+                if (branches == null) continue;
+                int callsBefore=calls.get();
+                Map<String, CommitEntity> existing = new HashMap<>();
+                commitMapper.selectSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(), input.scope().scopeId(),
+                        depotId, job.getSyncFrom(), job.getSyncTo()).forEach(row -> existing.put(row.getSha(), row));
+                var previousCheckpoint = checkpoints.read(job, depotId, input.identitySignature());
+                var before = previousCheckpoint.checkpoint();
+                Map<String,CodeCommitGraph.Node> graph=CodeCommitGraph.initialize(before);
+                Map<String, String> nextBranches = new LinkedHashMap<>();
+                Map<String, CodeBranchSync.Head> nextHeads = new LinkedHashMap<>();
+                Map<String, CommitAccumulator> commits = new LinkedHashMap<>();
+                boolean failed = false;
+                boolean reusedAll = true;
+                String failureCode = "REQUEST_FAILED";
+                Map<String, List<BranchPlan>> groups = new LinkedHashMap<>();
+                for (BranchPlan branch : branches) groups.computeIfAbsent(
+                        StringUtils.defaultIfBlank(branch.headSha(), "ref:"+branch.branch()), ignored -> new ArrayList<>()).add(branch);
+                List<List<BranchPlan>> allGroups = new ArrayList<>(groups.values());
+                try (CodeScanReadAhead<ContinuousRead> reads = new CodeScanReadAhead<>(properties.getCodingConcurrencyPerToken())) {
+                    for (int offset=0; offset<allGroups.size(); offset+=reads.width()) {
+                        List<List<BranchPlan>> batch = allGroups.subList(offset, Math.min(allGroups.size(), offset+reads.width()));
+                        CodeBranchSync.Checkpoint checkpoint = before;
+                        Map<String,CodeCommitGraph.Node> knownGraph=Map.copyOf(graph);
+                        Set<String> available=new HashSet<>(existing.keySet());available.addAll(commits.keySet());
+                        var pending = reads.submit(batch.stream().<java.util.concurrent.Callable<ContinuousRead>>map(group ->
+                                () -> readContinuousHead(input, job, group.get(0), checkpoint, existing, calls, knownGraph, available)).toList());
+                        for (int i=0; i<batch.size(); i++) {
+                            List<BranchPlan> group = batch.get(i);
+                            try {
+                                ContinuousRead result = awaitContinuous(pending.get(i), job);
+                                result.learned().forEach((sha,node)->graph.merge(sha,node,(old,value)->old.boundary()?value:value.boundary()?old:value));
+                                if (!result.result().complete()) {
+                                    failed=true;
+                                    if(result.result().errorCode()==null) job.setTruncated(true);
+                                    else failureCode=result.result().errorCode();
+                                }
+                                if (result.reused()) skipped+=group.size();
+                                else reusedAll = false;
+                                CodeBranchSync.Head current = result.result().head();
+                                BranchPlan first=group.get(0);
+                                for (CodingCommit value : result.result().added()) accumulate(commits, depot, first.branch(), value, input, job);
+                                List<CommitEntity> reused = current.matched().stream().filter(sha -> !commits.containsKey(sha))
+                                        .map(existing::get).filter(java.util.Objects::nonNull).toList();
+                                mergeSnapshot(commits, group, new BranchSnapshot(reused), input, job);
+                                for (String sha : current.matched()) {
+                                    CommitAccumulator item=commits.get(sha);
+                                    if (item!=null) group.forEach(branch -> item.addBranch(branch.branch()));
+                                }
+                                if(result.result().complete()) {
+                                    group.forEach(branch -> nextBranches.put(branch.branch(), branch.headSha()));
+                                    nextHeads.put(first.headSha(), current);
+                                }
+                            } catch (ScanCancelledException | ScanTaskLostException stopped) { throw stopped; }
+                            catch (RuntimeException error) {
                                 failed=true;
-                                if(result.result().errorCode()==null) job.setTruncated(true);
-                                else failureCode=result.result().errorCode();
+                                if(error instanceof CodingOpenApiException api && api.isPermissionDenied()) failureCode="PERMISSION_DENIED";
                             }
-                            if (result.reused()) skipped+=group.size();
-                            else reusedAll = false;
-                            CodeBranchSync.Head current = result.result().head();
-                            BranchPlan first=group.get(0);
-                            for (CodingCommit value : result.result().added()) accumulate(commits, depot, first.branch(), value, input, job);
-                            List<CommitEntity> reused = current.matched().stream().filter(sha -> !commits.containsKey(sha))
-                                    .map(existing::get).filter(java.util.Objects::nonNull).toList();
-                            mergeSnapshot(commits, group, new BranchSnapshot(reused), input, job);
-                            for (String sha : current.matched()) {
-                                CommitAccumulator item=commits.get(sha);
-                                if (item!=null) group.forEach(branch -> item.addBranch(branch.branch()));
-                            }
-                            if(result.result().complete()) {
-                                group.forEach(branch -> nextBranches.put(branch.branch(), branch.headSha()));
-                                nextHeads.put(first.headSha(), current);
-                            }
-                        } catch (ScanCancelledException | ScanTaskLostException stopped) { throw stopped; }
-                        catch (RuntimeException error) {
-                            failed=true;
-                            if(error instanceof CodingOpenApiException api && api.isPermissionDenied()) failureCode="PERMISSION_DENIED";
+                            job.setDoneBranches(job.getDoneBranches()+group.size()); save(job);
                         }
-                        job.setDoneBranches(job.getDoneBranches()+group.size()); save(job);
                     }
                 }
-            }
-            if (!java.util.Objects.equals(input.identitySignature(), identities.signature(input.scope())))
-                throw new CodingOpenApiException("IDENTITY_CHANGED", "Git 身份已变化，将按新身份重新同步");
-            // 单个 ref 变化不能使整个仓库的已验证分支进度失效。只发布仍稳定的分支；未完整范围不清旧行。
-            // 完整复用了原有分支头时，以本轮首次读取的分支清单为准。
-            int changedBranches = 0;
-            boolean deferred = false;
-            if (failed || !reusedAll || before == null || !nextBranches.equals(before.branches())) {
-                try {
-                    Map<String, String> after = new LinkedHashMap<>();
-                    branchHeads(input, depot, entry.getValue().isEmpty() ? depot.tokens().get(0).token()
-                            : entry.getValue().get(0).token(), true)
-                            .forEach(branch -> after.put(branch.name(), branch.sha()));
-                    if (!after.equals(nextBranches)) {
-                        if (!failed) {
-                            failureCode = "BRANCH_CHANGED";
-                            changedBranches = logChangedBranches(job.getId(), entry.getKey(), nextBranches, after);
-                            deferred = after.keySet().containsAll(nextBranches.keySet())
-                                    && (before == null || before.branches() == null
-                                    || after.keySet().containsAll(before.branches().keySet()));
+                if (!java.util.Objects.equals(input.identitySignature(), identities.signature(input.scope())))
+                    throw new CodingOpenApiException("IDENTITY_CHANGED", "Git 身份已变化，将按新身份重新同步");
+                // 单个 ref 变化不能使整个仓库的已验证分支进度失效。只发布仍稳定的分支；未完整范围不清旧行。
+                // 完整复用了原有分支头时，以本轮首次读取的分支清单为准。
+                int changedBranches = 0;
+                boolean deferred = false;
+                if (failed || !reusedAll || before == null || !nextBranches.equals(before.branches())) {
+                    try {
+                        Map<String, String> after = new LinkedHashMap<>();
+                        branchHeads(input, depot, branches.isEmpty() ? depot.tokens().get(0).token()
+                                : branches.get(0).token(), true)
+                                .forEach(branch -> after.put(branch.name(), branch.sha()));
+                        if (!after.equals(nextBranches)) {
+                            if (!failed) {
+                                failureCode = "BRANCH_CHANGED";
+                                changedBranches = logChangedBranches(job.getId(), depotId, nextBranches, after);
+                                deferred = after.keySet().containsAll(nextBranches.keySet())
+                                        && (before == null || before.branches() == null
+                                        || after.keySet().containsAll(before.branches().keySet()));
+                            }
+                            failed = !deferred;
+                            nextBranches.entrySet().removeIf(branch -> !java.util.Objects.equals(after.get(branch.getKey()),branch.getValue()));
+                            nextHeads.keySet().retainAll(new HashSet<>(nextBranches.values()));
                         }
-                        failed = !deferred;
-                        nextBranches.entrySet().removeIf(branch -> !java.util.Objects.equals(after.get(branch.getKey()),branch.getValue()));
-                        nextHeads.keySet().retainAll(new HashSet<>(nextBranches.values()));
+                    } catch (RuntimeException error) {
+                        failed = true;
+                        if (error instanceof CodingOpenApiException api && api.isPermissionDenied()) {
+                            failureCode = "PERMISSION_DENIED";
+                        }
+                        nextBranches.clear(); nextHeads.clear();
                     }
-                } catch (RuntimeException error) {
-                    failed = true;
-                    if (error instanceof CodingOpenApiException api && api.isPermissionDenied()) {
-                        failureCode = "PERMISSION_DENIED";
-                    }
-                    nextBranches.clear(); nextHeads.clear();
                 }
+                if (deferred) {
+                    commits.values().removeIf(commit -> existing.containsKey(commit.sha)
+                            || !commit.retainBranches(nextBranches.keySet()));
+                }
+                save(job);
+                int written = upsertCommits(commits.values());
+                commits.values().stream().map(row -> row.month.toString()).forEach(touched::add);
+                job.setTotalCommits(job.getTotalCommits() + written);
+                job.setDoneCommits(job.getDoneCommits() + written);
+                // 先保存幂等提交，再发布独立验证过的分支游标。即使其他分支失败，下一轮也只重试缺口。
+                if (!nextBranches.isEmpty() || !failed || !graph.isEmpty()) {
+                    checkpoints.save(job, depotId, new CodeBranchSync.Checkpoint(nextBranches, nextHeads, graph),
+                            previousCheckpoint);
+                }
+                if (failed) markRepoFailed(job, depot, failureCode,
+                        "BRANCH_CHANGED".equals(failureCode)
+                                ? "有 " + changedBranches + " 个分支待复核，已保留稳定分支进度和成功数据"
+                                : "部分分支未同步，已保留稳定分支进度和成功数据",
+                        branches.size(), written);
+                else if (deferred) {
+                    repoMapper.updateState(job.getId(), depot.depot().id(), "SKIPPED", nextBranches.size(), written,
+                            "BRANCH_CHANGED", "有 " + changedBranches + " 个分支待下轮复核，已保留稳定分支进度和成功数据");
+                } else {
+                    markRepoCompleted(job, depot, branches.size(), written);
+                    checkpoints.retireSuperseded(job, depotId);
+                }
+                log.info("zhaogang continuous repo, jobId={}, depotId={}, stableBranches={}, commitPageCalls={}, partial={}",
+                        job.getId(),depotId,nextBranches.size(),calls.get()-callsBefore,failed || deferred);
+            } catch (CodingOpenApiException busy) {
+                if (!"REPOSITORY_BUSY".equals(busy.code())) throw busy;
+                markRepoFailed(job, depot, busy.code(), busy.getMessage());
             }
-            if (deferred) {
-                commits.values().removeIf(commit -> existing.containsKey(commit.sha)
-                        || !commit.retainBranches(nextBranches.keySet()));
-            }
-            int written = upsertCommits(commits.values());
-            commits.values().stream().map(row -> row.month.toString()).forEach(touched::add);
-            job.setTotalCommits(job.getTotalCommits() + written);
-            job.setDoneCommits(job.getDoneCommits() + written);
-            // 先保存幂等提交，再发布独立验证过的分支游标。即使其他分支失败，下一轮也只重试缺口。
-            if (!nextBranches.isEmpty() || !failed || !graph.isEmpty()) {
-                checkpoints.save(job, entry.getKey(), new CodeBranchSync.Checkpoint(nextBranches, nextHeads, graph),
-                        previousCheckpoint);
-            }
-            if (failed) markRepoFailed(job, depot, failureCode,
-                    "BRANCH_CHANGED".equals(failureCode)
-                            ? "有 " + changedBranches + " 个分支待复核，已保留稳定分支进度和成功数据"
-                            : "部分分支未同步，已保留稳定分支进度和成功数据",
-                    entry.getValue().size(), written);
-            else if (deferred) {
-                repoMapper.updateState(job.getId(), depot.depot().id(), "SKIPPED", nextBranches.size(), written,
-                        "BRANCH_CHANGED", "有 " + changedBranches + " 个分支待下轮复核，已保留稳定分支进度和成功数据");
-            } else {
-                writeCommit(() -> commitMapper.cleanupSyncRepo(input.scope().codingTeamId(), input.scope().scope().name(),
-                        input.scope().scopeId(), entry.getKey(), job.getSyncFrom(), job.getSyncTo(), job.getId()));
-                markRepoCompleted(job, depot, entry.getValue().size(), written);
-            }
-            log.info("zhaogang continuous repo, jobId={}, depotId={}, stableBranches={}, commitPageCalls={}, partial={}",
-                    job.getId(),entry.getKey(),nextBranches.size(),calls.get()-callsBefore,failed || deferred);
-
         }
         log.info("zhaogang continuous sync, jobId={}, skippedHeads={}, commitPageCalls={}", job.getId(), skipped, calls.get());
         job.setStage("DIFFS"); save(job);
         return touched;
+    }
+
+    private CodeRepositoryAccess.RepositoryLock lockRepository(long org, long depot) {
+        return access == null ? () -> {} : access.lockRepository(org, depot);
     }
 
     private int logChangedBranches(long jobId, long depotId, Map<String, String> before, Map<String, String> after) {
@@ -544,6 +573,7 @@ class CodeScanWorker {
                 if (!java.util.Objects.equals(input.identitySignature(), identities.signature(input.scope()))) {
                     throw new CodingOpenApiException("IDENTITY_CHANGED", "Git 身份已变化，将按新身份重新扫描");
                 }
+                save(job);
                 int written = upsertCommits(commits.values());
                 commits.values().stream().map(item -> item.month.toString()).distinct().forEach(touchedMonths::add);
                 job.setTotalCommits(job.getTotalCommits() + written);
@@ -603,9 +633,7 @@ class CodeScanWorker {
                             job.getSyncFrom().toString(), job.getSyncTo().toString(), page, calls);
                 },commit -> {
                     LocalDateTime at=CodeStatsSupport.fromMillis(commit.commitAtMillis());
-                    return at!=null && !at.toLocalDate().isBefore(job.getSyncFrom()) && !at.toLocalDate().isAfter(job.getSyncTo())
-                            && belongsToScope(input,identities.resolve(input.identityIndex(),
-                            CodeStatsSupport.emailHash(commit.authorEmail()),CodeStatsSupport.nameKey(commit.authorName())));
+                    return at!=null && !at.toLocalDate().isBefore(job.getSyncFrom()) && !at.toLocalDate().isAfter(job.getSyncTo());
                 });
         return new ContinuousRead(result.result(),!result.requested(),result.learned());
     }
@@ -665,11 +693,7 @@ class CodeScanWorker {
                 LocalDateTime time = CodeStatsSupport.fromMillis(commit.commitAtMillis());
                 if (time != null && !time.toLocalDate().isBefore(LocalDate.parse(from))
                         && !time.toLocalDate().isAfter(LocalDate.parse(to))) {
-                    CodeIdentityResolver.Resolved owner = identities.resolve(input.identityIndex(),
-                            CodeStatsSupport.emailHash(commit.authorEmail()), CodeStatsSupport.nameKey(commit.authorName()));
-                    if (belongsToScope(input, owner)) {
-                        accumulate(rows, branch.plan(), branch.branch(), commit, input, input.job());
-                    }
+                    accumulate(rows, branch.plan(), branch.branch(), commit, input, input.job());
                 }
             }
             if (result.items().size() < Math.max(1, properties.getCodeCommitPageSize())
@@ -684,8 +708,6 @@ class CodeScanWorker {
     private void mergeSnapshot(Map<String, CommitAccumulator> target, List<BranchPlan> branches,
                                BranchSnapshot snapshot, ScanInput input, ScanJobEntity job) {
         for (CommitEntity row : snapshot.commits()) {
-            if (!belongsToScope(input, identities.resolve(input.identityIndex(), row.getAuthorEmailHash(),
-                    row.getAuthorNameKey()))) continue;
             CommitAccumulator accumulator = target.computeIfAbsent(row.getSha(), ignored ->
                     new CommitAccumulator(branches.get(0).plan(), row.getSha(), row.getCommitAt(), input, job.getId()));
             accumulator.authorName = row.getAuthorName();
@@ -763,24 +785,6 @@ class CodeScanWorker {
         accumulator.addBranch(branch);
     }
 
-    private void pruneUnmatched(ScanInput input) {
-        List<Long> remove = commitMapper.selectByMonth(input.scope().codingTeamId(), input.scope().scope().name(),
-                input.scope().scopeId(), input.month().toString()).stream()
-                .filter(row -> !belongsToScope(input, identities.resolve(input.identityIndex(),
-                        row.getAuthorEmailHash(), row.getAuthorNameKey())))
-                .map(CommitEntity::getId).toList();
-        for (int i = 0; i < remove.size(); i += 200) {
-            List<Long> batch = remove.subList(i, Math.min(remove.size(), i + 200));
-            writeCommit(() -> commitMapper.deleteUnmatchedRows(input.scope().codingTeamId(), input.scope().scope().name(),
-                    input.scope().scopeId(), input.month().toString(), batch));
-        }
-    }
-
-    private boolean belongsToScope(ScanInput input, CodeIdentityResolver.Resolved owner) {
-        return owner != null && !owner.ignored() && owner.memberId() != null
-                && input.scope().members().stream().anyMatch(member -> member.userId() == owner.memberId());
-    }
-
     private int upsertCommits(Iterable<CommitAccumulator> accumulators) {
         List<CommitEntity> batch = new ArrayList<>();
         int written = 0;
@@ -854,35 +858,30 @@ class CodeScanWorker {
                         : commitMapper.selectPendingDiffs(scope.codingTeamId(), scope.scope().name(), scope.scopeId(), month));
             }
         }
+        Set<Long> allowed = access == null ? null : access.visible(input.scope()).depots();
+        pending.removeIf(row -> allowed != null && !allowed.contains(row.getDepotId())
+                || !retryOnly && !depotTokens.containsKey(row.getDepotId()));
         job.setTotalDiffs(pending.size());
         job.setDoneDiffs(0);
         save(job);
         int processed = 0;
         for (CommitEntity commit : pending) {
             if (cancelled(job)) throw new ScanCancelledException();
-            if (!java.util.Objects.equals(input.identitySignature(), identities.signature(input.scope()))) {
-                throw new CodingOpenApiException("IDENTITY_CHANGED", "Git 身份已变化，将按新身份重新扫描");
-            }
-            CodeIdentityResolver.Resolved resolved = identities.resolve(mappingIndex,
-                    commit.getAuthorEmailHash(), commit.getAuthorNameKey());
             if (CodeLinePolicy.commitCountOnly(commit.getDepotName())) {
                 writeCommit(() -> commitMapper.updateDiff(commit.getId(), null, null, null,
                         CodeLinePolicy.SKIPPED_REPOSITORY, null));
-            } else if (resolved.memberId() == null || !memberIds.contains(resolved.memberId())) {
-                if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
-                if (!retryOnly || automaticRetry) {
-                    writeCommit(() -> commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED"));
-                }
             } else {
-                List<String> candidates = diffTokens(memberTokens.get(resolved.memberId()),
-                        depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens));
-                if (candidates.isEmpty()) {
-                    if (retryOnly) job.setFailedDiffs(job.getFailedDiffs() + 1);
-                    if (!retryOnly || automaticRetry) {
-                        writeCommit(() -> commitMapper.updateDiffStatus(commit.getId(), "SKIPPED_UNMAPPED"));
+                List<String> candidates = depotTokens.getOrDefault(commit.getDepotId(), fallbackTokens);
+                if (!candidates.isEmpty()) {
+                    try (var reservation = lockRepository(input.scope().codingTeamId(), commit.getDepotId())) {
+                        var current = access == null ? commit : commitMapper.selectById(commit.getId());
+                        if (current != null && !"OK".equals(current.getDiffStatus())) {
+                            fetchDiff(input, current, candidates, gitBatch);
+                        }
+                    } catch (CodingOpenApiException busy) {
+                        if (!"REPOSITORY_BUSY".equals(busy.code())) throw busy;
+                        job.setFailedDiffs(job.getFailedDiffs() + 1);
                     }
-                } else {
-                    fetchDiff(input, commit, candidates, gitBatch);
                 }
             }
             processed++;
@@ -1009,68 +1008,196 @@ class CodeScanWorker {
     }
 
     private void fetchDiff(ScanInput input, CommitEntity commit, List<String> candidates, CodeGitLineStats.Batch gitBatch) {
-        ScanJobEntity job = input.job();
+        var job = input.job();
+        boolean manualRetry = DIFF_RETRY.equals(input.mode()) && "MANUAL".equals(job.getRequestedMode());
+        var prior = manualRetry || "PENDING".equals(commit.getDiffStatus())
+                ? List.<DiffReadAttempt>of() : commitMapper.selectDiffReadAttempts(commit.getId());
+        var attempts = new ArrayList<DiffReadAttempt>();
         Set<DiffAttempt> failures = new LinkedHashSet<>();
-        String gitCandidate = null;
+        Set<String> fallbackTokens = new LinkedHashSet<>();
+
         for (String token : new LinkedHashSet<>(candidates)) {
+            checkActive(job);
+            if (!canRead(input, commit, token)) continue;
+            String fingerprint = CodingCredentialService.fingerprint(token);
+            String blocked = terminalReason(prior, fingerprint, "DIFF");
+            if (blocked != null) {
+                var reason = CodeDiffFailure.valueOf(blocked);
+                failures.add(new DiffAttempt(reason, null, null, null));
+                if (canCompare(reason, null)) fallbackTokens.add(token);
+                continue;
+            }
+
             CodingCommitDiff diff;
             try {
                 diff = commitDiff(input, commit, token);
             } catch (CodingOpenApiException error) {
-                CodeDiffFailure reason = CodeDiffFailure.classify(error);
+                checkActive(job);
+                var reason = CodeDiffFailure.classify(error);
+                boolean fallback = canCompare(reason, error.httpStatus());
+                attempts.add(new DiffReadAttempt(fingerprint, "DIFF", reason.name(),
+                        fallback || reason == CodeDiffFailure.PERMISSION_DENIED));
                 failures.add(new DiffAttempt(reason, CodeDiffFailure.safeUpstreamCode(error),
                         error.httpStatus(), error instanceof CodingResponseTooLargeException large ? large.limitBytes() : null));
-                if (gitBatch != null && gitCandidate == null && isGitFallbackCandidate(reason, error.httpStatus())) {
-                    gitCandidate = token;
-                }
-                if (Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
+                if (fallback) fallbackTokens.add(token);
                 continue;
             }
-            storeDiff(commit, diff);
-            return;
+            if (publishDiff(input, commit, token, diff, "DIFF")) return;
         }
-        CodeGitLineStats.Failure gitFailure = null;
-        if (gitCandidate != null) {
-            if (cancelled(job)) throw new ScanCancelledException();
-            CodeGitLineStats.Result git = gitBatch.count(commit, gitCandidate);
-            if (cancelled(job) || Thread.currentThread().isInterrupted()) throw new ScanCancelledException();
-            if (git.stats() != null) {
-                CodingCommitDiff stats = git.stats();
-                storeDiff(commit, stats);
-                log.info("zhaogang code diff filled, jobId={}, projectId={}, depotId={}, sha={}, source=GIT, additions={}, deletions={}, files={}",
-                        job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
-                        stats.additions(), stats.deletions(), stats.filesChanged());
-                return;
+
+        List<String> gitTokens = new ArrayList<>();
+        String comparisonFailure = null;
+        CodeDiffFailure temporaryComparisonFailure = null;
+        for (String token : fallbackTokens) {
+            checkActive(job);
+            if (!canRead(input, commit, token)) continue;
+            String fingerprint = CodingCredentialService.fingerprint(token);
+            String blocked = terminalReason(prior, fingerprint, "COMPARE");
+            if (blocked == null) {
+                CommitComparison comparison = compareCommit(input, commit, token);
+                if (comparison == null) continue;
+                if (comparison.diff() != null) {
+                    if (publishDiff(input, commit, token, comparison.diff(), "CODING_COMPARE")) return;
+                    continue;
+                }
+                blocked = comparison.reason();
+                attempts.add(new DiffReadAttempt(fingerprint, "COMPARE", blocked, comparison.terminal()));
+                if (!comparison.terminal()) temporaryComparisonFailure = comparison.failure();
             }
-            gitFailure = git.failure();
+            comparisonFailure = blocked;
+            if (!"PERMISSION_DENIED".equals(blocked) && !"MERGE".equals(blocked)) gitTokens.add(token);
+        }
+
+        CodeGitLineStats.Failure gitFailure = null;
+        if (gitBatch != null) {
+            for (String token : gitTokens) {
+                checkActive(job);
+                if (!canRead(input, commit, token)) continue;
+                String fingerprint = CodingCredentialService.fingerprint(token);
+                String blocked = terminalReason(prior, fingerprint, "GIT");
+                if (blocked != null) {
+                    gitFailure = CodeGitLineStats.Failure.valueOf(blocked);
+                    continue;
+                }
+                var git = gitBatch.count(commit, token);
+                if (git.stats() != null) {
+                    if (publishDiff(input, commit, token, git.stats(), "GIT")) return;
+                    continue;
+                }
+                checkActive(job);
+                gitFailure = git.failure();
+                boolean terminal = switch (gitFailure) {
+                    case PERMISSION_DENIED, SIZE_LIMIT, INVALID_TARGET, INVALID_OUTPUT, MERGE -> true;
+                    default -> false;
+                };
+                attempts.add(new DiffReadAttempt(fingerprint, "GIT", gitFailure.name(), terminal));
+                if (gitFailure != CodeGitLineStats.Failure.PERMISSION_DENIED
+                        && gitFailure != CodeGitLineStats.Failure.CREDENTIAL_UNAVAILABLE
+                        && gitFailure != CodeGitLineStats.Failure.OBJECT_UNAVAILABLE) break;
+            }
+        }
+
+        checkActive(job);
+        if (failures.isEmpty()) {
+            // 授权可能在排队或读取期间收窄，保留其他范围已有的共享结果。
+            job.setFailedDiffs(job.getFailedDiffs() + 1);
+            return;
         }
         CodeDiffFailure failure = failures.stream().map(DiffAttempt::reason)
                 .min(java.util.Comparator.comparingInt(CodeScanWorker::diffFailurePriority))
-                .orElse(CodeDiffFailure.REQUEST_FAILED);
-        storeDiffFailure(input, commit, failure, gitFailure);
-        log.info("zhaogang code diff failed, jobId={}, projectId={}, depotId={}, sha={}, reason={}, gitFallback={}, attempts={}",
+                .orElseThrow();
+        if (!attempts.isEmpty()) writeCommit(() -> commitMapper.recordDiffReadAttempts(commit.getId(), attempts));
+        storeDiffFailure(input, commit, failure, gitFailure, comparisonFailure, temporaryComparisonFailure);
+        log.info("zhaogang code diff failed, jobId={}, projectId={}, depotId={}, sha={}, reason={}, compareFallback={}, gitFallback={}, attempts={}",
                 job.getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
-                failure.name(), gitFailure, failures.stream().limit(8).toList());
+                failure.name(), comparisonFailure, gitFailure, failures.stream().limit(8).toList());
         job.setFailedDiffs(job.getFailedDiffs() + 1);
     }
 
-    private void storeDiffFailure(ScanInput input, CommitEntity commit, CodeDiffFailure failure, CodeGitLineStats.Failure gitFailure) {
-        CodeDiffRetryPolicy.State state;
+    private CommitComparison compareCommit(ScanInput input, CommitEntity commit, String token) {
+        try {
+            var parents = coding.commitParents(token, commit.getDepotId(), commit.getSha());
+            if (parents == null) return new CommitComparison(null, "INVALID_RESPONSE", false, CodeDiffFailure.INVALID_RESPONSE);
+            if (parents.isEmpty()) return new CommitComparison(null, "NO_PARENT", true, null);
+            if (parents.size() > 1) return new CommitComparison(null, "MERGE", true, null);
+            checkActive(input.job());
+            if (!canRead(input, commit, token)) return null;
+            var diff = coding.compareCommitLines(token, commit.getDepotId(), commit.getSha(), parents.get(0));
+            if (diff == null) return new CommitComparison(null, "INVALID_RESPONSE", false, CodeDiffFailure.INVALID_RESPONSE);
+            if (diff.additions() == 0 && diff.deletions() == 0) {
+                return new CommitComparison(null, "UNVERIFIED_ZERO", true, null);
+            }
+            return new CommitComparison(diff, null, false, null);
+        } catch (CodingOpenApiException error) {
+            if (error.code().startsWith("UnsupportedOperation")) {
+                return new CommitComparison(null, "UNSUPPORTED", true, null);
+            }
+            var reason = CodeDiffFailure.classify(error);
+            return new CommitComparison(null, reason.name(), !CodeDiffRetryPolicy.isTemporary(reason), reason);
+        }
+    }
+
+    private record CommitComparison(CodingCommitDiff diff, String reason, boolean terminal, CodeDiffFailure failure) {}
+
+    private String terminalReason(List<DiffReadAttempt> prior, String fingerprint, String method) {
+        return prior.stream().filter(attempt -> attempt.terminal() && attempt.method().equals(method)
+                        && attempt.credentialFingerprint().equals(fingerprint))
+                .map(DiffReadAttempt::reason).findFirst().orElse(null);
+    }
+
+    private boolean canRead(ScanInput input, CommitEntity commit, String token) {
+        return access == null || access.canRead(input.scope().codingTeamId(), commit.getDepotId(), token);
+    }
+
+    private void checkActive(ScanJobEntity job) {
+        if (Thread.currentThread().isInterrupted() || cancelled(job)) throw new ScanCancelledException();
+    }
+
+    private boolean publishDiff(ScanInput input, CommitEntity commit, String token, CodingCommitDiff diff, String source) {
+        checkActive(input.job());
+        if (!canRead(input, commit, token)) return false;
+        if ("CODING_COMPARE".equals(source)) {
+            // 文件类型留给后续补齐，同一轮扫描不再为这条提交拉取完整 diff 或 Git 对象。
+            writeCommit(() -> commitMapper.updateComparedDiff(commit.getId(), diff.additions(),
+                    diff.deletions(), diff.filesChanged()));
+        } else {
+            storeDiff(commit, diff);
+        }
+        if (!"DIFF".equals(source)) {
+            log.info("zhaogang code diff filled, jobId={}, projectId={}, depotId={}, sha={}, source={}, additions={}, deletions={}, files={}",
+                    input.job().getId(), commit.getProjectId(), commit.getDepotId(), diagnosticSha(commit.getSha()),
+                    source, diff.additions(), diff.deletions(), diff.filesChanged());
+        }
+        return true;
+    }
+
+    private void storeDiffFailure(ScanInput input, CommitEntity commit, CodeDiffFailure failure,
+                                  CodeGitLineStats.Failure gitFailure, String comparisonFailure,
+                                  CodeDiffFailure temporaryComparisonFailure) {
+        CodeDiffRetryPolicy.State state = null;
+        String detail = gitFailure != null ? gitFailure.name()
+                : comparisonFailure == null ? null : "COMPARE_" + comparisonFailure;
         if (properties.isCodeAutoDiffRetryEnabled()) {
             boolean automaticRetry = DIFF_RETRY.equals(input.mode()) && "AUTO".equals(input.job().getRequestedMode());
             int attempts = commit.getDiffRetryAttempts() == null ? 0 : commit.getDiffRetryAttempts();
+            if (automaticRetry && canCompare(failure, null) && attempts >= CodeDiffRetryPolicy.MAX_ATTEMPTS) {
+                attempts = 0;
+            }
             String credentials = failure == CodeDiffFailure.PERMISSION_DENIED || gitFailure == CodeGitLineStats.Failure.PERMISSION_DENIED
                     ? CodeDiffRetryPolicy.credentialSignature(input.scope()) : null;
-            state = CodeDiffRetryPolicy.afterFailure(failure, gitFailure, automaticRetry, attempts,
+            var retryReason = temporaryComparisonFailure == null ? failure : temporaryComparisonFailure;
+            var retryGitFailure = temporaryComparisonFailure == null ? gitFailure : null;
+            state = CodeDiffRetryPolicy.afterFailure(retryReason, retryGitFailure, automaticRetry, attempts,
                     LocalDateTime.now(clock), credentials);
-        } else {
-            state = null;
         }
-        if (state == null) {
+        if (state == null && detail == null) {
             writeCommit(() -> commitMapper.updateDiff(commit.getId(), null, null, null, failure.status(), null));
         } else {
+            var retry = state == null ? new CodeDiffRetryPolicy.State(
+                    commit.getDiffRetryAttempts() == null ? 0 : commit.getDiffRetryAttempts(),
+                    commit.getDiffRetryAfter(), commit.getDiffRetryCredentialSignature(), null) : state;
             writeCommit(() -> commitMapper.updateFailedDiffWithRetryState(commit.getId(), failure.status(),
-                    state.attempts(), state.retryAfter(), state.credentialSignature(), state.error()));
+                    retry.attempts(), retry.retryAfter(), retry.credentialSignature(), detail));
         }
     }
 
@@ -1080,7 +1207,7 @@ class CodeScanWorker {
                 diff.filesChanged(), "OK", fileTypes));
     }
 
-    private static boolean isGitFallbackCandidate(CodeDiffFailure reason, Integer httpStatus) {
+    private static boolean canCompare(CodeDiffFailure reason, Integer httpStatus) {
         if (!reason.sizeLimit && reason != CodeDiffFailure.INVALID_ARGUMENT) return false;
         if (httpStatus == null || (httpStatus >= 200 && httpStatus < 300)) return true;
         return (reason == CodeDiffFailure.INVALID_ARGUMENT && (httpStatus == 400 || httpStatus == 422))
@@ -1101,21 +1228,6 @@ class CodeScanWorker {
     }
 
     private void aggregate(ScanInput input, ScanJobEntity job) {
-        if (!java.util.Objects.equals(input.identitySignature(), identities.signature(input.scope()))) {
-            throw new CodingOpenApiException("IDENTITY_CHANGED", "Git 身份已变化，将按新身份重新扫描");
-        }
-        if (("FULL".equals(input.mode()) || "SYNC".equals(input.mode())) && !job.isCoverageIncomplete()
-                && (job.getFailedRepos() == null || job.getFailedRepos() == 0)
-                && ("SYNC".equals(input.mode()) || job.getFailedDiffs() == null || job.getFailedDiffs() == 0)
-                && !Boolean.TRUE.equals(job.getTruncated())) {
-            YearMonth first="SYNC".equals(input.mode()) ? YearMonth.from(job.getSyncFrom()) : input.month();
-            YearMonth last="SYNC".equals(input.mode()) ? YearMonth.from(job.getSyncTo()) : input.month();
-            for(YearMonth month=first;!month.isAfter(last);month=month.plusMonths(1)) {
-                String statMonth = month.toString();
-                writeCommit(() -> commitMapper.cleanupFullScan(input.scope().codingTeamId(), input.scope().scope().name(),
-                        input.scope().scopeId(), statMonth, job.getId()));
-            }
-        }
         boolean partial = job.isCoverageIncomplete() || (job.getFailedRepos() != null && job.getFailedRepos() > 0)
                 || (job.getFailedDiffs() != null && job.getFailedDiffs() > 0)
                 || Boolean.TRUE.equals(job.getTruncated());
@@ -1187,10 +1299,10 @@ class CodeScanWorker {
     private boolean cancelled(ScanJobEntity job) {
         if (cache.cancelled(job.getId())) return true;
         long now = System.currentTimeMillis();
-        if (now < nextDbCancelCheckMillis) return false;
-        nextDbCancelCheckMillis = now + 10_000L;
+        if (now < nextDbCancelCheckMillis.get()) return false;
+        nextDbCancelCheckMillis.set(now + 10_000L);
         ScanJobEntity current = jobMapper.selectById(job.getId());
-        return current == null || "CANCELLED".equals(current.getStatus());
+        return current == null || !Set.of("RUNNING", "QUEUED").contains(current.getStatus());
     }
 
     private String errorCode(CodingOpenApiException error) {

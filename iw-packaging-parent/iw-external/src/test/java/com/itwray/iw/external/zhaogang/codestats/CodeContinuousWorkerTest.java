@@ -255,7 +255,7 @@ class CodeContinuousWorkerTest {
         // The initial scan verifies two branch listings. The unchanged follow-up needs only the first.
         verify(coding, times(3)).branchHeads(anyString(), anyLong(), anyLong(), anyString());
         assertEquals(1,database.size());assertEquals(2L,database.get(a).getLastSeenScanId());
-        verify(commits,times(22)).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
+        verify(commits,never()).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
         assertEquals(Set.of(a),CodeSyncCheckpointCodec.decode(checkpoint).heads().get(a).matched());
     }
     @Test void changedHeadOnlyAddsNewCommitAndPreservesKnownHistory() {
@@ -268,7 +268,7 @@ class CodeContinuousWorkerTest {
     }
 
     @Test
-    void automaticTeamScansShareRepositoryReadsButAttributeToTheirOwnMembers() {
+    void automaticTeamScansCaptureTheSameRepositoryCommitsForLaterAttribution() {
         var first = new CodeStatsModule.ScopeInfo(CodeStatsModels.Scope.WORKBENCH_TEAM, 9, 100, "team",
                 "https://example.com", "first",
                 List.of(new CodeStatsModule.MemberCredential(1, "one", "", "shared-token", CodingRole.BACKEND)), false);
@@ -286,11 +286,11 @@ class CodeContinuousWorkerTest {
         var git = mock(CodeGitLineStats.class);
 
         assertEquals("COMPLETED", run(1, "2026-11-03", first, git, "AUTO", null, reads).getStatus());
-        assertEquals(Set.of(a), database.keySet());
+        assertEquals(Set.of(a, b), database.keySet());
         database.clear();
         checkpoint = null;
         assertEquals("COMPLETED", run(2, "2026-11-03", second, git, "AUTO", null, reads).getStatus());
-        assertEquals(Set.of(b), database.keySet());
+        assertEquals(Set.of(a, b), database.keySet());
         verify(coding, times(2)).branchHeads("shared-token", 10, 1, "CODING");
         verify(coding).commits(eq("shared-token"), any());
     }
@@ -320,7 +320,7 @@ class CodeContinuousWorkerTest {
             assertTrue(decoded.graph().containsKey(a));
         } catch(Exception e) { throw new AssertionError(e); }
         assertEquals(Set.of(a),database.keySet());
-        verify(commits,times(1)).cleanupSyncRepo(anyLong(),anyString(),anyLong(),anyLong(),any(),any(),anyLong());
+        verify(commits,never()).cleanupSyncRepo(anyLong(),anyString(),anyLong(),anyLong(),any(),any(),anyLong());
     }
     @Test void corruptCheckpointFallsBackToRemoteInsteadOfFalseZero() {
         checkpoint="not-json";
@@ -387,10 +387,11 @@ class CodeContinuousWorkerTest {
         when(commits.selectNewDiffs(anyLong(),anyString(),anyLong(),eq("2026-10"))).thenReturn(List.of(pending));
         doThrow(new CodingOpenApiException("FailedOperation","diff 修改文件过多，不宜在网页展示"))
                 .when(coding).commitDiff(anyString(),anyLong(),anyLong(),anyString());
+        when(coding.commitParents("fixture-token", 1L, a)).thenReturn(List.of());
         assertEquals("PARTIAL",run(1,"2026-11-03").getStatus());
-        verify(commits).updateDiff(77L, null, null, null, "DIFF_UPSTREAM_LIMIT", null);
-        // 行数不可用不影响已完成元数据的可见范围清理，不能永久保留已不可达提交。
-        verify(commits,times(11)).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
+        verify(commits).updateFailedDiffWithRetryState(77L, "DIFF_UPSTREAM_LIMIT", 0, null, null, "COMPARE_NO_PARENT");
+        // 行数失败时继续保留共享提交元数据。
+        verify(commits,never()).cleanupFullScan(anyLong(),anyString(),anyLong(),anyString(),anyLong());
         verify(commits,never()).updateDiff(77L,0L,0L,0,"OK", null);
     }
 
@@ -442,7 +443,11 @@ class CodeContinuousWorkerTest {
         var batch = mock(CodeGitLineStats.Batch.class);
         when(git.batch(scope)).thenReturn(batch);
         when(batch.count(root, "fixture-token")).thenReturn(CodeGitLineStats.Result.ok(new CodingCommitDiff(1, 0, 1)));
-        when(batch.count(large, "fixture-token")).thenReturn(CodeGitLineStats.Result.ok(new CodingCommitDiff(0, 23954, 1)));
+        when(coding.commitParents("fixture-token", 1L, a)).thenReturn(List.of());
+        when(coding.commitParents("fixture-token", 1L, b)).thenReturn(List.of(a));
+        when(coding.compareCommitLines("fixture-token", 1L, b, a)).thenReturn(new CodingCommitDiff(0, 23954, 1));
+        when(coding.commitParents("fixture-token", 1L, unresolved.getSha())).thenReturn(List.of(a));
+        when(coding.compareCommitLines("fixture-token", 1L, unresolved.getSha(), a)).thenReturn(new CodingCommitDiff(0, 0, 1));
         when(batch.count(unresolved, "fixture-token"))
                 .thenReturn(CodeGitLineStats.Result.failed(CodeGitLineStats.Failure.OBJECT_UNAVAILABLE));
         job = new ScanJobEntity();
@@ -456,8 +461,10 @@ class CodeContinuousWorkerTest {
         assertEquals(4, job.getDoneDiffs());
         assertEquals(2, job.getFailedDiffs());
         verify(commits).updateDiff(77L, 1L, 0L, 1, "OK", null);
-        verify(commits).updateDiff(78L, 0L, 23954L, 1, "OK", null);
-        verify(commits).updateDiff(79L, null, null, null, "DIFF_UPSTREAM_LIMIT", null);
+        verify(commits).updateComparedDiff(78L, 0L, 23954L, 1);
+        verify(commits).updateFailedDiffWithRetryState(79L, "DIFF_UPSTREAM_LIMIT", 0, null, null, "OBJECT_UNAVAILABLE");
+        verify(batch, never()).count(eq(large), anyString());
+        verify(coding, never()).commitParents(eq("fixture-token"), eq(1L), eq(forbidden.getSha()));
         verify(commits).updateFailedDiffWithRetryState(80L, "DIFF_PERMISSION_DENIED", 0, null,
                 CodeDiffRetryPolicy.credentialSignature(scope), null);
         verify(batch, never()).count(eq(forbidden), anyString());

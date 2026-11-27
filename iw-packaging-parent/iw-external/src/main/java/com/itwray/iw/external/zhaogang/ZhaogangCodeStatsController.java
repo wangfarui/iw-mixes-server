@@ -54,6 +54,7 @@ public class ZhaogangCodeStatsController {
                                               @RequestParam(required = false) Long workbenchTeamId,
                                               @RequestParam(defaultValue = "false") boolean refresh,
                                               HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, no-store");
         return GeneralResponse.success(module.statistics(context(request, response), from, to, scope,
                 workbenchTeamId, refresh));
     }
@@ -64,6 +65,7 @@ public class ZhaogangCodeStatsController {
             @RequestParam @NotBlank String from, @RequestParam @NotBlank String to,
             @RequestParam @Min(1) long workbenchTeamId, @RequestParam @Min(1) long memberUserId,
             HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, no-store");
         return GeneralResponse.success(module.memberStatistics(context(request, response), from, to,
                 workbenchTeamId, memberUserId));
     }
@@ -84,6 +86,7 @@ public class ZhaogangCodeStatsController {
                                                               @RequestParam(defaultValue = "false") boolean refresh,
                                                               HttpServletRequest request,
                                                               HttpServletResponse response) {
+        response.setHeader(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, no-store");
         return GeneralResponse.success(module.entries(context(request, response), from, to, scope, workbenchTeamId,
                 memberUserId, depotId, keyword, pageNumber, pageSize, sortBy, sortOrder, refresh));
     }
@@ -95,6 +98,7 @@ public class ZhaogangCodeStatsController {
                                                            @RequestParam @NotBlank String scope,
                                                            @RequestParam(required = false) Long workbenchTeamId,
                                                            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, no-store");
         return GeneralResponse.success(module.scan(context(request, response), from, to, scope, workbenchTeamId));
     }
 
@@ -178,7 +182,7 @@ public class ZhaogangCodeStatsController {
     }
 
     private CodeStatsModule.Context context(HttpServletRequest request, HttpServletResponse response) {
-        ZhaogangSession session = sessionManager.resolve(request, response);
+        ZhaogangSession session = sessionManager.resolveStatistics(request, response);
         return new CodeStatsModule.Context(session.token(), session.userId(), session.userName(),
                 session.avatar(), session.teamId() == null ? 0 : session.teamId(), session.team(),
                 properties.configuredTeamHost());

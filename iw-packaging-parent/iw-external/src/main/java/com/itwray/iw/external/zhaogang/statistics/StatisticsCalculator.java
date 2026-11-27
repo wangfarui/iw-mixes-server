@@ -85,17 +85,19 @@ final class StatisticsCalculator {
             Map<Metric, BigDecimal> values = new EnumMap<>(Metric.class);
             List<Issue> issues = new ArrayList<>();
             if (total == null) return new MemberMetrics(member, values, issues);
-            if (total.worklogReasons.isEmpty()) {
+            boolean partialWorklog = total.worklogReasons.contains(Reason.WORKLOG_PROJECT_PARTIAL);
+            if (total.worklogReasons.isEmpty() || (partialWorklog && total.hours.signum() > 0)) {
                 values.put(Metric.TOTAL_HOURS, total.hours);
                 values.put(Metric.OVERTIME_HOURS, total.overtime);
                 values.put(Metric.OVERTIME_DAYS, BigDecimal.valueOf(total.overtimeDays));
                 if (total.workdays > 0) values.put(Metric.UTILIZATION_RATE, WorklogDayRules.utilization(total.hours, total.workdays));
                 else issues.add(issue(Reason.NO_WORKDAYS, List.of(Metric.UTILIZATION_RATE)));
-            } else total.worklogReasons.forEach(reason -> issues.add(issue(reason, WORKLOG)));
+            }
+            total.worklogReasons.forEach(reason -> issues.add(issue(reason, WORKLOG)));
 
             if (!member.developer()) issues.add(issue(Reason.CODE_NOT_APPLICABLE, CODE));
             else if (!total.commitReasons.isEmpty()) total.commitReasons.forEach(reason -> issues.add(issue(reason, CODE)));
-            else {
+            else if (total.codeWarnings.isEmpty() || total.commits > 0) {
                 values.put(Metric.COMMIT_COUNT, BigDecimal.valueOf(total.commits));
                 if (total.lineReasons.isEmpty()) {
                     var added = BigDecimal.valueOf(total.additions);
@@ -105,6 +107,9 @@ final class StatisticsCalculator {
                     values.put(Metric.CHANGED_LINES, added.add(deleted));
                 } else total.lineReasons.forEach(reason -> issues.add(issue(reason, LINES)));
             }
+            total.codeWarnings.stream()
+                    .filter(reason -> reason != Reason.CODE_REPOSITORY_PARTIAL || total.commits == 0)
+                    .forEach(reason -> issues.add(issue(reason, CODE)));
             return new MemberMetrics(member, values, issues);
         }).toList();
     }
@@ -167,7 +172,8 @@ final class StatisticsCalculator {
         Status status;
         if (targets == 0 || (denominator == 0 && reasons.equals(Set.of(Reason.NO_WORKDAYS)))) status = Status.NOT_APPLICABLE;
         else if (denominator == 0) status = Status.UNAVAILABLE;
-        else status = count < targets || reasons.contains(Reason.CODE_REPOSITORY_PARTIAL) ? Status.PARTIAL : Status.READY;
+        else status = count < targets || reasons.stream().anyMatch(reason -> reason != Reason.NO_WORKDAYS)
+                ? Status.PARTIAL : Status.READY;
         return new Indicator(denominator == 0 ? null : sum.divide(BigDecimal.valueOf(denominator), scale, RoundingMode.HALF_UP),
                 status, List.copyOf(reasons), count, targets);
     }
@@ -226,6 +232,7 @@ final class StatisticsCalculator {
         long deletions;
         Set<Reason> worklogReasons = EnumSet.noneOf(Reason.class);
         Set<Reason> commitReasons = EnumSet.noneOf(Reason.class);
+        Set<Reason> codeWarnings = EnumSet.noneOf(Reason.class);
         Set<Reason> lineReasons = EnumSet.noneOf(Reason.class);
 
         void add(Day day) {
@@ -237,7 +244,9 @@ final class StatisticsCalculator {
             additions += day.additions();
             deletions += day.deletions();
             if (day.worklogReason() != null) worklogReasons.add(day.worklogReason());
-            if (day.commitReason() != null && day.commitReason() != Reason.CODE_REPOSITORY_PARTIAL) {
+            if (day.commitReason() == Reason.CODE_REPOSITORY_PARTIAL || day.commitReason() == Reason.CODE_AUTHOR_PARTIAL) {
+                codeWarnings.add(day.commitReason());
+            } else if (day.commitReason() != null) {
                 commitReasons.add(day.commitReason());
             }
             if (day.linesReason() != null) lineReasons.add(day.linesReason());

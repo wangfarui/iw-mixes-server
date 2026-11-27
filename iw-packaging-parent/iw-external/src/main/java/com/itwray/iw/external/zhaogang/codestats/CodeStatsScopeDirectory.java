@@ -24,6 +24,7 @@ class CodeStatsScopeDirectory {
     private final CodingCredentialService credentials;
     private final ZhaogangCodeSyncTargetMapper targets;
     private final ZhaogangProperties properties;
+    private CodeRepositoryAccess access;
 
     CodeStatsScopeDirectory(WorkbenchTeamModule teams, CodingCredentialService credentials,
                             ZhaogangCodeSyncTargetMapper targets, ZhaogangProperties properties) {
@@ -33,13 +34,42 @@ class CodeStatsScopeDirectory {
         this.properties = properties;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    void useRepositoryAccess(CodeRepositoryAccess access) {
+        this.access = access;
+    }
+
+    @org.springframework.transaction.event.TransactionalEventListener(fallbackExecution = true)
+    void credentialChanged(com.itwray.iw.external.zhaogang.credential.StatisticsCredentialChanged event) {
+        try {
+            if (event.workbenchTeamId() == null) {
+                credentials.token(event.organization(), event.userId())
+                        .ifPresent(token -> access.requestVerification(event.organization(), token));
+            } else {
+                teams.findCodeSyncTeam(event.organization(), event.workbenchTeamId())
+                        .map(team -> team.managementCredential().token()).filter(org.apache.commons.lang3.StringUtils::isNotBlank)
+                        .ifPresent(token -> access.requestVerification(event.organization(), token));
+            }
+        } catch (RuntimeException error) {
+            org.slf4j.LoggerFactory.getLogger(CodeStatsScopeDirectory.class)
+                    .warn("代码仓库权限核验未提交，error={}", error.getClass().getSimpleName());
+        }
+    }
+
+    private CodeStatsModule.ScopeInfo verifyRepositories(CodeStatsModule.ScopeInfo scope) {
+        if (access != null) access.requestVerification(scope);
+        return scope;
+    }
+
     CodeStatsModule.ScopeInfo resolve(CodeStatsModule.Context context, Scope scope, Long workbenchTeamId) {
         if (scope == Scope.SELF) {
-            return new CodeStatsModule.ScopeInfo(scope, context.userId(), context.codingTeamId(),
+            String token = access == null ? context.token()
+                    : credentials.token(context.codingTeamId(), context.userId()).orElse("");
+            return verifyRepositories(new CodeStatsModule.ScopeInfo(scope, context.userId(), context.codingTeamId(),
                     context.codingTeamKey(), context.codingTeamHost(), context.userName(),
                     List.of(new CodeStatsModule.MemberCredential(context.userId(), context.userName(),
-                            context.avatar(), context.token())), false,
-                    credentials.exists(context.codingTeamId(), context.userId()));
+                            context.avatar(), token)), false,
+                    credentials.exists(context.codingTeamId(), context.userId())));
         }
         if (workbenchTeamId == null || workbenchTeamId <= 0) {
             throw new CodingOpenApiException("团队代码统计必须选择 Dev Hub 团队");
@@ -52,9 +82,9 @@ class CodeStatsScopeDirectory {
             CodeSyncTeam team = teams.findCodeSyncTeam(context.codingTeamId(), workbenchTeamId)
                     .filter(found -> found.members().stream().anyMatch(member -> member.userId() == context.userId()))
                     .orElseThrow(() -> new CodeStatsForbiddenException("你不是该 Dev Hub 团队成员"));
-            return teamScope(context.codingTeamId(), workbenchTeamId, context.codingTeamKey(),
+            return verifyRepositories(teamScope(context.codingTeamId(), workbenchTeamId, context.codingTeamKey(),
                     StringUtils.defaultIfBlank(team.codingTeamHost(), context.codingTeamHost()), team,
-                    team.administratorUserId() == context.userId());
+                    team.administratorUserId() == context.userId()));
         } catch (WorkbenchTeamException error) {
             throw new CodingOpenApiException(error.getMessage());
         }

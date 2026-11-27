@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-27T02:57:11.270163+00:00",
+  "repos": {
+    "iw-mixes-server": {
+      "head": "2694a753da9e4d3ac854953d7308c5284aa7412d",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "f618b7ff95b83ce647bbf9267f9860b18871e8a8",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "3e058639ed2a5898a744a095790dc9b9270198a997c05cdccc61bd184ee45004",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-server/AGENTS.md",
+      "sha256": "90cff9a99988347de3f01e7d85c9814bb199ba7393095ebae492866ea82af62f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/scripts/iw-external-init.sql",
+      "sha256": "ee4c1a012ae35ad84748f75eef00a1501077eccc02368aaa55c2bc137f589b45",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/scripts/iw-external-migrate-20261120-worklog-mirror.sql",
+      "sha256": "c62adbaaf6cdc741274a7cc8daeaaf507a28e7f7a6213ab8c7682b8156a11c9e",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/scripts/iw-external-migrate-20261126-code-checkpoint-parts.sql",
+      "sha256": "278a236f23a9117a92c6a3e20cb41e8f590ea429bdd021bd30b45cc296f42981",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeScanCheckpointStore.java",
+      "sha256": "3a9fefe0df8b5ec00a774fe826caf478546271f4e39d185c04c6b38b287e0248",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeScanWorker.java",
+      "sha256": "6fe518fb3adbd762a358dd48e3987dd7e8137fbbd5ea7cd8fcce73d1e6dfa97f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeStatisticsSource.java",
+      "sha256": "204beb5377d78a262cec82d9349bfe7e2dd61e88da9f2e194fa22f51c9413114",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeStatsScopeDirectory.java",
+      "sha256": "e638696264d8d65d2840e508c147d140ca035b85db4d7bc4dfe008c9300463f8",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/statistics/StatisticsBuilder.java",
+      "sha256": "bcc9248e144986f387cf3b1a8e6826109909f4a58baaa5626ceeb341a913be3b",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/statistics/StatisticsService.java",
+      "sha256": "b77b354c13ada07f87f46185d3e7d1882cae9324950ed1deed0e80cde5628002",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirror.java",
+      "sha256": "2f06dc5568fc43011f8e9d6c37c62d0eaec8bfed41e33feb874fe626547dc176",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirrorRepository.java",
+      "sha256": "0592c41f0d7c44f46dac5c63020dc3fccb15470c627043d9d5be6efaee4d24e2",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/AGENTS.md",
+      "sha256": "b7611beddd999c4c3e46389a1f0bd0ba80b1d9bd0f063a813a2b935b387324e5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/code/ZhaogangCodeMineView.vue",
+      "sha256": "c7497e9e2186f6a47ebd1a2a1dd889af79fdb76b6c16c7a7ce18773d13e7eea7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/code/ZhaogangCodeTeamView.vue",
+      "sha256": "faa3bb7e20758560279b211c9b1e916dc1f3c2ac7f81e6c37f0dbe049cce70d7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/components/worklog/WorklogDashboard.vue",
+      "sha256": "a3fd09eb35208ece05311f0f3fe91108cb71b33a74347ba194943c5e699633de",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/statistics/ZhaogangStatisticsView.vue",
+      "sha256": "8458a9e8355cc66e25a0535818c6927ed821ddfc87bbc7b21417a5881e799cbf",
+      "tracked": true
+    }
+  ]
+}

@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class WorklogMirror {
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(WorklogMirror.class);
   static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
   static final long INITIAL_FROM =
       LocalDate.of(2026, 1, 1).atStartOfDay(ZONE).toInstant().toEpochMilli();
@@ -133,7 +134,9 @@ class WorklogMirror {
   }
 
   String version(Context context, Long team, List<MemberCredential> members) {
+    var permitted = viewGrants(context, team, members);
     return CodingCredentialService.fingerprint(
+        repo.accessVersion(context.codingTeamId(), permitted.values()) + "|" + permitted + "|" +
         ensure(context, team, members).stream()
             .sorted(Comparator.comparing(Source::key))
             .map(
@@ -229,10 +232,52 @@ class WorklogMirror {
     // Repeated clicks within 10 seconds share the successful round.
     long latest =
         ensure(context, team, members).stream().mapToLong(Source::incrementAt).min().orElse(0);
-    if (latest > 0 && clock.millis() - latest < 10_000) return before;
+    if (latest > 0 && !before.partial() && clock.millis() - latest < 10_000) return before;
     repo.scope(scopeKey(context, team, members), clock.millis(), true);
     for (var key : keys(context, team, members)) repo.incrementalRequest(key, priority);
     return status(context, team, members);
+  }
+
+  void verifyCredential(long org, long user, Long workbenchTeamId) {
+    workers.execute(() -> {
+      try {
+        if (workbenchTeamId == null) {
+          var current = credential(org, user);
+          if (!current.token().isBlank()) verifyMember(org, user, current);
+          return;
+        }
+        var team = teams.findWorklogSyncTeam(org, workbenchTeamId).orElse(null);
+        if (team == null || team.managementCredential().token().isBlank()) return;
+        String token = team.managementCredential().token();
+        long checkedAt = clock.millis();
+        var projects = new TreeSet<>(coding.accessibleProjectNames(token, user));
+        var latest = teams.findWorklogSyncTeam(org, workbenchTeamId).orElse(null);
+        if (latest == null || !token.equals(latest.managementCredential().token())) return;
+        repo.saveAccess(org, CodingCredentialService.fingerprint(token), projects, checkedAt);
+        for (var member : latest.members()) {
+          if (member.ignoreTeamStatistics()) continue;
+          var current = credential(org, member.userId());
+          if (current.managementTeamId() == workbenchTeamId && token.equals(current.token())) {
+            confirmMember(org, member.userId(), current, projects, checkedAt);
+          }
+        }
+      } catch (RuntimeException error) {
+        LOG.warn("工时权限核验失败，error={}", error.getClass().getSimpleName());
+      }
+    });
+  }
+
+  private void verifyMember(long org, long user, Credential current) {
+    long checkedAt = clock.millis();
+    var projects = new TreeSet<>(coding.accessibleProjectNames(current.token(), user));
+    if (current.equals(credential(org, user))) confirmMember(org, user, current, projects, checkedAt);
+  }
+
+  private void confirmMember(long org, long user, Credential current, Set<String> projects, long checkedAt) {
+    String key = memberKey(org, user);
+    repo.ensure(key, org, user, current.managementTeamId(), CodingCredentialService.fingerprint(current.token()));
+    var source = repo.source(key);
+    if (source != null && current.equals(credential(org, user))) repo.confirmProjects(source, null, projects, checkedAt);
   }
 
   void reconcile(Context context, Long team, List<MemberCredential> members, long from) {
@@ -254,6 +299,15 @@ class WorklogMirror {
     return ensure(context, team, List.of(member)).stream().findFirst().orElse(null);
   }
 
+  Map<String,String> viewGrants(Context context, Long team, List<MemberCredential> members) {
+    Map<String,String> grants = new TreeMap<>();
+    for (var member : members) {
+      if (!member.token().isBlank()) grants.put(key(context, team, member),
+          CodingCredentialService.fingerprint(member.token()));
+    }
+    return grants;
+  }
+
   List<Worklog> rows(
       Context context,
       Long team,
@@ -263,16 +317,17 @@ class WorklogMirror {
       WorklogQueryService.EntryPosition after,
       int limit) {
     ensure(context, team, members);
-    return repo.rows(keys(context, team, members), millis(from), millis(to), after, limit);
+    return repo.rows(viewGrants(context, team, members), millis(from), millis(to), after, limit);
   }
 
   java.math.BigDecimal total(
       Context context, Long team, List<MemberCredential> members, LocalDate from, LocalDate to) {
-    return repo.total(keys(context, team, members), millis(from), millis(to));
+    return repo.total(viewGrants(context, team, members), millis(from), millis(to));
   }
 
   Issue issue(Context context, Long team, MemberCredential member, Worklog row) {
-    return repo.issue(key(context, team, member), row.projectName(), row.issueCode());
+    return member == null || member.token().isBlank() ? null
+        : repo.issue(key(context, team, member), CodingCredentialService.fingerprint(member.token()), row.projectName(), row.issueCode());
   }
 
   String syncedAt(Context context, Long team, List<MemberCredential> members) {
@@ -285,7 +340,8 @@ class WorklogMirror {
     if (s.through() == 0)
       return new ReadProblem("NOT_SYNCED", s.warning().isBlank() ? "工时正在初始化，请稍后刷新" : s.warning());
     if (s.state().equals("FAILED")) return new ReadProblem("SYNC_FAILED", s.warning());
-    if (s.incomplete()) return new ReadProblem("INCOMPLETE", s.warning());
+    if (s.incomplete()) return new ReadProblem("INCOMPLETE",
+        s.warning().isBlank() ? "部分项目的工时覆盖待补齐，暂不据此判断缺勤" : s.warning());
     if (s.historyBefore() > INITIAL_FROM)
       return new ReadProblem("INITIALIZING", "近期数据已同步，正在从近到远补齐 2026 年以来的历史工时，暂不据此判断缺勤");
     if (clock.millis() - s.incrementAt() > Duration.ofMinutes(30).toMillis())
@@ -305,7 +361,7 @@ class WorklogMirror {
 
   int projectCount(
       Context context, Long team, List<MemberCredential> members, LocalDate from, LocalDate to) {
-    return repo.projectCount(keys(context, team, members), millis(from), millis(to));
+    return repo.projectCount(viewGrants(context, team, members), millis(from), millis(to));
   }
 
   @Scheduled(fixedDelay = 2000)
@@ -334,28 +390,30 @@ class WorklogMirror {
     Source source = repo.source(sourceKey);
     try {
       String token = resolveToken(source);
-      boolean initial = source.through() == 0;
-      boolean history = !initial && source.requestedFrom() == -2;
-      long through = history ? source.historyBefore() - 1 : clock.millis();
-      long from =
-          initial || history
-              ? Math.max(
-                  INITIAL_FROM,
-                  Instant.ofEpochMilli(through)
-                      .atZone(ZONE)
-                      .withDayOfMonth(1)
-                      .toLocalDate()
-                      .atStartOfDay(ZONE)
-                      .toInstant()
-                      .toEpochMilli())
-              : source.requestedFrom() >= 0
-                  ? Math.max(INITIAL_FROM, source.requestedFrom())
-                  : Math.max(INITIAL_FROM, source.through() - 600_000);
-      var rows = fetch(source, lease, token, from, through);
-      boolean reconcile = source.requestedFrom() >= 0 && source.through() > 0;
+      long credentialOwner = source.managementTeamId() == 0 ? source.userId() : coding.currentUserProfile(token).id();
+      long checkedAt = clock.millis();
+      List<String> visibleProjects = coding.accessibleProjectNames(token, credentialOwner);
+      if (!token.equals(resolveToken(source)))
+        throw new ReadProblem("SOURCE_CHANGED", "工时统计令牌已变化，请重新同步");
+      var verified = repo.confirmProjects(source, lease, new TreeSet<>(visibleProjects), checkedAt);
+      var coverage = verified.coverage();
+      long historyBoundary = coverage.values().stream().mapToLong(WorklogMirrorRepository.ProjectCoverage::historyBefore)
+          .max().orElse(INITIAL_FROM);
+      boolean firstProject = coverage.values().stream().anyMatch(project -> project.through() == 0);
+      boolean history = !firstProject && source.requestedFrom() == -2 && historyBoundary > INITIAL_FROM;
+      boolean reconcile = !firstProject && source.requestedFrom() >= 0 && source.through() > 0;
+      long through = history ? historyBoundary - 1 : clock.millis();
+      long from = history ? monthStart(through) : reconcile ? Math.max(INITIAL_FROM, source.requestedFrom())
+          : coverage.values().stream().mapToLong(project -> project.through() == 0 ? monthStart(through)
+              : Math.max(INITIAL_FROM, project.through() - 600_000)).min().orElse(through);
+      Set<String> projects = coverage.entrySet().stream()
+          .filter(entry -> !history || entry.getValue().historyBefore() == historyBoundary)
+          .map(Map.Entry::getKey).collect(Collectors.toSet());
+      var rows = projects.isEmpty() ? new LinkedHashMap<Long, Worklog>()
+          : fetch(source, lease, token, from, through, projects);
       // A changing offset result must not invalidate previously observed records.
-      if ((reconcile || initial || history)
-          && !rows.equals(fetch(source, lease, token, from, through)))
+      if (!projects.isEmpty() && (reconcile || firstProject || history)
+          && !rows.equals(fetch(source, lease, token, from, through, projects)))
         throw new ReadProblem("UNSTABLE", "CODING 工时分页结果发生变化，将在下次同步重试");
       Map<IssueKey, Issue> snapshots = new LinkedHashMap<>();
       Map<Long, IssueKey> missingIssues = new LinkedHashMap<>();
@@ -397,7 +455,6 @@ class WorklogMirror {
       // Recheck after remote I/O: a changed credential or membership cannot publish an old source.
       if (!token.equals(resolveToken(source)))
         throw new ReadProblem("SOURCE_CHANGED", "工时统计令牌已变化，请重新同步");
-      deleted.record(source.teamId(), missingIssues);
       boolean incomplete =
           rows.values().stream().anyMatch(w -> w.startAt() == null || w.startAt() <= 0);
       repo.publish(
@@ -409,7 +466,11 @@ class WorklogMirror {
           new ArrayList<>(rows.values()),
           snapshots,
           reconcile,
-          incomplete);
+          incomplete,
+          projects,
+          history,
+          verified.revision(),
+          () -> deleted.record(source.teamId(), missingIssues));
     } catch (Exception failure) {
       boolean denied =
           failure instanceof CodingOpenApiException c
@@ -421,10 +482,14 @@ class WorklogMirror {
           failure instanceof ReadProblem p
               ? p.getMessage()
               : denied
-                  ? (source.managementTeamId() == 0
+                  ? (source == null || source.managementTeamId() == 0
                       ? "个人令牌已失效或权限不足，请更新个人 PAT；不会自动切换团队令牌"
                       : "团队管理令牌已失效或权限不足，请检查团队配置")
                   : "工时同步失败，请稍后重试";
+      if (denied && source != null && !source.fingerprint().isBlank()
+          && source.fingerprint().equals(CodingCredentialService.fingerprint(credential(source.teamId(), source.userId()).token()))) {
+        repo.saveAccess(source.teamId(), source.fingerprint(), Set.of(), clock.millis());
+      }
       repo.fail(
           sourceKey,
           lease,
@@ -435,7 +500,7 @@ class WorklogMirror {
   }
 
   private LinkedHashMap<Long, Worklog> fetch(
-      Source s, String lease, String token, long from, long through) {
+      Source s, String lease, String token, long from, long through, Set<String> projects) {
     LinkedHashMap<Long, Worklog> rows = new LinkedHashMap<>();
     for (int offset = 0; offset < 100_000; offset += 1000) {
       repo.heartbeat(s.key(), lease, clock.millis());
@@ -450,7 +515,7 @@ class WorklogMirror {
             || row.createdAt() <= 0
             || row.projectName() == null)
           throw new ReadProblem("INVALID_ROW", "CODING 返回的工时身份或提交时间不完整，未发布本批结果");
-        if (row.createdAt() < from || row.createdAt() > through) continue;
+        if (row.createdAt() < from || row.createdAt() > through || !projects.contains(row.projectName())) continue;
         Worklog previous = rows.put(row.id(), row);
         if (previous != null && !previous.equals(row))
           throw new ReadProblem("UNSTABLE", "CODING 工时分页结果发生变化，请重试");
@@ -458,6 +523,10 @@ class WorklogMirror {
       if (page.size() < 1000) return rows;
     }
     throw new ReadProblem("PAGE_LIMIT", "工时记录达到查询页数上限，本批结果未发布");
+  }
+
+  private static long monthStart(long timestamp) {
+    return Math.max(INITIAL_FROM, millis(Instant.ofEpochMilli(timestamp).atZone(ZONE).toLocalDate().withDayOfMonth(1)));
   }
 
   private String resolveToken(Source s) {
@@ -478,7 +547,7 @@ class WorklogMirror {
             + ":"
             + repo.sources(keys(c, team, members)).stream()
                 .sorted(Comparator.comparing(Source::key))
-                .map(s -> s.key() + ":" + s.fingerprint() + ":" + s.managementTeamId())
+                .map(Source::key)
                 .collect(Collectors.joining(",")));
   }
 

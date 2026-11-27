@@ -24,7 +24,7 @@ class ZhaogangCodeStatsControllerTest {
     @BeforeEach
     void setUp() {
         var sessions = mock(ZhaogangSessionManager.class);
-        when(sessions.resolve(any(), any())).thenReturn(new ZhaogangSession("synthetic", 1L, "本人", "", "team", 100L));
+        when(sessions.resolveStatistics(any(), any())).thenReturn(new ZhaogangSession("synthetic", 1L, "本人", "", "team", 100L));
         var properties = new ZhaogangProperties();
         actor = new CodeStatsModule.Context("synthetic", 1, "本人", "", 100, "team", properties.configuredTeamHost());
         mvc = MockMvcBuilders.standaloneSetup(new ZhaogangCodeStatsController(sessions, module, properties)).build();

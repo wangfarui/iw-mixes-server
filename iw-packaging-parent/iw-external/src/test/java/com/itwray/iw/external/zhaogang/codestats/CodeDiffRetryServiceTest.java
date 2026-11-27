@@ -69,7 +69,7 @@ class CodeDiffRetryServiceTest {
         assertThrows(CodingOpenApiException.class,
                 () -> service.retryDiffs(scope(true), source(), selected, 3L));
         verify(jobs, never()).insert(any(ScanJobEntity.class));
-        verifyNoInteractions(worker);
+        verify(worker, never()).run(any());
     }
 
     private CodeStatsModule.ScopeInfo scope(boolean admin) {

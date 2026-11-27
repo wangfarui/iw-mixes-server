@@ -41,16 +41,20 @@ final class CodeDiffRetryPolicy {
         return new State(attempts, retryAfter, null, error);
     }
 
-    private static boolean isTemporary(CodeDiffFailure reason) {
+    static boolean isTemporary(CodeDiffFailure reason) {
         return switch (reason) {
             case RATE_LIMITED, TIMEOUT, UNAVAILABLE, INVALID_RESPONSE, REQUEST_FAILED -> true;
             default -> false;
         };
     }
 
-    static String gitFailureMessage(String error) {
+    static String failureDetail(String error) {
         if (error == null) return "";
         return switch (error) {
+            case "COMPARE_NO_PARENT" -> "，根提交缺少可比较的父提交";
+            case "COMPARE_UNVERIFIED_ZERO" -> "，CODING 比较结果为零，待核验";
+            case "COMPARE_PERMISSION_DENIED" -> "，CODING 拒绝读取提交比较数据";
+            case "COMPARE_MERGE" -> "，提交存在多个父提交";
             case "EXECUTABLE_UNAVAILABLE" -> "，Git 不可执行";
             case "PERMISSION_DENIED" -> "，Git 凭证无权读取";
             case "CREDENTIAL_UNAVAILABLE" -> "，Git 凭证暂不可用";
@@ -59,7 +63,7 @@ final class CodeDiffRetryPolicy {
             case "BUSY" -> "，Git 补算繁忙";
             case "OBJECT_UNAVAILABLE" -> "，Git 未能取得提交对象";
             case "INVALID_TARGET", "INVALID_OUTPUT", "MERGE" -> "，Git 无法确认行数";
-            default -> "，Git 补算失败";
+            default -> error.startsWith("COMPARE_") ? "，CODING 提交比较失败" : "，Git 补算失败";
         };
     }
 

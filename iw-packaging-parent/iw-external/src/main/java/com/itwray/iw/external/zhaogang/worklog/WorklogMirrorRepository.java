@@ -63,8 +63,8 @@ class WorklogMirrorRepository {
           jdbc.update(
               """
                 INSERT INTO external_zhaogang_worklog_source
-                (source_key,coding_team_id,coding_user_id,management_team_id,credential_fingerprint)
-                VALUES (:key,:team,:user,:management,:fingerprint)
+                (source_key,coding_team_id,coding_user_id,management_team_id,credential_fingerprint,state,blocked)
+                VALUES (:key,:team,:user,:management,:fingerprint,'IDLE',1)
                 ON DUPLICATE KEY UPDATE source_key=source_key
                 """,
               Map.of(
@@ -85,20 +85,11 @@ class WorklogMirrorRepository {
                   this::mapSource);
           if (!current.fingerprint().equals(fingerprint)
               || current.managementTeamId() != managementTeam) {
-            // Credential changes invalidate the entire previous visibility scope, including
-            // in-flight work.
-            jdbc.update(
-                "DELETE FROM external_zhaogang_worklog_entry WHERE source_key=:key",
-                Map.of("key", key));
-            jdbc.update(
-                "DELETE FROM external_zhaogang_worklog_issue_snapshot WHERE source_key=:key",
-                Map.of("key", key));
             jdbc.update(
                 """
           UPDATE external_zhaogang_worklog_source SET management_team_id=:management,credential_fingerprint=:fingerprint,
-          synced_through=0,increment_at=0,history_before=0,data_version=data_version+1,state='QUEUED',
-          warning='',blocked=0,incomplete=0,requested_from=-1,incremental=1,priority_no=10,
-          lease_id='',lease_until=0,retry_after=0,rerun_requested=0 WHERE source_key=:key
+          data_version=data_version+1,state='IDLE',warning='',blocked=1,requested_from=-1,incremental=1,
+          priority_no=10,lease_id='',lease_until=0,retry_after=0,rerun_requested=0 WHERE source_key=:key
           """,
                 Map.of("key", key, "management", managementTeam, "fingerprint", fingerprint));
           }
@@ -242,6 +233,130 @@ class WorklogMirrorRepository {
             now + 60_000));
   }
 
+  record ProjectCoverage(long through, long historyBefore) {}
+
+  record ProjectAccess(Set<String> projects, long revision, long checkedAt) {}
+  record ConfirmedProjects(Map<String, ProjectCoverage> coverage, long revision) {}
+
+  ConfirmedProjects confirmProjects(Source source, String lease, Set<String> projects, long checkedAt) {
+    return tx.execute(status -> {
+      if (lease == null) {
+        var locked = lockSource(source.key());
+        if (locked == null || !locked.fingerprint().equals(source.fingerprint())
+            || locked.state().equals("RUNNING")) return new ConfirmedProjects(Map.of(), 0);
+      } else {
+        lockSource(source, lease);
+      }
+      var authorized = saveAccess(source.teamId(), source.fingerprint(), projects, checkedAt);
+      var currentProjects = authorized.projects();
+      var params = new MapSqlParameterSource("key", source.key())
+          .addValue("fingerprint", source.fingerprint()).addValue("projects", currentProjects);
+      int changed = jdbc.update("""
+          UPDATE external_zhaogang_worklog_project SET credential_fingerprint=''
+          WHERE source_key=:key AND credential_fingerprint<>''
+          """ + (currentProjects.isEmpty() ? "" : " AND project_name NOT IN (:projects)"), params);
+      var granted = jdbc.queryForList("""
+          SELECT project_name FROM external_zhaogang_worklog_project
+          WHERE source_key=:key AND credential_fingerprint=:fingerprint
+          """, params, String.class);
+      for (String project : currentProjects) {
+        if (granted.contains(project)) continue;
+        params.addValue("project", project);
+        changed += jdbc.update("""
+            INSERT INTO external_zhaogang_worklog_project(source_key,project_name,credential_fingerprint)
+            VALUES (:key,:project,:fingerprint)
+            ON DUPLICATE KEY UPDATE credential_fingerprint=VALUES(credential_fingerprint)
+            """, params);
+      }
+      Map<String, ProjectCoverage> coverage = new LinkedHashMap<>();
+      jdbc.query("""
+          SELECT project_name,synced_through,history_before FROM external_zhaogang_worklog_project
+          WHERE source_key=:key AND credential_fingerprint=:fingerprint
+          """, params, rs -> {
+        coverage.put(rs.getString(1), new ProjectCoverage(rs.getLong(2), rs.getLong(3)));
+      });
+      jdbc.update("""
+          UPDATE external_zhaogang_worklog_source SET blocked=0,
+              history_before=:history,incomplete=:incomplete,data_version=data_version+1
+          WHERE source_key=:key AND (blocked=1 OR :changed OR (incomplete=0 AND :incomplete))
+          """, params.addValue("changed", changed > 0).addValue("history", coverage.values().stream().mapToLong(ProjectCoverage::historyBefore)
+                  .max().orElse(WorklogMirror.INITIAL_FROM))
+              .addValue("incomplete", coverage.values().stream().anyMatch(c -> c.through() == 0
+                  || c.historyBefore() > WorklogMirror.INITIAL_FROM)));
+      return new ConfirmedProjects(coverage, authorized.revision());
+    });
+  }
+
+  private Source lockSource(String key) {
+    return jdbc.query("SELECT * FROM external_zhaogang_worklog_source WHERE source_key=:key FOR UPDATE",
+        Map.of("key", key), this::mapSource).stream().findFirst().orElse(null);
+  }
+
+  private Source lockSource(Source source, String lease) {
+    var locked = lockSource(source.key());
+    if (locked == null || !locked.state().equals("RUNNING") || !locked.leaseId().equals(lease)
+        || !locked.fingerprint().equals(source.fingerprint()))
+      throw new IllegalStateException("Sync lease expired");
+    return locked;
+  }
+
+  ProjectAccess saveAccess(long org, String fingerprint, Set<String> projects, long checkedAt) {
+    return tx.execute(status -> {
+      var args = new MapSqlParameterSource("org", org).addValue("fingerprint", fingerprint);
+      jdbc.update("""
+          INSERT IGNORE INTO external_zhaogang_worklog_access
+              (coding_team_id,credential_fingerprint,project_names,revision,checked_at)
+          VALUES (:org,:fingerprint,JSON_ARRAY(),0,0)
+          """, args);
+      var current = lockAccess(org, fingerprint);
+      if (current.checkedAt() > checkedAt) return current;
+      boolean changed = current.revision() == 0 || !current.projects().equals(projects);
+      jdbc.update("""
+          UPDATE external_zhaogang_worklog_access SET project_names=:projects,checked_at=:checked,revision=revision+:changed
+          WHERE coding_team_id=:org AND credential_fingerprint=:fingerprint
+          """, args.addValue("projects", toJson(new TreeSet<>(projects))).addValue("checked", checkedAt)
+              .addValue("changed", changed ? 1 : 0));
+      if (changed) {
+        jdbc.update("""
+            INSERT INTO external_zhaogang_statistics_revision(coding_team_id,stat_month,version_no,visibility_version,code_visibility_ms)
+            VALUES (:org,'*',1,:visibility,0)
+            ON DUPLICATE KEY UPDATE version_no=version_no+1,visibility_version=visibility_version+:visibility
+            """, args.addValue("visibility", projects.containsAll(current.projects()) ? 0 : 1));
+      }
+      return new ProjectAccess(projects, current.revision() + (changed ? 1 : 0), checkedAt);
+    });
+  }
+
+  private ProjectAccess lockAccess(long org, String fingerprint) {
+    return jdbc.queryForObject("""
+        SELECT project_names,revision,checked_at FROM external_zhaogang_worklog_access
+        WHERE coding_team_id=:org AND credential_fingerprint=:fingerprint FOR UPDATE
+        """, Map.of("org", org, "fingerprint", fingerprint), (rs, n) -> {
+      try {
+        return new ProjectAccess(json.readValue(rs.getString(1),
+            new com.fasterxml.jackson.core.type.TypeReference<Set<String>>() {}), rs.getLong(2), rs.getLong(3));
+      } catch (JsonProcessingException invalid) {
+        throw new SQLException("Cannot read worklog project access", invalid);
+      }
+    });
+  }
+
+  String accessVersion(long org, Collection<String> fingerprints) {
+    if (fingerprints.isEmpty()) return "";
+    return String.join(",", jdbc.queryForList("""
+        SELECT CONCAT(credential_fingerprint,':',revision) FROM external_zhaogang_worklog_access
+        WHERE coding_team_id=:org AND credential_fingerprint IN (:fingerprints) ORDER BY credential_fingerprint
+        """, Map.of("org",org,"fingerprints",fingerprints), String.class));
+  }
+
+  private String toJson(Object value) {
+    try {
+      return json.writeValueAsString(value);
+    } catch (JsonProcessingException invalid) {
+      throw new IllegalStateException("Cannot encode worklog project access", invalid);
+    }
+  }
+
   void publish(
       Source source,
       String lease,
@@ -251,26 +366,27 @@ class WorklogMirrorRepository {
       List<Worklog> rows,
       Map<com.itwray.iw.external.zhaogang.CodingIssueSnapshotLoader.IssueKey, Issue> issues,
       boolean reconcile,
-      boolean incomplete) {
+      boolean incomplete,
+      Set<String> projects,
+      boolean history,
+      long accessRevision,
+      Runnable publishDeletionFacts) {
     tx.executeWithoutResult(
         status -> {
-          var locked =
-              jdbc.query(
-                      "SELECT * FROM external_zhaogang_worklog_source WHERE source_key=:key FOR"
-                          + " UPDATE",
-                      Map.of("key", source.key()),
-                      this::mapSource)
-                  .get(0);
-          if (!locked.state().equals("RUNNING") || !locked.leaseId().equals(lease))
-            throw new IllegalStateException("Sync lease expired");
-          if (reconcile) {
+          lockSource(source, lease);
+          var access = lockAccess(source.teamId(), source.fingerprint());
+          if (access.revision() != accessRevision || !access.projects().containsAll(projects))
+            throw new WorklogMirror.ReadProblem("SOURCE_CHANGED", "工时项目可见范围已变化，请重新同步");
+          publishDeletionFacts.run();
+          if (reconcile && !projects.isEmpty()) {
             // Mark only entries absent from the published result. Toggling every row through
             // missing would invalidate aggregate readers even when visibility did not change.
             var seen = new HashSet<>(rows.stream().map(Worklog::id).toList());
             var absent = jdbc.queryForList("""
                 SELECT worklog_id FROM external_zhaogang_worklog_entry
-                WHERE source_key=:key AND created_at>=:from AND created_at<=:through AND missing=0
-                """, Map.of("key", source.key(), "from", from, "through", through), Long.class)
+                WHERE source_key=:key AND project_name IN (:projects)
+                  AND created_at>=:from AND created_at<=:through AND missing=0
+                """, Map.of("key", source.key(), "from", from, "through", through, "projects", projects), Long.class)
                 .stream().filter(id -> !seen.contains(id)).toList();
             for (int i = 0; i < absent.size(); i += 500) {
               jdbc.update("""
@@ -315,9 +431,10 @@ class WorklogMirrorRepository {
               (key, issue) ->
                   jdbc.update(
                       """
-                    INSERT INTO external_zhaogang_worklog_issue_snapshot(source_key,project_name,issue_code,issue_json,checked_at)
-                    VALUES (:source,:project,:code,:json,:now)
-                    ON DUPLICATE KEY UPDATE issue_json=VALUES(issue_json),checked_at=VALUES(checked_at)
+                    INSERT INTO external_zhaogang_worklog_issue_snapshot(source_key,project_name,issue_code,issue_json,checked_at,credential_fingerprint)
+                    VALUES (:source,:project,:code,:json,:now,:fingerprint)
+                    ON DUPLICATE KEY UPDATE issue_json=VALUES(issue_json),checked_at=VALUES(checked_at),
+                        credential_fingerprint=VALUES(credential_fingerprint)
                     """,
                       Map.of(
                           "source",
@@ -328,10 +445,24 @@ class WorklogMirrorRepository {
                           key.issueCode(),
                           "json",
                           encode(issue),
+                          "fingerprint",
+                          source.fingerprint(),
                           "now",
                           now)));
-          long historyBefore =
-              source.through() == 0 || source.requestedFrom() == -2 ? from : locked.historyBefore();
+          if (!projects.isEmpty()) {
+            jdbc.update("""
+                UPDATE external_zhaogang_worklog_project
+                SET history_before=IF(:history OR history_before=0,:from,history_before),
+                    synced_through=IF(:history,synced_through,GREATEST(synced_through,:through))
+                WHERE source_key=:key AND credential_fingerprint=:fingerprint AND project_name IN (:projects)
+                """, Map.of("history", history, "from", from, "through", through, "key", source.key(),
+                    "fingerprint", source.fingerprint(), "projects", projects));
+          }
+          long historyBefore = jdbc.queryForObject("""
+              SELECT COALESCE(MAX(IF(history_before=0,:through,history_before)),:initial)
+              FROM external_zhaogang_worklog_project WHERE source_key=:key AND credential_fingerprint=:fingerprint
+              """, Map.of("key", source.key(), "fingerprint", source.fingerprint(), "through", through,
+                  "initial", WorklogMirror.INITIAL_FROM), Long.class);
           boolean moreHistory = historyBefore > WorklogMirror.INITIAL_FROM;
           jdbc.update(
               """
@@ -363,11 +494,11 @@ class WorklogMirrorRepository {
   }
 
   List<Worklog> rows(
-      List<String> keys, long from, long to, WorklogQueryService.EntryPosition after, int limit) {
+      Map<String,String> keys, long from, long to, WorklogQueryService.EntryPosition after, int limit) {
     if (keys.isEmpty()) return List.of();
     var args =
         new MapSqlParameterSource()
-            .addValue("keys", keys)
+            .addValue("grants", grants(keys))
             .addValue("from", from)
             .addValue("to", to)
             .addValue("limit", limit);
@@ -402,24 +533,24 @@ class WorklogMirrorRepository {
                 (Long) rs.getObject("updated_at")));
   }
 
-  BigDecimal total(List<String> keys, long from, long to) {
+  BigDecimal total(Map<String,String> keys, long from, long to) {
     if (keys.isEmpty()) return BigDecimal.ZERO;
     return jdbc.queryForObject(
         "SELECT COALESCE(SUM(e.hours),0) " + visible(),
-        Map.of("keys", keys, "from", from, "to", to),
+        Map.of("grants", grants(keys), "from", from, "to", to),
         BigDecimal.class);
   }
 
-  int projectCount(List<String> keys, long from, long to) {
+  int projectCount(Map<String,String> keys, long from, long to) {
     return keys.isEmpty()
         ? 0
         : jdbc.queryForObject(
             "SELECT COUNT(DISTINCT e.project_name) " + visible(),
-            Map.of("keys", keys, "from", from, "to", to),
+            Map.of("grants", grants(keys), "from", from, "to", to),
             Integer.class);
   }
 
-  Map<Long, Map<java.time.LocalDate, BigDecimal>> dailyHours(List<String> keys, long from, long to) {
+  Map<Long, Map<java.time.LocalDate, BigDecimal>> dailyHours(Map<String,String> keys, long from, long to) {
     Map<Long, Map<java.time.LocalDate, BigDecimal>> result = new HashMap<>();
     if (keys.isEmpty()) return result;
     jdbc.query("""
@@ -427,17 +558,29 @@ class WorklogMirrorRepository {
           DATE_ADD('1970-01-01', INTERVAL FLOOR((e.start_at + 28800000) / 86400000) DAY) AS stat_date,
           SUM(e.hours) AS hours
         """ + visible() + " GROUP BY s.coding_user_id, stat_date",
-        Map.of("keys", keys, "from", from, "to", to), rs -> {
+        Map.of("grants", grants(keys), "from", from, "to", to), rs -> {
           result.computeIfAbsent(rs.getLong("coding_user_id"), ignored -> new HashMap<>())
               .put(rs.getObject("stat_date", java.time.LocalDate.class), rs.getBigDecimal("hours"));
         });
     return result;
   }
 
+  private String grants(Map<String,String> keys) {
+    return toJson(keys.entrySet().stream()
+        .map(entry -> Map.of("source", entry.getKey(), "credential", entry.getValue())).toList());
+  }
+
   private String visible() {
     return """
                 FROM external_zhaogang_worklog_entry e JOIN external_zhaogang_worklog_source s ON s.source_key=e.source_key
-                WHERE e.source_key IN (:keys) AND s.blocked=0 AND e.missing=0 AND e.start_at>=:from AND e.start_at<:to
+                JOIN JSON_TABLE(:grants, '$[*]' COLUMNS (
+                    source_key CHAR(64) PATH '$.source', fingerprint CHAR(64) PATH '$.credential'
+                )) scope ON scope.source_key=e.source_key
+                JOIN external_zhaogang_worklog_access a ON a.coding_team_id=s.coding_team_id
+                    AND a.credential_fingerprint=scope.fingerprint
+                WHERE JSON_CONTAINS(a.project_names,JSON_QUOTE(e.project_name))
+                AND (scope.fingerprint<>s.credential_fingerprint OR s.blocked=0)
+                AND e.missing=0 AND e.start_at>=:from AND e.start_at<:to
                 AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_issue_key k
                     WHERE k.coding_team_id=e.coding_team_id AND k.project_name=e.project_name AND k.issue_code=e.issue_code)
                 AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_entry w
@@ -447,12 +590,15 @@ class WorklogMirrorRepository {
                 """;
   }
 
-  Issue issue(String source, String project, long code) {
+  Issue issue(String source, String fingerprint, String project, long code) {
     return jdbc
         .query(
-            "SELECT issue_json FROM external_zhaogang_worklog_issue_snapshot WHERE"
-                + " source_key=:source AND project_name=:project AND issue_code=:code",
-            Map.of("source", source, "project", project, "code", code),
+            """
+            SELECT i.issue_json FROM external_zhaogang_worklog_issue_snapshot i
+            WHERE i.source_key=:source AND i.project_name=:project AND i.issue_code=:code
+              AND i.credential_fingerprint=:fingerprint
+            """,
+            Map.of("source", source, "fingerprint", fingerprint, "project", project, "code", code),
             (rs, n) -> decode(rs.getString(1)))
         .stream()
         .filter(Objects::nonNull)

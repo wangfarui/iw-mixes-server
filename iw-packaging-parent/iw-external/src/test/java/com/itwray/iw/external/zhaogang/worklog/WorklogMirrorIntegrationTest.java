@@ -54,7 +54,8 @@ class WorklogMirrorIntegrationTest {
     String url = System.getenv("IW_WORKLOG_TEST_JDBC_URL");
     if (!url.startsWith("jdbc:mysql://127.0.0.1:") || !url.contains("/devhub_worklog_test?"))
       throw new IllegalArgumentException("Isolated database required");
-    var ds = new DriverManagerDataSource(url, "root", "");
+    var ds = new DriverManagerDataSource(url, "root",
+        System.getenv().getOrDefault("IW_SHARED_MYSQL_TEST_PASSWORD", ""));
     var sql =
         new ResourceDatabasePopulator(
             new FileSystemResource("scripts/iw-external-migrate-20261120-worklog-mirror.sql"),
@@ -67,7 +68,7 @@ class WorklogMirrorIntegrationTest {
     jdbc.getJdbcTemplate().execute("DELETE FROM external_zhaogang_worklog_deleted_entry");
     jdbc.getJdbcTemplate().execute("CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_deleted_issue_key (coding_team_id BIGINT NOT NULL,project_name VARCHAR(255) NOT NULL,issue_code BIGINT NOT NULL,confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(coding_team_id,project_name,issue_code))");
     jdbc.getJdbcTemplate().execute("DELETE FROM external_zhaogang_worklog_deleted_issue_key");
-    for (String table : List.of("entry", "source", "issue_snapshot", "sync_scope"))
+    for (String table : List.of("entry", "source", "issue_snapshot", "sync_scope", "project", "access"))
       jdbc.getJdbcTemplate().execute("DELETE FROM external_zhaogang_worklog_" + table);
     repo =
         new WorklogMirrorRepository(
@@ -86,6 +87,10 @@ class WorklogMirrorIntegrationTest {
             targets,
             clock);
     when(credentials.token(10, 101)).thenReturn(Optional.of(member.token()));
+    when(coding.accessibleProjectNames(anyString(), anyLong()))
+        .thenReturn(List.of("fixture", "project", "demo"));
+    when(coding.currentUserProfile(anyString())).thenReturn(
+        new CodingOpenApiPort.CodingUserProfile(999, "fixture manager", "", "", 10));
     when(loader.loadForWorklogs(anyMap(), anyBoolean())).thenReturn(Map.of());
     when(coding.worklogPage(anyString(), anyLong(), anyLong(), anyLong(), anyInt(), eq(1000)))
         .thenAnswer(
@@ -111,7 +116,7 @@ class WorklogMirrorIntegrationTest {
     remote.add(row(99002, "2026-11-19", clock.millis() - 1000, 8));
     mirror.status(context, 1L, List.of(member));
     run();
-    var keys = mirror.keys(context, 1L, List.of(member));
+    var keys = mirror.viewGrants(context, 1L, List.of(member));
     long from = date("2026-11-19").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
     long to = date("2026-11-20").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
     assertThat(repo.total(keys, from, to)).isEqualByComparingTo("8");
@@ -125,7 +130,7 @@ class WorklogMirrorIntegrationTest {
     remote.add(row(99001, "2026-11-19", clock.millis() - 1000, 8));
     mirror.status(context, 1L, List.of(member));
     run();
-    var keys = mirror.keys(context, 1L, List.of(member));
+    var keys = mirror.viewGrants(context, 1L, List.of(member));
     long from = date("2026-11-19").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
     long to = date("2026-11-20").atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
     assertThat(repo.total(keys, from, to)).isEqualByComparingTo("8");
@@ -206,12 +211,12 @@ class WorklogMirrorIntegrationTest {
         """, Map.of("key", legacyKey));
     mirror.status(context, 1L, List.of(member));
     assertThat(repo.source(legacyKey).state()).isEqualTo("RETIRED");
-    assertThat(repo.source(key()).state()).isEqualTo("QUEUED");
+    assertThat(repo.source(key()).state()).isEqualTo("IDLE");
   }
 
   @Test
-  void initialReadsQueueWithoutCallingCodingAndPersistAcrossInstances() {
-    assertThat(mirror.status(context, null, List.of(member)).running()).isTrue();
+  void initialReadsDoNotQueueAndExplicitRequestPersistsAcrossInstances() {
+    assertThat(mirror.status(context, null, List.of(member)).running()).isFalse();
     assertThat(
             mirror.rows(
                 context, null, List.of(member), date("2026-10-01"), date("2026-12-01"), null, 10))
@@ -377,7 +382,7 @@ class WorklogMirrorIntegrationTest {
   @Test
   void aLostLeaseCannotPublishAndUnstableReconciliationPreservesPreviousRows() {
     remote.add(row(1, "2026-11-19", clock.millis() - 1000, 8));
-    mirror.status(context, null, List.of(member));
+    mirror.request(context, null, List.of(member));
     assertThat(repo.claim(key(), "old", clock.millis())).isTrue();
     var source = repo.source(key());
     clock.advance(121_000);
@@ -393,7 +398,7 @@ class WorklogMirrorIntegrationTest {
                     remote,
                     Map.of(),
                     false,
-                    false))
+                    false, java.util.Set.of("fixture"), false, 1, () -> {}))
         .isInstanceOf(IllegalStateException.class);
     mirror.run(key(), "new");
     run();
@@ -520,7 +525,8 @@ class WorklogMirrorIntegrationTest {
     remote.add(row(1, "2026-11-19", clock.millis() - 1000, 4));
     mirror.status(context, null, List.of(member));
     run();
-    assertThat(mirror.total(context, 1L, List.of(manager), date("2026-11-01"), date("2026-12-01")))
+    assertThat(mirror.total(context, 1L, List.of(manager), date("2026-11-01"), date("2026-12-01"))).isZero();
+    assertThat(mirror.total(context, 1L, List.of(member), date("2026-11-01"), date("2026-12-01")))
         .isEqualByComparingTo("4");
   }
 
@@ -593,7 +599,7 @@ class WorklogMirrorIntegrationTest {
 
   @Test
   void registrationDuringActiveTaskPersistsFollowupAndIgnoresManualCooldown() {
-    mirror.status(context, null, List.of(member));
+    mirror.request(context, null, List.of(member));
     assertThat(repo.claim(key(), "active", clock.millis())).isTrue();
     mirror.afterRegistration(context, member);
     mirror.run(key(), "active");
@@ -796,7 +802,7 @@ class WorklogMirrorIntegrationTest {
   }
 
   @Test
-  void managementDataUsesOneCanonicalSourceAcrossTeamsAndPersonalBindingInvalidatesIt() {
+  void managementDataUsesOneCanonicalSourceAndPersonalBindingPreservesProgress() {
     when(credentials.token(10, 101)).thenReturn(Optional.empty());
     when(targets.managementTeamForMember(10, 101)).thenReturn(1L);
     when(teams.findWorklogSyncTeam(10, 1))
@@ -820,7 +826,8 @@ class WorklogMirrorIntegrationTest {
                     "SELECT COUNT(*) FROM external_zhaogang_worklog_source", Long.class))
         .isEqualTo(1);
     assertThat(mirror.total(context, 2L, List.of(managed), date("2026-11-01"), date("2026-12-01")))
-        .isEqualByComparingTo("8");
+        .isZero();
+    repo.saveAccess(10, CodingCredentialService.fingerprint(managed.token()), java.util.Set.of("fixture"), clock.millis());
     assertThat(mirror.total(context, 1L, List.of(managed), date("2026-11-01"), date("2026-12-01")))
         .isEqualByComparingTo("8");
     verify(coding, never())
@@ -828,9 +835,12 @@ class WorklogMirrorIntegrationTest {
             eq("synthetic-other-manager"), anyLong(), anyLong(), anyLong(), anyInt(), anyInt());
     when(credentials.token(10, 101)).thenReturn(Optional.of(member.token()));
     mirror.status(context, 2L, List.of(managed));
-    assertThat(repo.source(key()).through()).isZero();
-    assertThat(mirror.total(context, 1L, List.of(managed), date("2026-11-01"), date("2026-12-01")))
-        .isZero();
+    assertThat(repo.source(key()).through()).isPositive();
+    assertThat(mirror.total(context, 1L, List.of(member), date("2026-11-01"), date("2026-12-01"))).isZero();
+    var source = repo.source(key());
+    repo.confirmProjects(source, null, java.util.Set.of("fixture"), clock.millis());
+    assertThat(mirror.total(context, 1L, List.of(member), date("2026-11-01"), date("2026-12-01")))
+        .isEqualByComparingTo("8");
     assertThat(repo.source(key()).managementTeamId()).isZero();
     assertThat(
             jdbc.getJdbcTemplate()
@@ -839,7 +849,13 @@ class WorklogMirrorIntegrationTest {
         .isEqualTo(1);
   }
 
+  private void queueDiscoveredMembers() {
+    jdbc.queryForList("SELECT source_key FROM external_zhaogang_worklog_source WHERE state='IDLE'",
+        Map.of(), String.class).forEach(key -> repo.queue(key, -1, true));
+  }
+
   private void runOne() {
+    queueDiscoveredMembers();
     var source = repo.pending(clock.millis()).get(0);
     String lease = UUID.randomUUID().toString();
     assertThat(repo.claim(source.key(), lease, clock.millis())).isTrue();
@@ -847,6 +863,7 @@ class WorklogMirrorIntegrationTest {
   }
 
   private void run() {
+    queueDiscoveredMembers();
     for (int round = 0; round < 30; round++) {
       var pending = repo.pending(clock.millis());
       if (pending.isEmpty()) return;

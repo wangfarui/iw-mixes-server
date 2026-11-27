@@ -22,7 +22,7 @@ import static com.itwray.iw.external.zhaogang.statistics.StatisticsRepository.*;
 @Service
 class StatisticsService {
     static final long REFRESH_MS = 60_000;
-    private static final String FORMULA = "v2";
+    private static final String FORMULA = "v3";
 
     record Query(LocalDate from, LocalDate to, RangeKind rangeKind, Metric worklogMetric, Metric codeMetric,
                  Metric sortMetric, SortOrder sortOrder, String keyword, String role,

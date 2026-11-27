@@ -20,6 +20,14 @@ import java.util.stream.Collectors;
 @Service
 public class CodingCredentialService {
 
+    private org.springframework.context.ApplicationEventPublisher events;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void useStatisticsEvents(org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
+    }
+
+
     private final ZhaogangCodingCredentialMapper mapper;
 
     public CodingCredentialService(ZhaogangCodingCredentialMapper mapper) {
@@ -31,7 +39,9 @@ public class CodingCredentialService {
         if (codingTeamId <= 0 || codingUserId <= 0 || normalized.isBlank()) {
             throw new IllegalArgumentException("CODING 凭证信息不完整");
         }
+        boolean changed = events != null && !token(codingTeamId, codingUserId).filter(normalized::equals).isPresent();
         mapper.upsert(codingTeamId, codingUserId, normalized, fingerprint(normalized), userName, avatar);
+        if (changed) events.publishEvent(new StatisticsCredentialChanged(codingTeamId, codingUserId, null));
     }
 
     public Optional<String> token(long codingTeamId, long codingUserId) {

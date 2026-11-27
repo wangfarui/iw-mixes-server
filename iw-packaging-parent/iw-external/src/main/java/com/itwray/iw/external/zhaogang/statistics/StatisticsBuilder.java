@@ -106,7 +106,7 @@ class StatisticsBuilder {
         }
         members.forEach(member -> selections.putIfAbsent(member.userId(), null));
         var work = worklogs.read(org, month, selections);
-        var commits = code.read(org, month, today, retention, revision.codeVisibilityMs(), memberships);
+        var commits = code.read(org, month, today, retention, memberships);
         var schedule = calendar.resolve(org, month);
         var leaveDates = leaves.resolve(org, members.stream().map(DirectoryMember::userId).toList(), month);
         List<Day> days = new ArrayList<>(members.size() * month.lengthOfMonth());
@@ -115,6 +115,7 @@ class StatisticsBuilder {
             var hoursByDate = work.hours().getOrDefault(user, Map.of());
             var leave = leaveDates.getOrDefault(user, Set.of());
             var worklogReason = reason(work.reasons().get(user));
+            if (worklogReason != null && !hoursByDate.isEmpty()) worklogReason = Reason.WORKLOG_PROJECT_PARTIAL;
             for (var day : schedule.days()) {
                 LocalDate date = day.date();
                 BigDecimal hours = hoursByDate.getOrDefault(date, BigDecimal.ZERO);
@@ -123,12 +124,12 @@ class StatisticsBuilder {
                 var contribution = commits.data().get(new CodeStatisticsSource.Key(user, date));
                 Reason commitReason = reason(commits.reason());
                 if (!member.developer()) commitReason = Reason.CODE_NOT_APPLICABLE;
-                else if (commitReason == null && (commits.ambiguousDates().contains(date)
-                        || commits.unmappedMembers().contains(user))) commitReason = Reason.CODE_IDENTITY;
+                else if (commitReason == null && commits.unmappedMembers().contains(user)) commitReason = Reason.CODE_IDENTITY;
                 Reason linesReason = commitReason != null ? commitReason
                         : contribution != null && contribution.linesIncomplete() ? Reason.CODE_DIFF : null;
                 // Persist the coverage warning with the monthly facts so reused snapshots carry it too.
-                if (commitReason == null && commits.repositoriesPartial()) commitReason = Reason.CODE_REPOSITORY_PARTIAL;
+                if (commitReason == null && commits.ambiguousDates().contains(date)) commitReason = Reason.CODE_AUTHOR_PARTIAL;
+                else if (commitReason == null && commits.repositoriesPartial()) commitReason = Reason.CODE_REPOSITORY_PARTIAL;
                 days.add(new Day(user, date, hours, eligible, overtime.hours(), overtime.days(),
                         contribution == null ? 0 : contribution.commits(), contribution == null ? 0 : contribution.additions(),
                         contribution == null ? 0 : contribution.deletions(), worklogReason, commitReason, linesReason));

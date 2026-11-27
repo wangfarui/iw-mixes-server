@@ -374,7 +374,7 @@ class WorklogQueryService {
                 var source = mirror.source(context, workbenchTeamId, member);
                 var problem = mirror.problem(source, from, toExclusive);
                 boolean failed = source == null || source.blocked() || source.through() == 0;
-                List<Worklog> rows = failed ? List.of() : mirror.rows(context, workbenchTeamId, List.of(member), from, toExclusive, null, 100_001);
+                List<Worklog> rows = mirror.rows(context, workbenchTeamId, List.of(member), from, toExclusive, null, 100_001);
                 if (rows.size() > 100_000) problem = new WorklogMirror.ReadProblem("PAGE_LIMIT", "本地工时记录超过单次统计保护上限");
                 return new MemberLogs(member.userId(), member.token(), rows, problem != null, failed, problem);
             }).toList();

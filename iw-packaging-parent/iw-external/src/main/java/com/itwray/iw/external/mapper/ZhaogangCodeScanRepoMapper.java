@@ -70,6 +70,54 @@ public interface ZhaogangCodeScanRepoMapper extends BaseMapper<ScanRepoEntity> {
             @Param("depotId") long depotId, @Param("signature") String signature,
             @Param("from") java.time.LocalDate from, @Param("jobId") long jobId);
 
+    @Select("""
+            SELECT r.* FROM external_zhaogang_code_scan_repo r
+            JOIN external_zhaogang_code_scan_job j ON j.id=r.job_id
+            WHERE j.coding_team_id=#{org} AND r.depot_id=#{depotId} AND j.id<>#{jobId}
+              AND j.sync_from=#{from} AND j.sync_to<=#{to}
+              AND j.scan_mode IN ('SYNC','SYNC_V2','SNAPSHOT_V1')
+              AND r.sync_state IS NOT NULL AND r.sync_state NOT LIKE 'rescan2:%'
+              AND r.shared_checkpoint=#{shared}
+              AND (#{shared} OR r.status='COMPLETED')
+            ORDER BY j.sync_to DESC,r.update_time DESC,j.id DESC LIMIT 1
+            """)
+    ScanRepoEntity selectRepositoryCheckpoint(@Param("org") long org, @Param("depotId") long depotId,
+            @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to,
+            @Param("jobId") long jobId, @Param("shared") boolean shared);
+
+    @Update("""
+            UPDATE external_zhaogang_code_scan_repo SET sync_state=#{state},shared_checkpoint=1,update_time=current_timestamp
+            WHERE job_id=#{jobId} AND depot_id=#{depotId}
+            """)
+    int saveRepositoryCheckpoint(@Param("jobId") long jobId, @Param("depotId") long depotId,
+                                 @Param("state") String state);
+
+    @Delete("""
+            DELETE p FROM external_zhaogang_code_checkpoint_part p
+            JOIN external_zhaogang_code_scan_repo r ON r.job_id=p.job_id AND r.depot_id=p.depot_id
+            JOIN external_zhaogang_code_scan_job j ON j.id=r.job_id
+            JOIN external_zhaogang_code_scan_repo kept ON kept.job_id=#{jobId} AND kept.depot_id=r.depot_id
+            WHERE j.coding_team_id=#{org} AND r.depot_id=#{depotId} AND p.job_id<>#{jobId}
+              AND j.sync_from=#{from} AND j.sync_to<=#{to}
+              AND r.shared_checkpoint=1 AND j.status NOT IN ('RUNNING','QUEUED')
+              AND kept.sync_state IS NOT NULL AND kept.sync_state NOT LIKE 'rescan2:%'
+            """)
+    int deleteSupersededRepositoryParts(@Param("org") long org, @Param("depotId") long depotId,
+            @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to, @Param("jobId") long jobId);
+
+    @Update("""
+            UPDATE external_zhaogang_code_scan_repo r
+            JOIN external_zhaogang_code_scan_job j ON j.id=r.job_id
+            JOIN external_zhaogang_code_scan_repo kept ON kept.job_id=#{jobId} AND kept.depot_id=r.depot_id
+            SET r.sync_state=NULL
+            WHERE j.coding_team_id=#{org} AND r.depot_id=#{depotId} AND r.job_id<>#{jobId}
+              AND j.sync_from=#{from} AND j.sync_to<=#{to}
+              AND r.shared_checkpoint=1 AND r.sync_state IS NOT NULL AND j.status NOT IN ('RUNNING','QUEUED')
+              AND kept.sync_state IS NOT NULL AND kept.sync_state NOT LIKE 'rescan2:%'
+            """)
+    int retireSupersededRepositoryCheckpoints(@Param("org") long org, @Param("depotId") long depotId,
+            @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to, @Param("jobId") long jobId);
+
     @Update("""
             update external_zhaogang_code_scan_repo set sync_state=#{state}, update_time=current_timestamp
              where job_id=#{jobId} and depot_id=#{depotId}

@@ -91,7 +91,7 @@ public class CodingRequestLimiter {
             case ISSUE_ACTION -> issueWindow;
             case WORKLOG_ACTION -> worklogWindow;
             case "DescribeGitCommitsInPage" -> commitWindow;
-            case "DescribeGitCommitDiff" -> diffWindow;
+            case "DescribeGitCommitDiff", "DescribeGitCommitInfo", "DescribeChangeBetween2Commit" -> diffWindow;
             default -> RateWindow.NONE;
         };
     }

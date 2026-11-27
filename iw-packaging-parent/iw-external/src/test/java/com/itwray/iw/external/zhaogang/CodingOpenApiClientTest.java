@@ -33,6 +33,40 @@ class CodingOpenApiClientTest {
     }
 
     @Test
+    void commitComparisonUsesTheVerifiedDirectionAndRequiresCompleteCounts() throws Exception {
+        String sha = "a".repeat(40);
+        String parent = "b".repeat(40);
+        var calls = new java.util.ArrayList<JsonNode>();
+        CodingOpenApiClient client = client(exchange -> {
+            var request = objectMapper.readTree(exchange.getRequestBody());
+            calls.add(request);
+            if ("DescribeGitCommitInfo".equals(request.path("Action").asText())) {
+                respond(exchange, """
+                        {"Response":{"GitCommit":{"Sha":"%s","Parents":["%s"]}}}
+                        """.formatted(sha, parent));
+            } else if (calls.size() == 2) {
+                respond(exchange, """
+                        {"Response":{"Change":{"Insertions":6197,"Deletions":3086,"FilesChanged":98}}}
+                        """);
+            } else {
+                respond(exchange, """
+                        {"Response":{"Change":{"Insertions":6197,"FilesChanged":98}}}
+                        """);
+            }
+        });
+
+        assertEquals(List.of(parent), client.commitParents("synthetic-token", 91L, sha));
+        assertEquals(new CodingOpenApiPort.CodingCommitDiff(6197, 3086, 98),
+                client.compareCommitLines("synthetic-token", 91L, sha, parent));
+        assertEquals("DescribeChangeBetween2Commit", calls.get(1).path("Action").asText());
+        assertEquals(91L, calls.get(1).path("DepotId").asLong());
+        assertEquals(sha, calls.get(1).path("Source").asText());
+        assertEquals(parent, calls.get(1).path("Target").asText());
+        org.junit.jupiter.api.Assertions.assertThrows(CodingOpenApiException.class,
+                () -> client.compareCommitLines("synthetic-token", 91L, sha, parent));
+    }
+
+    @Test
     void parentDeletionGuardRejectsChildrenOutsideReviewedScope() throws Exception {
         var client = client(exchange -> {
             var request = objectMapper.readTree(exchange.getRequestBody());

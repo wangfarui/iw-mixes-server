@@ -17,6 +17,7 @@ class CodeStatsModuleContextTest {
     void springCreatesModuleWithItsProductionDependencies() {
         new ApplicationContextRunner()
                 .withBean(CodeStatsScopeDirectory.class, () -> mock(CodeStatsScopeDirectory.class))
+                .withBean(CodeRepositoryAccess.class, () -> mock(CodeRepositoryAccess.class))
                 .withBean(CodingOpenApiPort.class, () -> mock(CodingOpenApiPort.class))
                 .withBean(ZhaogangCodeScanJobMapper.class, () -> mock(ZhaogangCodeScanJobMapper.class))
                 .withBean(ZhaogangCodeScanRepoMapper.class, () -> mock(ZhaogangCodeScanRepoMapper.class))

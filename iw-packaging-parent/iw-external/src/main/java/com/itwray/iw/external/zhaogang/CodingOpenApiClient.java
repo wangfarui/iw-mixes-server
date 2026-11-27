@@ -198,6 +198,55 @@ class CodingOpenApiClient implements CodingOpenApiPort {
         return new CodingCommitDiff(additions, deletions, diffs.size(), fileTypes);
     }
 
+    @Override
+    public List<String> commitParents(String token, long depotId, String sha) {
+        String action = "DescribeGitCommitInfo";
+        JsonNode response = invoke(token, action, Map.of("DepotId", depotId, "Sha", sha),
+                Math.max(1, properties.getCodeDiffMaxBytes()));
+        JsonNode commit = response.path("GitCommit");
+        if (commit.isMissingNode()) commit = response.path("Data").path("GitCommit");
+        List<String> parentShas = parents(commit);
+        if (!sha.equalsIgnoreCase(commit.path("Sha").asText()) || !commit.path("Parents").isArray()
+                || parentShas.size() != commit.path("Parents").size()
+                || parentShas.stream().anyMatch(parent -> !parent.matches("[a-fA-F0-9]{40}|[a-fA-F0-9]{64}")
+                        || parent.equalsIgnoreCase(sha))) {
+            throw invalidComparison(action);
+        }
+        return List.copyOf(parentShas);
+    }
+
+    @Override
+    public CodingCommitDiff compareCommitLines(String token, long depotId, String sha, String parentSha) {
+        String action = "DescribeChangeBetween2Commit";
+        // CODING 实测方向：当前提交放 Source，父提交放 Target。
+        JsonNode response = invoke(token, action, Map.of("DepotId", depotId, "Source", sha, "Target", parentSha),
+                Math.max(1, properties.getCodeDiffMaxBytes()));
+        JsonNode change = response.path("Change");
+        if (change.isMissingNode()) change = response.path("Data").path("Change");
+        if (change.isArray() && change.size() == 1) change = change.get(0);
+        int additions = comparisonCount(change.path("Insertions"), action);
+        int deletions = comparisonCount(change.path("Deletions"), action);
+        JsonNode filesChanged = change.path("FilesChanged");
+        JsonNode updateFileNum = change.path("UpdateFileNum");
+        int files = comparisonCount(filesChanged.isMissingNode() ? updateFileNum : filesChanged, action);
+        if ((!updateFileNum.isMissingNode() && comparisonCount(updateFileNum, action) != files)
+                || (files == 0 && (additions > 0 || deletions > 0))) {
+            throw invalidComparison(action);
+        }
+        return new CodingCommitDiff(additions, deletions, files);
+    }
+
+    private int comparisonCount(JsonNode value, String action) {
+        if (!value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() < 0) {
+            throw invalidComparison(action);
+        }
+        return value.intValue();
+    }
+
+    private CodingOpenApiException invalidComparison(String action) {
+        return new CodingOpenApiException(action, "InvalidDiffResponse", "CODING 未返回可用的提交比较数据");
+    }
+
     private String diffPath(JsonNode diff, String... keys) {
         String path = text(diff, keys);
         return "/dev/null".equals(path) ? null : path;
@@ -770,7 +819,8 @@ class CodingOpenApiClient implements CodingOpenApiPort {
 
     private JsonNode invoke(String token, String action, Map<String, Object> parameters, long maxResponseBytes) {
         boolean repositoryRead = java.util.Set.of("DescribeMyDepots", "DescribeProjectDepotBranches",
-                "DescribeGitCommitsInPage", "DescribeGitCommitDiff").contains(action);
+                "DescribeGitCommitsInPage", "DescribeGitCommitDiff", "DescribeGitCommitInfo",
+                "DescribeChangeBetween2Commit").contains(action);
         boolean protectedRead = CodingRequestLimiter.WORKLOG_ACTION.equals(action)
                 || CodingRequestLimiter.ISSUE_ACTION.equals(action);
         long deadline = protectedRead

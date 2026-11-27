@@ -439,6 +439,7 @@ create table external_zhaogang_code_scan_repo
     depot_name           varchar(128)    not null comment '仓库名称',
     web_url              varchar(512)    not null default '' comment '仓库Web地址，用于拼接提交链接',
     sync_state longtext NULL,
+    shared_checkpoint tinyint NOT NULL DEFAULT 0,
     branch_count         int unsigned default 0 not null comment '本次发现的分支数',
     commit_count         int unsigned default 0 not null comment '本次去重提交数',
     status               varchar(16)     not null comment 'PENDING/RUNNING/COMPLETED/FAILED/SKIPPED',
@@ -448,7 +449,8 @@ create table external_zhaogang_code_scan_repo
     update_time          datetime default current_timestamp not null on update current_timestamp,
     primary key (id),
     unique key uk_job_depot (job_id, depot_id),
-    key idx_job_status (job_id, status)
+    key idx_job_status (job_id, status),
+    key idx_depot_checkpoint (depot_id, shared_checkpoint, job_id)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码扫描仓库检查点';
 
 CREATE TABLE IF NOT EXISTS external_zhaogang_code_checkpoint_part
@@ -757,6 +759,7 @@ CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_issue_snapshot (
     issue_code BIGINT NOT NULL,
     issue_json MEDIUMTEXT NOT NULL,
     checked_at BIGINT NOT NULL,
+    credential_fingerprint CHAR(64) NOT NULL DEFAULT '',
     PRIMARY KEY (source_key, project_name, issue_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -1453,6 +1456,184 @@ BEGIN
         ON DUPLICATE KEY UPDATE version_no = version_no + 1,
             visibility_version = visibility_version + VALUES(visibility_version),
             code_visibility_ms = GREATEST(code_visibility_ms, VALUES(code_visibility_ms));
+    END IF;
+END$$
+
+DELIMITER ;
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_shared_code_commit
+(
+    id                   bigint unsigned not null auto_increment comment '提交统计行ID',
+    coding_team_id       bigint unsigned not null comment 'CODING顶层团队ID',
+    scope_type           varchar(16)     not null default 'SHARED',
+    scope_id             bigint unsigned not null default 0,
+    month                char(7)         not null comment '提交所属自然月 YYYY-MM',
+    project_id           bigint unsigned not null comment 'CODING项目ID',
+    project_name         varchar(128)    not null comment 'CODING项目路径/名称',
+    project_display_name varchar(128)    not null default '' comment '项目展示名快照',
+    depot_id             bigint unsigned not null comment 'CODING仓库ID',
+    depot_name           varchar(128)    not null comment '仓库名称',
+    sha                  varchar(64)     not null comment 'Git提交SHA',
+    short_sha            varchar(12)     not null comment '短SHA',
+    author_name          varchar(128)    not null default '' comment 'Git作者名，仅展示',
+    author_email_hash    char(64)        null comment '作者邮箱SHA-256，不存明文邮箱',
+    author_name_key      varchar(64)     not null default '' comment '归一化作者名SHA-256，空名不参与匹配',
+    commit_at            datetime        not null comment '作者提交时间（Asia/Shanghai）',
+    commit_date          date            not null comment '作者提交日期（Asia/Shanghai）',
+    message              varchar(1024)   not null default '' comment '提交说明，截断保存，仅纯文本展示',
+    branch_names         text            null comment '该提交出现过的分支名JSON数组，最多50个',
+    branch_count         int unsigned default 0 not null comment '该提交出现过的分支数',
+    branch_truncated     tinyint(1) default 0 not null comment '分支名是否因上限截断',
+    additions            bigint unsigned null comment '新增行数；null=未统计',
+    deletions            bigint unsigned null comment '删除行数；null=未统计',
+    files_changed        int unsigned    null comment '修改文件数；null=未统计',
+    file_type_stats      json            null comment '各扩展名新增与删除行数，SQL NULL 表示未统计',
+    file_types_checked_at datetime       null comment '历史文件类型最近一次补算时间',
+    diff_status          varchar(24)     not null comment 'PENDING/OK/SKIPPED_UNMAPPED/SKIPPED_MERGE/SKIPPED_REPOSITORY/FAILED/TOO_LARGE',
+    diff_retry_attempts  tinyint unsigned not null default 0,
+    diff_retry_after     datetime         null,
+    diff_retry_credential_signature char(64) null,
+    diff_retry_error     varchar(32)      null,
+    is_merge             tinyint(1) default 0 not null comment '是否合并提交（Parents>1）',
+    commit_url           varchar(768)    not null default '' comment 'CODING提交Web地址',
+    last_seen_scan_id    bigint unsigned not null default 0 comment '最近一次看到该提交的全量扫描任务ID',
+    create_time          datetime default current_timestamp not null,
+    update_time          datetime default current_timestamp not null on update current_timestamp,
+    author_conflict tinyint NOT NULL DEFAULT 0,
+    primary key (id),
+    unique key uk_org_depot_sha (coding_team_id, depot_id, sha),
+    key idx_org_commit_date (coding_team_id, commit_date, depot_id),
+    key idx_code_scope_date (coding_team_id, scope_type, scope_id, commit_date),
+    key idx_code_diff_retry (coding_team_id, scope_type, scope_id, diff_status, commit_date),
+    key idx_scope_month_date (coding_team_id, scope_type, scope_id, month, commit_date),
+    key idx_scope_month_depot (coding_team_id, scope_type, scope_id, month, depot_id),
+    key idx_scope_month_email (coding_team_id, scope_type, scope_id, month, author_email_hash),
+    key idx_scope_month_name (coding_team_id, scope_type, scope_id, month, author_name_key),
+    key idx_scope_seen (coding_team_id, scope_type, scope_id, month, last_seen_scan_id)
+) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码提交统计缓存';
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_code_diff_attempt (
+    commit_id BIGINT UNSIGNED NOT NULL,
+    credential_fingerprint CHAR(64) CHARACTER SET ascii NOT NULL,
+    read_method VARCHAR(12) CHARACTER SET ascii NOT NULL,
+    failure_reason VARCHAR(32) CHARACTER SET ascii NOT NULL,
+    terminal TINYINT(1) NOT NULL,
+    PRIMARY KEY (commit_id, credential_fingerprint, read_method),
+    CONSTRAINT fk_zg_diff_attempt_commit FOREIGN KEY (commit_id)
+        REFERENCES external_zhaogang_shared_code_commit (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_project (
+    source_key CHAR(64) NOT NULL,
+    project_name VARCHAR(255) NOT NULL,
+    credential_fingerprint CHAR(64) NOT NULL,
+    synced_through BIGINT NOT NULL DEFAULT 0,
+    history_before BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (source_key, project_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_worklog_access (
+    coding_team_id BIGINT NOT NULL,
+    credential_fingerprint CHAR(64) NOT NULL,
+    project_names JSON NOT NULL,
+    revision BIGINT NOT NULL DEFAULT 1,
+    checked_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (coding_team_id, credential_fingerprint)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS external_zhaogang_code_access (
+    coding_team_id BIGINT UNSIGNED NOT NULL,
+    credential_fingerprint CHAR(64) NOT NULL,
+    depot_ids JSON NOT NULL,
+    checked_at BIGINT NOT NULL,
+    complete TINYINT NOT NULL,
+    PRIMARY KEY (coding_team_id, credential_fingerprint)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DELIMITER $$
+CREATE TRIGGER IF NOT EXISTS zg_stats_wl_proj_i AFTER INSERT ON external_zhaogang_worklog_project
+FOR EACH ROW
+BEGIN
+
+    INSERT INTO external_zhaogang_statistics_revision
+        (coding_team_id, stat_month, version_no, visibility_version, code_visibility_ms)
+    SELECT coding_team_id, '*', 1, 1, 0 FROM external_zhaogang_worklog_source WHERE source_key=NEW.source_key
+    ON DUPLICATE KEY UPDATE version_no=version_no+1, visibility_version=visibility_version+1;
+
+END$$
+
+CREATE TRIGGER IF NOT EXISTS zg_stats_wl_proj_u AFTER UPDATE ON external_zhaogang_worklog_project
+FOR EACH ROW
+BEGIN
+    IF NEW.credential_fingerprint<>OLD.credential_fingerprint THEN
+    INSERT INTO external_zhaogang_statistics_revision
+        (coding_team_id, stat_month, version_no, visibility_version, code_visibility_ms)
+    SELECT coding_team_id, '*', 1, 1, 0 FROM external_zhaogang_worklog_source WHERE source_key=NEW.source_key
+    ON DUPLICATE KEY UPDATE version_no=version_no+1, visibility_version=visibility_version+1;
+    END IF;
+END$$
+
+CREATE TRIGGER IF NOT EXISTS zg_stats_shared_commit_i AFTER INSERT ON external_zhaogang_shared_code_commit
+FOR EACH ROW
+BEGIN
+    IF NEW.scope_type = 'SHARED' THEN
+        INSERT INTO external_zhaogang_statistics_revision
+            (coding_team_id, stat_month, version_no, visibility_version, code_visibility_ms)
+        SELECT NEW.coding_team_id, NEW.month, 1, 0, 0 WHERE (NEW.coding_team_id) IS NOT NULL
+        ON DUPLICATE KEY UPDATE version_no = version_no + 1,
+            visibility_version = visibility_version + VALUES(visibility_version),
+            code_visibility_ms = GREATEST(code_visibility_ms, VALUES(code_visibility_ms));
+    END IF;
+END$$
+
+CREATE TRIGGER IF NOT EXISTS zg_stats_shared_commit_u AFTER UPDATE ON external_zhaogang_shared_code_commit
+FOR EACH ROW
+BEGIN
+    IF NEW.scope_type = 'SHARED' AND (NOT (NEW.commit_at <=> OLD.commit_at)
+        OR NOT (NEW.author_email_hash <=> OLD.author_email_hash)
+        OR NOT (NEW.author_name_key <=> OLD.author_name_key) OR NEW.is_merge <> OLD.is_merge OR NEW.author_conflict <> OLD.author_conflict
+        OR NEW.depot_name <> OLD.depot_name OR (NEW.diff_status = 'DIFF_PERMISSION_DENIED'
+        AND OLD.diff_status <> NEW.diff_status)) THEN
+        INSERT INTO external_zhaogang_statistics_revision
+            (coding_team_id, stat_month, version_no, visibility_version, code_visibility_ms)
+        SELECT NEW.coding_team_id, '*', 1, 1, 0 WHERE (NEW.coding_team_id) IS NOT NULL
+        ON DUPLICATE KEY UPDATE version_no = version_no + 1,
+            visibility_version = visibility_version + VALUES(visibility_version),
+            code_visibility_ms = GREATEST(code_visibility_ms, VALUES(code_visibility_ms));
+    ELSEIF NEW.scope_type = 'SHARED' AND (NOT (NEW.additions <=> OLD.additions)
+        OR NOT (NEW.deletions <=> OLD.deletions) OR NEW.diff_status <> OLD.diff_status) THEN
+        INSERT INTO external_zhaogang_statistics_revision
+            (coding_team_id, stat_month, version_no, visibility_version, code_visibility_ms)
+        SELECT NEW.coding_team_id, NEW.month, 1, 0, 0 WHERE (NEW.coding_team_id) IS NOT NULL
+        ON DUPLICATE KEY UPDATE version_no = version_no + 1,
+            visibility_version = visibility_version + VALUES(visibility_version),
+            code_visibility_ms = GREATEST(code_visibility_ms, VALUES(code_visibility_ms));
+    END IF;
+END$$
+
+CREATE TRIGGER IF NOT EXISTS zg_stats_shared_commit_d AFTER DELETE ON external_zhaogang_shared_code_commit
+FOR EACH ROW
+BEGIN
+    IF OLD.scope_type = 'SHARED' THEN
+        INSERT INTO external_zhaogang_statistics_revision
+            (coding_team_id, stat_month, version_no, visibility_version, code_visibility_ms)
+        SELECT OLD.coding_team_id, '*', 1, 1, 0 WHERE (OLD.coding_team_id) IS NOT NULL
+        ON DUPLICATE KEY UPDATE version_no = version_no + 1,
+            visibility_version = visibility_version + VALUES(visibility_version),
+            code_visibility_ms = GREATEST(code_visibility_ms, VALUES(code_visibility_ms));
+    END IF;
+END$$
+
+
+CREATE TRIGGER IF NOT EXISTS zg_stats_shared_scan_u AFTER UPDATE ON external_zhaogang_code_scan_job
+FOR EACH ROW
+BEGIN
+    IF NEW.scope_type='SELF' AND NEW.scan_mode IN ('SYNC','SYNC_V2','SNAPSHOT_V1')
+       AND NEW.status<>OLD.status AND NEW.status IN ('COMPLETED','PARTIAL') THEN
+        INSERT INTO external_zhaogang_statistics_revision
+            (coding_team_id,stat_month,version_no,visibility_version,code_visibility_ms)
+        VALUES (NEW.coding_team_id,'*',1,0,0)
+        ON DUPLICATE KEY UPDATE version_no=version_no+1;
     END IF;
 END$$
 
