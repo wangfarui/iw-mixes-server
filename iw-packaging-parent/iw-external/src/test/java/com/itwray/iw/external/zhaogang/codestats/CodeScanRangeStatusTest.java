@@ -88,4 +88,34 @@ class CodeScanRangeStatusTest {
             verify(commits).selectDiffFailures(100,"SELF",1,LocalDate.parse("2026-11-01"),LocalDate.parse("2026-11-30"));
         } finally {service.shutdown();}
     }
+
+    @Test
+    void sharedMonthsAndSyncSummaryReuseTheLatestRepositorySyncTime() {
+        var access = mock(CodeRepositoryAccess.class);
+        var worker = mock(CodeScanWorker.class);
+        when(worker.repositoryAccess()).thenReturn(access);
+        var catalog = new CodeRepositoryAccess.Catalog(Set.of(7L), true, 1);
+        when(access.visible(scope)).thenReturn(catalog);
+        var syncedAt = LocalDateTime.parse("2026-11-04T10:30:00");
+        when(access.latestSyncedAt(100, catalog)).thenReturn(syncedAt);
+        when(access.coverage(100, catalog, LocalDate.of(2026, 10, 25), LocalDate.of(2026, 10, 31), syncedAt))
+                .thenReturn(new CodeRepositoryAccess.Coverage(true, true, syncedAt));
+        when(access.coverage(100, catalog, LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 4), syncedAt))
+                .thenReturn(new CodeRepositoryAccess.Coverage(true, false, syncedAt));
+        var identities = mock(CodeIdentityResolver.class);
+        when(identities.organizationMappings(100)).thenReturn(List.of());
+        var service = new CodeScanService(jobs, repos, commits, mock(CodeStatsViewCache.class),
+                worker, new ZhaogangProperties(), identities, clock);
+        try {
+            var state = service.scanState(scope, CodeRange.parse("2026-10-25", "2026-11-04", 24, clock));
+            assertEquals(List.of("PARTIAL", "COMPLETED"), state.months().stream().map(CodeStatsModels.ScanMonth::status).toList());
+            assertEquals(CodeStatsSupport.format(syncedAt), state.sync().lastFinishedAt());
+            assertTrue(state.months().stream().allMatch(month -> state.sync().lastFinishedAt().equals(month.lastSuccessfulAt())));
+            verify(access).latestSyncedAt(100, catalog);
+            verify(access, times(2)).coverage(eq(100L), eq(catalog), any(LocalDate.class), any(LocalDate.class), eq(syncedAt));
+            verify(access, never()).coverage(anyLong(), any(), any(), any());
+        } finally {
+            service.shutdown();
+        }
+    }
 }

@@ -100,25 +100,27 @@ class CodeScanService implements CodeBackfillTrigger {
         List<ScanMonth> months = new ArrayList<>();
         var access = worker.repositoryAccess();
         var catalog = access == null ? null : access.visible(scope);
+        var syncedAt = catalog == null ? null : access.latestSyncedAt(scope.codingTeamId(), catalog);
         for (YearMonth month : range.months()) {
             var scoped = scanMonth(scope, month, range);
-            months.add(catalog == null ? scoped : sharedMonth(scope, range, month, scoped, access, catalog));
+            months.add(catalog == null ? scoped : sharedMonth(scope, range, month, scoped, access, catalog, syncedAt));
         }
         boolean anyAvailable = months.stream().anyMatch(month -> month.retryAfterSeconds() == 0
                 && !STATUS_RUNNING.equals(month.status()) && !STATUS_QUEUED.equals(month.status()));
         long retryAfter = anyAvailable ? 0 : months.stream().mapToLong(ScanMonth::retryAfterSeconds)
                 .filter(value -> value > 0).min().orElse(0);
         return new ScanState(scope.scope().name(), scope.scope() == Scope.WORKBENCH_TEAM ? scope.scopeId() : null,
-                range.view(), aggregateStatus(months), months, retryAfter, syncInfo(scope));
+                range.view(), aggregateStatus(months), months, retryAfter, syncInfo(scope, catalog != null, syncedAt));
     }
 
     private ScanMonth sharedMonth(CodeStatsModule.ScopeInfo scope, CodeRange range, YearMonth month,
-                                  ScanMonth task, CodeRepositoryAccess access, CodeRepositoryAccess.Catalog catalog) {
+                                  ScanMonth task, CodeRepositoryAccess access, CodeRepositoryAccess.Catalog catalog,
+                                  LocalDateTime latestSyncedAt) {
         LocalDate from = range.from().isAfter(month.atDay(1)) ? range.from() : month.atDay(1);
         LocalDate to = range.to().isBefore(month.atEndOfMonth()) ? range.to() : month.atEndOfMonth();
         LocalDate today = LocalDate.now(clock);
         if (to.isAfter(today)) to = today;
-        var coverage = access.coverage(scope.codingTeamId(), catalog, from, to);
+        var coverage = access.coverage(scope.codingTeamId(), catalog, from, to, latestSyncedAt);
         boolean active = STATUS_RUNNING.equals(task.status()) || STATUS_QUEUED.equals(task.status());
         var syncedAt = CodeStatsSupport.format(coverage.syncedAt());
         boolean ready = coverage.ready();
@@ -148,16 +150,13 @@ class CodeScanService implements CodeBackfillTrigger {
         };
     }
 
-    private CodeStatsModels.SyncInfo syncInfo(CodeStatsModule.ScopeInfo scope) {
+    private CodeStatsModels.SyncInfo syncInfo(CodeStatsModule.ScopeInfo scope, boolean shared, LocalDateTime latestSyncedAt) {
         ScanJobEntity latest = jobMapper.selectLatestSync(scope.codingTeamId(), scope.scope().name(), scope.scopeId());
         boolean enabled = properties.isCodeSyncEnabled() && scope.automaticSyncEligible() && hasToken(scope);
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime next = now.toLocalDate().atStartOfDay().plusHours((now.getHour() / 3 + 1) * 3L);
         String nextSyncAt = enabled ? CodeStatsSupport.format(next) : null;
-        var access = worker.repositoryAccess();
-        String lastSuccess = access == null ? latest == null ? null : CodeStatsSupport.format(latest.getFinishedAt())
-                : CodeStatsSupport.format(access.coverage(scope.codingTeamId(), access.visible(scope),
-                    LocalDate.parse(properties.getCodeSyncFrom()), now.toLocalDate()).syncedAt());
+        String lastSuccess = CodeStatsSupport.format(shared ? latestSyncedAt : latest == null ? null : latest.getFinishedAt());
         if (latest == null) {
             return new CodeStatsModels.SyncInfo(enabled, properties.getCodeSyncFrom(), null, lastSuccess, nextSyncAt, "NOT_STARTED", 0);
         }

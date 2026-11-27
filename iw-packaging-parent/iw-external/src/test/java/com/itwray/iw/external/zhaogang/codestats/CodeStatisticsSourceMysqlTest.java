@@ -18,9 +18,11 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -97,6 +99,69 @@ class CodeStatisticsSourceMysqlTest {
                 jdbc.update("DELETE FROM external_zhaogang_" + table + " WHERE coding_team_id=?", ORG);
             }
         }
+    }
+
+    @Test
+    void coverageUsesVisibleCompletedRepositoriesAndOneCheckpointPerRange() {
+        var dataSource = new DriverManagerDataSource(System.getenv("IW_STATISTICS_TEST_JDBC_URL"), "root",
+                System.getenv().getOrDefault("IW_SHARED_MYSQL_TEST_PASSWORD", ""));
+        var jdbc = new JdbcTemplate(dataSource);
+        var transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        var access = new CodeRepositoryAccess(new NamedParameterJdbcTemplate(dataSource), transactions,
+                new ObjectMapper(), mock(CodingOpenApiPort.class));
+        var from = LocalDate.of(2026, 11, 1);
+        var to = from.plusDays(9);
+        var lastFinished = to.atTime(15, 0);
+        try {
+            transactions.executeWithoutResult(transaction -> {
+                transaction.setRollbackOnly();
+                insertScan(jdbc, ORG, 1, "SYNC", "COMPLETED", false, from, to, lastFinished);
+                insertScan(jdbc, ORG, 1, "SYNC_V2", "COMPLETED", true, from, to, lastFinished.minusHours(1));
+                insertScan(jdbc, ORG, 2, "SNAPSHOT_V1", "COMPLETED", true, from, to, lastFinished.minusHours(2));
+                insertScan(jdbc, ORG, 3, "SYNC_V2", "COMPLETED", true, from, from.plusDays(3), lastFinished.minusHours(1));
+                insertScan(jdbc, ORG, 3, "SYNC_V2", "COMPLETED", true, from.plusDays(4), to, lastFinished.minusHours(1));
+                insertScan(jdbc, ORG, 3, "SYNC_V2", "FAILED", true, from, to, lastFinished.plusHours(4));
+                insertScan(jdbc, ORG, 3, "SYNC_V2", "COMPLETED", true, from, to, null);
+                insertScan(jdbc, ORG, 3, "FULL", "COMPLETED", true, from, to, lastFinished.plusHours(3));
+                insertScan(jdbc, ORG + 1, 3, "SYNC_V2", "COMPLETED", true, from, to, lastFinished.plusHours(2));
+                insertScan(jdbc, ORG, 4, "SYNC_V2", "COMPLETED", true, from, to, lastFinished.plusHours(1));
+
+                var covered = new CodeRepositoryAccess.Catalog(Set.of(1L, 2L), true, 0);
+                assertThat(access.coverage(ORG, covered, from, to))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(true, false, lastFinished));
+                assertThat(access.coverage(ORG, covered, from, to, lastFinished.minusHours(2)))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(true, true, lastFinished.minusHours(2)));
+                assertThat(access.coverage(ORG, covered, from, to.plusDays(1)))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(true, true, lastFinished));
+                assertThat(access.coverage(ORG, new CodeRepositoryAccess.Catalog(Set.of(1L, 3L), true, 0), from, to))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(true, true, lastFinished));
+                assertThat(access.coverage(ORG, new CodeRepositoryAccess.Catalog(Set.of(1L), false, 0), from, to))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(true, true, lastFinished));
+                assertThat(access.coverage(ORG, new CodeRepositoryAccess.Catalog(Set.of(5L), true, 0), from, to))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(false, true, null));
+                assertThat(access.coverage(ORG, new CodeRepositoryAccess.Catalog(Set.of(), true, 0), from, to))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(true, false, null));
+                assertThat(access.coverage(ORG, new CodeRepositoryAccess.Catalog(Set.of(), false, 0), from, to))
+                        .isEqualTo(new CodeRepositoryAccess.Coverage(false, true, null));
+            });
+        } finally {
+            access.shutdown();
+        }
+    }
+
+    private static void insertScan(JdbcTemplate jdbc, long org, long depot, String mode, String status, boolean shared,
+                                   LocalDate from, LocalDate to, LocalDateTime finishedAt) {
+        jdbc.update("""
+                INSERT INTO external_zhaogang_code_scan_job
+                (coding_team_id,scope_type,scope_id,month,scan_mode,status,stage,requested_mode,requested_by,
+                 sync_from,sync_to,finished_at)
+                VALUES (?, 'SELF', 1, '2026-11', ?, 'PARTIAL', 'DONE', 'MANUAL', 1, ?, ?, ?)
+                """, org, mode, from, to, finishedAt);
+        jdbc.update("""
+                INSERT INTO external_zhaogang_code_scan_repo
+                (job_id,project_id,project_name,depot_id,depot_name,status,shared_checkpoint)
+                VALUES (LAST_INSERT_ID(),10,'fixture',?,'repo',?,?)
+                """, depot, status, shared);
     }
 
     private static void insertGrant(JdbcTemplate jdbc, String fingerprint, String depots) {

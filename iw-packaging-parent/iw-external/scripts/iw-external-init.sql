@@ -425,6 +425,8 @@ create table external_zhaogang_code_scan_job
     unique key uk_code_active_scope (active_scope_key),
     key idx_scope_month_time (coding_team_id, scope_type, scope_id, month, create_time),
     key idx_code_sync_scope (coding_team_id, scope_type, scope_id, scan_mode, id),
+    key idx_code_coverage_finished (coding_team_id, finished_at, scan_mode),
+    key idx_code_coverage_range (coding_team_id, sync_to, sync_from, scan_mode, finished_at),
     key idx_status_heartbeat (status, heartbeat_at)
 ) engine = InnoDB default charset = utf8mb4 comment '找钢工作台代码扫描任务';
 

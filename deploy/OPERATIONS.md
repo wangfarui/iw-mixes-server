@@ -269,6 +269,8 @@ journalctl -u iw-external -p err -n 100 --no-pager
 
 自动补算默认开启。设 `IW_ZHAOGANG_CODE_AUTO_DIFF_RETRY_ENABLED=false` 可暂停后台补算，手动补算仍可使用。每分钟检查空闲扫描线程，同一进程最多运行一批，每批最多五笔。失败记录可在「代码 → 数据同步 → 扫描范围与失败明细」查看。
 
+升级代码同步覆盖查询前，在 `iw-external` 使用的 MySQL 库执行 [覆盖查询索引迁移](../iw-packaging-parent/iw-external/scripts/iw-external-migrate-20261127-code-coverage-indexes.sql)。使用同一连接执行整份脚本，确认两个索引创建成功后再部署新版 `iw-external`。脚本可重复执行，只在扫描任务表新增索引。
+
 ## Nginx 日志
 
 Nginx 部署在外网机器：

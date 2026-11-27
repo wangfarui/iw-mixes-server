@@ -95,22 +95,46 @@ class CodeRepositoryAccess {
     }
 
     Coverage coverage(long org, Catalog catalog, LocalDate from, LocalDate to) {
+        return coverage(org, catalog, from, to, latestSyncedAt(org, catalog));
+    }
+
+    LocalDateTime latestSyncedAt(long org, Catalog catalog) {
+        if (catalog.depots().isEmpty()) return null;
+        // Legacy completed repositories still contribute to the latest sync time.
+        return jdbc.query("""
+                SELECT j.finished_at
+                FROM external_zhaogang_code_scan_job j FORCE INDEX (idx_code_coverage_finished)
+                WHERE j.coding_team_id=:org AND j.finished_at IS NOT NULL
+                  AND j.scan_mode IN ('SYNC','SYNC_V2','SNAPSHOT_V1')
+                  AND (SELECT 1 FROM external_zhaogang_code_scan_repo r
+                       WHERE r.job_id=j.id AND r.status='COMPLETED' AND r.depot_id IN (:depots)
+                       LIMIT 1) = 1
+                ORDER BY j.finished_at DESC
+                LIMIT 1
+                """, Map.of("org", org, "depots", catalog.depots()),
+                (rs, n) -> rs.getObject("finished_at", LocalDateTime.class)).stream().findFirst().orElse(null);
+    }
+
+    Coverage coverage(long org, Catalog catalog, LocalDate from, LocalDate to, LocalDateTime syncedAt) {
         if (catalog.depots().isEmpty()) return new Coverage(catalog.complete(), !catalog.complete(), null);
-        var scanned = jdbc.query("""
-                SELECT r.depot_id, MAX(j.finished_at) AS synced_at,
-                       SUM(r.shared_checkpoint=1 AND j.sync_from<=:from AND j.sync_to>=:to) AS covered
-                FROM external_zhaogang_code_scan_repo r
-                JOIN external_zhaogang_code_scan_job j ON j.id=r.job_id
-                WHERE j.coding_team_id=:org AND r.depot_id IN (:depots)
-                  AND j.scan_mode IN ('SYNC','SYNC_V2','SNAPSHOT_V1') AND j.finished_at IS NOT NULL
-                  AND r.status='COMPLETED'
-                GROUP BY r.depot_id
-                """, Map.of("org", org, "depots", catalog.depots(), "from", from, "to", to),
-                (rs, n) -> new Coverage(rs.getLong("covered") > 0, false,
-                        rs.getObject("synced_at", LocalDateTime.class)));
-        var syncedAt = scanned.stream().map(Coverage::syncedAt).max(LocalDateTime::compareTo).orElse(null);
-        boolean complete = catalog.complete() && scanned.size() == catalog.depots().size() && scanned.stream().allMatch(Coverage::ready);
-        return new Coverage(complete || syncedAt != null, !complete, syncedAt);
+        if (syncedAt == null) return new Coverage(false, true, null);
+        // Stop at the first missing repository. Each repository needs one checkpoint covering the entire range.
+        boolean complete = catalog.complete() && Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT NOT EXISTS (
+                    SELECT 1
+                    FROM JSON_TABLE(:depots, '$[*]' COLUMNS (depot_id BIGINT UNSIGNED PATH '$')) d
+                    WHERE (SELECT 1
+                           FROM external_zhaogang_code_scan_job j FORCE INDEX (idx_code_coverage_range)
+                           STRAIGHT_JOIN external_zhaogang_code_scan_repo r ON r.job_id=j.id AND r.depot_id=d.depot_id
+                           WHERE j.coding_team_id=:org AND j.sync_from<=:from AND j.sync_to>=:to
+                             AND j.finished_at<=:syncedAt AND j.scan_mode IN ('SYNC','SYNC_V2','SNAPSHOT_V1')
+                             AND r.status='COMPLETED' AND r.shared_checkpoint=1
+                           ORDER BY j.sync_to DESC
+                           LIMIT 1) IS NULL
+                )
+                """, Map.of("org", org, "depots", encode(catalog.depots()), "from", from, "to", to,
+                "syncedAt", syncedAt), Boolean.class));
+        return new Coverage(true, !complete, syncedAt);
     }
 
     void requestVerification(CodeStatsModule.ScopeInfo scope) {
